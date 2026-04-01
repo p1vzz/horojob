@@ -1,0 +1,4 @@
+interface:
+  display_name: "React Native"
+  short_description: "Implement mobile UI behavior and screen architecture"
+  default_prompt: "Use $react-native to implement this screen or component task using existing app patterns."

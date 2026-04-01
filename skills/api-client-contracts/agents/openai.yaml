@@ -1,0 +1,4 @@
+interface:
+  display_name: "API Client Contracts"
+  short_description: "Keep mobile request and response mapping contract-safe"
+  default_prompt: "Use $api-client-contracts to update client DTO parsing and service mappings for this endpoint change."

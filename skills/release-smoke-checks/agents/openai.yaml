@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Smoke Checks"
+  short_description: "Run focused pre-release smoke checks for mobile flows"
+  default_prompt: "Use $release-smoke-checks to validate this change set before release."

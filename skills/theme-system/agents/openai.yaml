@@ -1,0 +1,4 @@
+interface:
+  display_name: "Theme System"
+  short_description: "Apply token-based dark/light theming and palette parity"
+  default_prompt: "Use $theme-system to implement this light and dark theme change with semantic tokens."

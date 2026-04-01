@@ -1,0 +1,4 @@
+interface:
+  display_name: "Expo Runtime Debug"
+  short_description: "Diagnose Metro, runtime, and native wiring failures"
+  default_prompt: "Use $expo-runtime-debug to diagnose and fix this startup or runtime crash."

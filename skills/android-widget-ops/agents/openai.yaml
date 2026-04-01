@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android Widget Ops"
+  short_description: "Build and debug Android widget resources and provider flows"
+  default_prompt: "Use $android-widget-ops to implement this Android widget layout or provider change."

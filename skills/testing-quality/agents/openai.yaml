@@ -1,0 +1,4 @@
+interface:
+  display_name: "Testing Quality"
+  short_description: "Run focused mobile test and verify workflow"
+  default_prompt: "Use $testing-quality to add or update tests for this mobile change and run verify."

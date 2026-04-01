@@ -1,0 +1,22 @@
+<resources>
+  <string name="app_name">horojob</string>
+  <string name="morning_briefing_widget_description">Daily career briefing widget for premium users</string>
+  <string name="widget_small_vibe_label">Morning Briefing - Career Vibe (2x2)</string>
+  <string name="widget_small_score_label">Morning Briefing - Career Score (2x2)</string>
+  <string name="widget_small_energy_arc_label">Morning Briefing - Energy Arc (2x2)</string>
+  <string name="widget_small_energy_value_label">Morning Briefing - Energy Value (2x2)</string>
+  <string name="widget_small_ring_label">Morning Briefing - Ring Score (2x2)</string>
+  <string name="widget_medium_vibe_label">Morning Briefing - Main Card (4x2)</string>
+  <string name="widget_strip_peak_label">Morning Briefing - Peak Strip (4x1)</string>
+  <string name="widget_strip_minimal_label">Morning Briefing - Minimal Strip (4x1)</string>
+  <string name="widget_small_vibe_description">Compact Career Vibe card in Morning Career Briefing style.</string>
+  <string name="widget_small_score_description">Compact Career Score card with daily cosmic hints.</string>
+  <string name="widget_small_energy_arc_description">Compact energy gauge widget for Morning Career Briefing.</string>
+  <string name="widget_small_energy_value_description">Compact energy value widget for Morning Career Briefing.</string>
+  <string name="widget_small_ring_description">Compact ring score widget for Morning Career Briefing.</string>
+  <string name="widget_medium_vibe_description">Main Morning Career Briefing widget with summary and trend.</string>
+  <string name="widget_strip_peak_description">Strip widget with career vibe and peak communication time.</string>
+  <string name="widget_strip_minimal_description">Minimal strip widget with quick vibe and peak time.</string>
+  <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
+  <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+</resources>

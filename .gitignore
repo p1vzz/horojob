@@ -1,0 +1,16 @@
+.expo/
+.env
+node_modules
+google-services.json
+android/app/google-services.json
+*firebase-adminsdk*.json
+*.p8
+.metro-pid
+*.log
+*.err
+coverage/
+uidump*.xml
+settings-*.xml
+appwidget-dumpsys.txt
+RKStorage.db
+img_1.png
