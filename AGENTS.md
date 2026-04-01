@@ -57,6 +57,7 @@ This project is not a monorepo.
   - `npm run android`
   - `npm run ios`
   - `npm run web`
+  - `npm run lint`
   - `npm run typecheck`
   - `npm run test`
   - `npm run test:rntl`

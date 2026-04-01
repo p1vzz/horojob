@@ -1,8 +1,8 @@
 <resources>
-  <color name="splashscreen_background">#0D0D15</color>
-  <color name="iconBackground">#0D0D15</color>
+  <color name="splashscreen_background">#EEE7DA</color>
+  <color name="iconBackground">#EEE7DA</color>
   <color name="colorPrimary">#023c69</color>
-  <color name="colorPrimaryDark">#0D0D15</color>
+  <color name="colorPrimaryDark">#EEE7DA</color>
   <color name="widget_card_bg_start">#FFFDF8</color>
   <color name="widget_card_bg_end">#F2ECE2</color>
   <color name="widget_card_stroke">#2EAF966A</color>

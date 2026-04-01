@@ -27,7 +27,7 @@ export type PushNotificationsCoreDeps = {
   }) => Promise<unknown>;
 };
 
-function syncKeyForUser(userId: string) {
+export function pushTokenSyncStorageKeyForUser(userId: string) {
   return `${PUSH_TOKEN_SYNC_PREFIX}:${userId}`;
 }
 
@@ -70,7 +70,7 @@ export function createPushNotificationsService(deps: PushNotificationsCoreDeps) 
       return { status: 'token_unavailable' };
     }
 
-    const key = syncKeyForUser(userId);
+    const key = pushTokenSyncStorageKeyForUser(userId);
     const previousToken = await deps.getStoredToken(key);
     if (previousToken === token) {
       return { status: 'already_synced', token };
@@ -88,7 +88,7 @@ export function createPushNotificationsService(deps: PushNotificationsCoreDeps) 
   };
 
   const clearPushTokenSyncMarkerForUser = async (userId: string) => {
-    await deps.removeStoredToken(syncKeyForUser(userId));
+    await deps.removeStoredToken(pushTokenSyncStorageKeyForUser(userId));
   };
 
   return {

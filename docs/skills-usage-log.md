@@ -51,3 +51,7 @@ Track non-trivial tasks to measure skill routing quality and real invocation fre
 | 2026-03-31 | Screenshot upload runtime extraction and tests | react-native | api-client-contracts, testing-quality | Completed |
 | 2026-03-31 | Screenshot runtime regression coverage and smoke checklist expansion | testing-quality | release-smoke-checks, react-native | Completed |
 | 2026-04-01 | Added cross-repo mobile-server-contract-sync skill and agent metadata | mobile-server-contract-sync | api-client-contracts, skill-creator | Completed |
+| 2026-04-01 | Added ESLint lint gate for mobile repo | testing-quality | react-native | Completed |
+| 2026-04-01 | Fixed authSession push notifications import cycle breaking web/mobile runtime startup | expo-runtime-debug | react-native, testing-quality | Completed |
+| 2026-04-01 | Added pinned startup loader preview override with light-theme loader palette | theme-system | react-native | Completed |
+| 2026-04-01 | Replaced startup zodiac loader with neutral brand logo loader and regenerated app icons/splash assets | theme-system | react-native | Completed |

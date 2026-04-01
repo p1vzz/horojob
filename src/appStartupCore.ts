@@ -12,6 +12,10 @@ export function shouldForceOnboardingEntry(rawValue: string | null | undefined, 
   return isDev && parseBooleanEnv(rawValue);
 }
 
+export function shouldForceStartupLoader(rawValue: string | null | undefined, isDev: boolean) {
+  return isDev && parseBooleanEnv(rawValue);
+}
+
 export function resolveInitialRouteName(input: {
   hasOnboarded: boolean;
   forceOnboardingEntry: boolean;

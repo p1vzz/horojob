@@ -3,25 +3,87 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Line, Path, Rect } from 'react-native-svg';
 import { ZODIAC_META, type ZodiacSign } from '../../utils/zodiac';
 
+export type LoaderAppearance = 'dark' | 'light';
+
 type ZodiacCardLoaderSize = 'sm' | 'md' | 'lg';
 
 type ZodiacCardLoaderProps = {
   sign: ZodiacSign;
   size?: ZodiacCardLoaderSize;
   text?: string;
+  appearance?: LoaderAppearance;
 };
 
 type ZodiacCardLoaderFullscreenProps = {
   sign: ZodiacSign;
   text?: string;
   subtitle?: string;
+  appearance?: LoaderAppearance;
 };
 
 type IllustrationProps = {
   stroke: string;
 };
 
+type LoaderPalette = {
+  frameStrong: string;
+  frameSoft: string;
+  frameDashed: string;
+  cardBorder: string;
+  cardBackground: string;
+  cardGlow: string;
+  cardShadow: string;
+  badgeFill: string;
+  badgeBorder: string;
+  star: string;
+  loadingText: string;
+  fullscreenBackground: string;
+  fullscreenSubtitle: string;
+  ambientCircleA: string;
+  ambientCircleB: string;
+};
+
 const GOLD = '#C9A84C';
+
+const DARK_LOADER_PALETTE: LoaderPalette = {
+  frameStrong: 'rgba(201,168,76,0.4)',
+  frameSoft: 'rgba(201,168,76,0.25)',
+  frameDashed: 'rgba(201,168,76,0.15)',
+  cardBorder: 'rgba(201,168,76,0.3)',
+  cardBackground: '#0A0A12',
+  cardGlow: 'rgba(201,168,76,0.08)',
+  cardShadow: '#C9A84C',
+  badgeFill: 'rgba(201,168,76,0.16)',
+  badgeBorder: 'rgba(201,168,76,0.42)',
+  star: 'rgba(201,168,76,0.72)',
+  loadingText: 'rgba(201,168,76,0.82)',
+  fullscreenBackground: '#050508',
+  fullscreenSubtitle: 'rgba(212,212,224,0.65)',
+  ambientCircleA: 'rgba(201,168,76,0.08)',
+  ambientCircleB: 'rgba(90,58,204,0.08)',
+};
+
+const LIGHT_LOADER_PALETTE: LoaderPalette = {
+  frameStrong: 'rgba(181,141,43,0.42)',
+  frameSoft: 'rgba(181,141,43,0.24)',
+  frameDashed: 'rgba(181,141,43,0.16)',
+  cardBorder: 'rgba(181,141,43,0.34)',
+  cardBackground: '#FFF9F0',
+  cardGlow: 'rgba(188,107,42,0.08)',
+  cardShadow: '#B58D2B',
+  badgeFill: 'rgba(181,141,43,0.12)',
+  badgeBorder: 'rgba(181,141,43,0.34)',
+  star: 'rgba(181,141,43,0.72)',
+  loadingText: 'rgba(146,98,27,0.9)',
+  fullscreenBackground: '#F3F0E9',
+  fullscreenSubtitle: 'rgba(86,75,61,0.74)',
+  ambientCircleA: 'rgba(188,107,42,0.08)',
+  ambientCircleB: 'rgba(125,91,221,0.08)',
+};
+
+function resolveLoaderPalette(appearance: LoaderAppearance): LoaderPalette {
+  return appearance === 'light' ? LIGHT_LOADER_PALETTE : DARK_LOADER_PALETTE;
+}
 
 const SIZE_CONFIG: Record<ZodiacCardLoaderSize, { width: number; height: number; illustration: number }> = {
   sm: { width: 120, height: 168, illustration: 98 },
@@ -343,11 +405,12 @@ const ILLUSTRATIONS: Record<ZodiacSign, React.ComponentType<IllustrationProps>> 
   pisces: PiscesIllustration,
 };
 
-export const ZodiacCardLoader = ({ sign, size = 'md', text }: ZodiacCardLoaderProps) => {
+export const ZodiacCardLoader = ({ sign, size = 'md', text, appearance = 'dark' }: ZodiacCardLoaderProps) => {
   const cardPulse = useRef(new Animated.Value(0)).current;
   const innerPulse = useRef(new Animated.Value(0)).current;
   const textPulse = useRef(new Animated.Value(0)).current;
   const config = SIZE_CONFIG[size];
+  const palette = resolveLoaderPalette(appearance);
 
   useEffect(() => {
     const cardLoop = Animated.loop(
@@ -437,20 +500,23 @@ export const ZodiacCardLoader = ({ sign, size = 'md', text }: ZodiacCardLoaderPr
           {
             width: config.width,
             height: config.height,
+            borderColor: palette.cardBorder,
+            backgroundColor: palette.cardBackground,
+            shadowColor: palette.cardShadow,
             transform: [{ scale }],
           },
         ]}
       >
         <View style={StyleSheet.absoluteFill}>
           <Svg width="100%" height="100%" viewBox="0 0 100 140" preserveAspectRatio="none">
-            <Path d="M5 20 Q5 5 20 5" fill="none" stroke="rgba(201,168,76,0.4)" strokeWidth="0.8" />
-            <Path d="M5 25 Q5 10 25 10" fill="none" stroke="rgba(201,168,76,0.25)" strokeWidth="0.5" />
-            <Path d="M95 20 Q95 5 80 5" fill="none" stroke="rgba(201,168,76,0.4)" strokeWidth="0.8" />
-            <Path d="M95 25 Q95 10 75 10" fill="none" stroke="rgba(201,168,76,0.25)" strokeWidth="0.5" />
-            <Path d="M5 120 Q5 135 20 135" fill="none" stroke="rgba(201,168,76,0.4)" strokeWidth="0.8" />
-            <Path d="M5 115 Q5 130 25 130" fill="none" stroke="rgba(201,168,76,0.25)" strokeWidth="0.5" />
-            <Path d="M95 120 Q95 135 80 135" fill="none" stroke="rgba(201,168,76,0.4)" strokeWidth="0.8" />
-            <Path d="M95 115 Q95 130 75 130" fill="none" stroke="rgba(201,168,76,0.25)" strokeWidth="0.5" />
+            <Path d="M5 20 Q5 5 20 5" fill="none" stroke={palette.frameStrong} strokeWidth="0.8" />
+            <Path d="M5 25 Q5 10 25 10" fill="none" stroke={palette.frameSoft} strokeWidth="0.5" />
+            <Path d="M95 20 Q95 5 80 5" fill="none" stroke={palette.frameStrong} strokeWidth="0.8" />
+            <Path d="M95 25 Q95 10 75 10" fill="none" stroke={palette.frameSoft} strokeWidth="0.5" />
+            <Path d="M5 120 Q5 135 20 135" fill="none" stroke={palette.frameStrong} strokeWidth="0.8" />
+            <Path d="M5 115 Q5 130 25 130" fill="none" stroke={palette.frameSoft} strokeWidth="0.5" />
+            <Path d="M95 120 Q95 135 80 135" fill="none" stroke={palette.frameStrong} strokeWidth="0.8" />
+            <Path d="M95 115 Q95 130 75 130" fill="none" stroke={palette.frameSoft} strokeWidth="0.5" />
             <Rect
               x="8"
               y="8"
@@ -458,17 +524,17 @@ export const ZodiacCardLoader = ({ sign, size = 'md', text }: ZodiacCardLoaderPr
               height="124"
               rx="8"
               fill="none"
-              stroke="rgba(201,168,76,0.15)"
+              stroke={palette.frameDashed}
               strokeWidth="0.5"
               strokeDasharray={[2, 2]}
             />
           </Svg>
         </View>
 
-        <Animated.View style={[styles.cardGlow, { opacity: glowOpacity }]} />
+        <Animated.View style={[styles.cardGlow, { backgroundColor: palette.cardGlow, opacity: glowOpacity }]} />
 
         <View style={styles.badgeTop}>
-          <View style={styles.badgeTopCircle}>
+          <View style={[styles.badgeTopCircle, { backgroundColor: palette.badgeFill, borderColor: palette.badgeBorder }]}>
             <Text style={styles.badgeTopSymbol}>{meta.symbol}</Text>
           </View>
         </View>
@@ -481,6 +547,7 @@ export const ZodiacCardLoader = ({ sign, size = 'md', text }: ZodiacCardLoaderPr
               {
                 left: config.width * star.x,
                 top: config.height * star.y,
+                backgroundColor: palette.star,
                 opacity: 0.25 + (index % 4) * 0.12,
               },
             ]}
@@ -504,14 +571,14 @@ export const ZodiacCardLoader = ({ sign, size = 'md', text }: ZodiacCardLoaderPr
         </Animated.View>
 
         <View style={styles.badgeBottom}>
-          <View style={styles.badgeBottomPill}>
+          <View style={[styles.badgeBottomPill, { backgroundColor: palette.badgeFill, borderColor: palette.badgeBorder }]}>
             <Text style={styles.badgeBottomText}>{meta.name}</Text>
           </View>
         </View>
       </Animated.View>
 
       {text ? (
-        <Animated.Text style={[styles.loadingText, { opacity: textOpacity }]}>
+        <Animated.Text style={[styles.loadingText, { color: palette.loadingText, opacity: textOpacity }]}>
           {text}
         </Animated.Text>
       ) : null}
@@ -523,8 +590,10 @@ export const ZodiacCardLoaderFullscreen = ({
   sign,
   text = 'Consulting the stars...',
   subtitle,
+  appearance = 'dark',
 }: ZodiacCardLoaderFullscreenProps) => {
   const ambientPulse = useRef(new Animated.Value(0)).current;
+  const palette = resolveLoaderPalette(appearance);
 
   useEffect(() => {
     const ambientLoop = Animated.loop(
@@ -559,12 +628,13 @@ export const ZodiacCardLoaderFullscreen = ({
   });
 
   return (
-    <View style={styles.fullscreenRoot}>
+    <View style={[styles.fullscreenRoot, { backgroundColor: palette.fullscreenBackground }]}>
       <Animated.View
         pointerEvents="none"
         style={[
           styles.ambientCircleA,
           {
+            backgroundColor: palette.ambientCircleA,
             opacity: ambientOpacity,
             transform: [{ scale: ambientScale }],
           },
@@ -575,14 +645,15 @@ export const ZodiacCardLoaderFullscreen = ({
         style={[
           styles.ambientCircleB,
           {
+            backgroundColor: palette.ambientCircleB,
             opacity: ambientOpacity,
             transform: [{ scale: ambientScale }],
           },
         ]}
       />
       <View style={styles.fullscreenContent}>
-        <ZodiacCardLoader sign={sign} size="lg" text={text} />
-        {subtitle ? <Text style={styles.fullscreenSubtitle}>{subtitle}</Text> : null}
+        <ZodiacCardLoader sign={sign} size="lg" text={text} appearance={appearance} />
+        {subtitle ? <Text style={[styles.fullscreenSubtitle, { color: palette.fullscreenSubtitle }]}>{subtitle}</Text> : null}
       </View>
     </View>
   );
@@ -597,9 +668,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: 'rgba(201,168,76,0.3)',
-    backgroundColor: '#0A0A12',
-    shadowColor: '#C9A84C',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.24,
     shadowRadius: 18,
@@ -624,9 +692,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(201,168,76,0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.42)',
   },
   badgeTopSymbol: {
     color: GOLD,
@@ -644,7 +710,6 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 99,
-    backgroundColor: 'rgba(201,168,76,0.72)',
   },
   badgeBottom: {
     position: 'absolute',
@@ -658,9 +723,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: 'rgba(201,168,76,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.3)',
   },
   badgeBottomText: {
     color: GOLD,
@@ -670,7 +733,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 8,
-    color: 'rgba(201,168,76,0.82)',
     fontSize: 13,
     letterSpacing: 1.3,
   },
@@ -678,7 +740,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#050508',
   },
   fullscreenContent: {
     alignItems: 'center',
@@ -687,7 +748,6 @@ const styles = StyleSheet.create({
   },
   fullscreenSubtitle: {
     marginTop: 4,
-    color: 'rgba(212,212,224,0.65)',
     fontSize: 12,
     textAlign: 'center',
   },
@@ -696,13 +756,11 @@ const styles = StyleSheet.create({
     width: 380,
     height: 380,
     borderRadius: 999,
-    backgroundColor: 'rgba(201,168,76,0.08)',
   },
   ambientCircleB: {
     position: 'absolute',
     width: 560,
     height: 560,
     borderRadius: 999,
-    backgroundColor: 'rgba(90,58,204,0.08)',
   },
 });

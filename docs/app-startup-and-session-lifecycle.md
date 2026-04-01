@@ -18,18 +18,21 @@ Document how app startup resolves session state, onboarding state, and backgroun
 ## Startup Sequence
 
 1. Initialize notification response listeners.
-2. Run auth bootstrap:
+2. Show neutral brand startup loader while bootstrap runs.
+   - visual asset: `assets/horojob-logo-lockup.png`
+   - background: neutral theme-agnostic splash color
+3. Run auth bootstrap:
    - `ensureAuthSession()`
    - read local onboarding cache (`loadOnboardingForUser`)
    - configure RevenueCat for the user when available
-3. Resolve birth profile source of truth:
+4. Resolve birth profile source of truth:
    - try `fetchBirthProfile()`
    - if remote profile exists: overwrite local onboarding cache
    - if remote profile is missing: clear onboarding + natal chart local caches
-4. Mark app ready:
+5. Mark app ready:
    - `setHasOnboarded(Boolean(localProfile))`
    - `setIsReady(true)`
-5. Trigger non-blocking background sync tasks:
+6. Trigger non-blocking background sync tasks:
    - `registerPushTokenForUser(userId)`
    - `syncRevenueCatSubscription()` + `updateCurrentSessionUser(...)`
    - `syncMorningBriefingCache()`
@@ -41,6 +44,7 @@ Document how app startup resolves session state, onboarding state, and backgroun
   - else -> `Onboarding`
 - Optional development override:
   - `EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY=true` keeps initial route on `Onboarding`
+  - `EXPO_PUBLIC_FORCE_STARTUP_LOADER=true` keeps startup loader pinned for visual inspection
   - override is honored in development builds only
 
 ## Notification-Driven Navigation

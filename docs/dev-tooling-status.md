@@ -1,6 +1,6 @@
 # Dev Tooling Status
 
-Last verified: 2026-03-30 (local)
+Last verified: 2026-04-01 (local)
 
 ## Verified working
 
@@ -22,6 +22,12 @@ Last verified: 2026-03-30 (local)
 - Coverage tooling:
   - command: `npm run coverage`
   - result: `coverage/core` (`c8`, node tests) + `coverage/rntl` (`jest-expo`, RNTL tests)
+- ESLint quality gate:
+  - command: `npm run lint`
+  - result: passes with repository-aligned flat config (`eslint.config.mjs`)
+- Full validation:
+  - command: `npm run verify`
+  - result: `typecheck + lint + node tests + RNTL`
 
 ## Notes
 
@@ -29,3 +35,4 @@ Last verified: 2026-03-30 (local)
   - `C:\ProgramData\chocolatey\bin\rg.exe`
   - `C:\Users\p1vzz\AppData\Local\Microsoft\WinGet\Packages\BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe\ripgrep-15.1.0-x86_64-pc-windows-msvc\rg.exe`
 - Current default `rg` in `PATH` is the Chocolatey one (`14.1.0`).
+- The repo now has a dedicated `lint` script and `verify` includes lint by default.

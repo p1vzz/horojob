@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   clearAuthSession,
   loadAuthSession,
@@ -11,8 +12,8 @@ import {
 } from '../utils/morningBriefingStorage';
 import { clearInterviewStrategyStateForUser } from '../utils/interviewStrategyStorage';
 import { clearMorningBriefingWidget } from './morningBriefingWidgetBridge';
-import { clearPushTokenSyncMarkerForUser } from './pushNotifications';
 import { createAuthSessionManager } from './authSessionCore';
+import { pushTokenSyncStorageKeyForUser } from './pushNotificationsCore';
 
 export { ApiError } from './authSessionCore';
 
@@ -28,7 +29,7 @@ const authSessionManager = createAuthSessionManager({
       clearMorningBriefingSetupStateForUser(userId),
       clearMorningBriefingWidgetVariantForUser(userId),
       clearInterviewStrategyStateForUser(userId),
-      clearPushTokenSyncMarkerForUser(userId),
+      AsyncStorage.removeItem(pushTokenSyncStorageKeyForUser(userId)),
     ]);
   },
   clearGlobalState: async () => {

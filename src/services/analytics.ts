@@ -7,7 +7,6 @@ const analyticsService = createAnalyticsService({
   isDev: __DEV__,
   logger: (scope, name, properties) => {
     // Keep a lightweight in-client logger until analytics SDK is wired.
-    // eslint-disable-next-line no-console
     console.log(scope, name, properties);
   },
 });

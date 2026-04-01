@@ -21,7 +21,7 @@ import { DiscoverRolesScreen } from './src/screens/DiscoverRolesScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { JobScreenshotUploadScreen } from './src/screens/JobScreenshotUploadScreen';
 import { FullNatalCareerAnalysisScreen } from './src/screens/FullNatalCareerAnalysisScreen';
-import { FullScreenCosmicLoader } from './src/components/loaders/FullScreenCosmicLoader';
+import { BrandStartupLoader, BRAND_STARTUP_BACKGROUND } from './src/components/loaders/BrandStartupLoader';
 import { ensureAuthSession, updateCurrentSessionUser } from './src/services/authSession';
 import { fetchBirthProfile } from './src/services/astrologyApi';
 import { clearNatalChartCacheForUser } from './src/utils/natalChartStorage';
@@ -32,7 +32,7 @@ import { syncRevenueCatSubscription } from './src/services/billingApi';
 import { registerPushTokenForUser } from './src/services/pushNotifications';
 import * as Notifications from 'expo-notifications';
 import { ThemeModeProvider, useThemeMode } from './src/theme/ThemeModeProvider';
-import { resolveInitialRouteName, shouldForceOnboardingEntry } from './src/appStartupCore';
+import { resolveInitialRouteName, shouldForceOnboardingEntry, shouldForceStartupLoader } from './src/appStartupCore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
@@ -43,11 +43,14 @@ function AppShell() {
   const pendingDashboardOpenRef = useRef(false);
   const { mode, theme, isReady: isThemeReady } = useThemeMode();
   const forceOnboardingEntry = shouldForceOnboardingEntry(process.env.EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY, __DEV__);
+  const forceStartupLoader = shouldForceStartupLoader(process.env.EXPO_PUBLIC_FORCE_STARTUP_LOADER, __DEV__);
   const initialRouteName = resolveInitialRouteName({
     hasOnboarded,
     forceOnboardingEntry,
   });
   const isAppReady = isReady && isThemeReady;
+  const shouldShowStartupLoader = forceStartupLoader || !isAppReady;
+  const appBackgroundColor = shouldShowStartupLoader ? BRAND_STARTUP_BACKGROUND : theme.colors.background;
 
   useEffect(() => {
     const openDashboard = () => {
@@ -88,6 +91,10 @@ function AppShell() {
   }, []);
 
   useEffect(() => {
+    if (forceStartupLoader) {
+      return;
+    }
+
     let mounted = true;
     const run = async () => {
       let localProfile = null;
@@ -162,10 +169,10 @@ function AppShell() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [forceStartupLoader]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: appBackgroundColor }}>
       <SafeAreaProvider>
         <NavigationContainer
           ref={navigationRef}
@@ -176,7 +183,7 @@ function AppShell() {
             }
           }}
         >
-          {isAppReady ? (
+          {isAppReady && !forceStartupLoader ? (
             <Stack.Navigator
               screenOptions={{ headerShown: false }}
               initialRouteName={initialRouteName}
@@ -193,14 +200,11 @@ function AppShell() {
               <Stack.Screen name="JobScreenshotUpload" component={JobScreenshotUploadScreen} />
             </Stack.Navigator>
           ) : (
-            <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-              <FullScreenCosmicLoader
-                title="Preparing Session"
-                subtitle={isThemeReady ? 'Syncing profile and chart data...' : 'Restoring saved appearance and profile...'}
-              />
+            <View style={{ flex: 1, backgroundColor: appBackgroundColor }}>
+              <BrandStartupLoader subtitle="Preparing your session..." />
             </View>
           )}
-          <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
+          <StatusBar style={shouldShowStartupLoader || mode === 'light' ? 'dark' : 'light'} />
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>
