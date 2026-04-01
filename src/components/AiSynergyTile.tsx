@@ -3,7 +3,7 @@ import { View, Text, Animated } from 'react-native';
 import { Cpu, Activity } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line, Path, G } from 'react-native-svg';
-import { fetchDailyTransit, type DailyTransitResponse } from '../services/astrologyApi';
+import { fetchDailyTransit } from '../services/astrologyApi';
 import { useAppTheme } from '../theme/ThemeModeProvider';
 import {
   FALLBACK_AI_SYNERGY,
