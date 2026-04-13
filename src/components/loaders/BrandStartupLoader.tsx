@@ -1,15 +1,30 @@
-import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, Animated, Easing, Image, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import {
+  BrandAstroWheelMark,
+  BRAND_ASCENT_ARROW_TRACK_PATH,
+  BRAND_ASCENT_AURA_TRACK_PATH,
+} from '../brand/BrandAstroWheelMark';
+import { CosmicOnboardingDarkBackground } from '../backgrounds/CosmicOnboardingDarkBackground';
+import { useBrightnessAdaptation } from '../../contexts/BrightnessAdaptationContext';
+import { adaptColorOpacity, adaptOpacity } from '../../utils/brightnessAdaptation';
 
-export const BRAND_STARTUP_BACKGROUND = '#EEE7DA';
+export const BRAND_STARTUP_BACKGROUND = '#06060C';
 
-const BRAND_STARTUP_SUBTITLE = '#5E564B';
-const BRAND_STARTUP_ACCENT = '#B58D2B';
-const BRAND_STARTUP_SHELL = '#202533';
-const BRAND_STARTUP_SHADOW = '#161B28';
-const BRAND_STARTUP_AMBIENT_GOLD = 'rgba(181,141,43,0.14)';
-const BRAND_STARTUP_AMBIENT_SLATE = 'rgba(36,47,70,0.08)';
-const LOGO_RATIO = 444 / 456;
+const BRAND_STARTUP_SUBTITLE = 'rgba(212,212,224,0.72)';
+const BRAND_STARTUP_ACCENT = '#C9A84C';
+const BRAND_STARTUP_SHINE_SOFT = 'rgba(201,168,76,0.34)';
+const BRAND_STARTUP_SHINE_CORE = 'rgba(255,241,191,0.92)';
+const LOGO_VIEWBOX_SIZE = 100;
+const LOGO_ARROW_TRACK_LENGTH = 70;
+const LOGO_AURA_TRACK_LENGTH = 239;
+const LOGO_ARROW_SOFT_SEGMENT = 14;
+const LOGO_ARROW_CORE_SEGMENT = 7;
+const LOGO_AURA_SOFT_SEGMENT = 22;
+const LOGO_AURA_CORE_SEGMENT = 10;
+
+const AnimatedSvgPath = Animated.createAnimatedComponent(Path);
 
 type BrandStartupLoaderProps = {
   subtitle?: string;
@@ -17,117 +32,165 @@ type BrandStartupLoaderProps = {
 };
 
 export const BrandStartupLoader = ({
-  subtitle = 'Preparing your session...',
-  showIndicator = true,
+  subtitle,
+  showIndicator = false,
 }: BrandStartupLoaderProps) => {
   const { width } = useWindowDimensions();
-  const ambientPulse = useRef(new Animated.Value(0)).current;
-  const logoFloat = useRef(new Animated.Value(0)).current;
-  const logoWidth = Math.max(240, Math.min(width - 56, 320));
-  const logoHeight = Math.round(logoWidth * LOGO_RATIO);
+  const { channels } = useBrightnessAdaptation();
+  const shimmerProgress = useRef(new Animated.Value(0)).current;
+  const walkerMotionProgress = useRef(new Animated.Value(0)).current;
+  const [walkerAnimationState, setWalkerAnimationState] = useState({
+    flightProgress: 0,
+    stridePhase: 0,
+    travelProgress: 0,
+  });
+  const logoSize = Math.max(252, Math.min(width - 80, 320));
 
   useEffect(() => {
-    const ambientLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(ambientPulse, {
-          toValue: 1,
-          duration: 2600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(ambientPulse, {
-          toValue: 0,
-          duration: 2600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
+    const shimmerLoop = Animated.loop(
+      Animated.timing(shimmerProgress, {
+        toValue: 1,
+        duration: 2900,
+        easing: Easing.linear,
+        isInteraction: false,
+        useNativeDriver: false,
+      })
     );
+    const walkerMotion = Animated.timing(walkerMotionProgress, {
+      toValue: 1,
+      duration: 16800,
+      easing: Easing.out(Easing.cubic),
+      isInteraction: false,
+      useNativeDriver: false,
+    });
+    const easeAscent = Easing.inOut(Easing.cubic);
+    const easeFlight = Easing.out(Easing.cubic);
+    const ascentCutoff = 0.82;
+    const strideCycleCount = 2.2;
 
-    const logoLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(logoFloat, {
-          toValue: 1,
-          duration: 2100,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoFloat, {
-          toValue: 0,
-          duration: 2100,
-          easing: Easing.inOut(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    ambientLoop.start();
-    logoLoop.start();
+    shimmerProgress.setValue(0);
+    walkerMotionProgress.setValue(0);
+    shimmerLoop.start();
+    walkerMotion.start();
+    const walkerMotionListenerId = walkerMotionProgress.addListener(({ value }) => {
+      const ascentRawProgress = Math.min(value / ascentCutoff, 1);
+      const flightRawProgress = value <= ascentCutoff
+        ? 0
+        : Math.min((value - ascentCutoff) / (1 - ascentCutoff), 1);
+      const nextState = {
+        flightProgress: Math.round(easeFlight(flightRawProgress) * 64) / 64,
+        stridePhase: flightRawProgress > 0
+          ? 0.18
+          : Math.round((((ascentRawProgress * strideCycleCount) % 1) + Number.EPSILON) * 1000) / 1000,
+        travelProgress: Math.round(easeAscent(ascentRawProgress) * 64) / 64,
+      };
+      setWalkerAnimationState((currentState) => (
+        currentState.flightProgress === nextState.flightProgress
+        && currentState.stridePhase === nextState.stridePhase
+        && currentState.travelProgress === nextState.travelProgress
+          ? currentState
+          : nextState
+      ));
+    });
 
     return () => {
-      ambientLoop.stop();
-      logoLoop.stop();
+      shimmerLoop.stop();
+      walkerMotion.stop();
+      walkerMotionProgress.removeListener(walkerMotionListenerId);
     };
-  }, [ambientPulse, logoFloat]);
+  }, [shimmerProgress, walkerMotionProgress]);
 
-  const ambientOpacity = ambientPulse.interpolate({
+  const arrowDashOffset = shimmerProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.25, 0.5],
+    outputRange: [LOGO_ARROW_TRACK_LENGTH * 0.08, -LOGO_ARROW_TRACK_LENGTH * 0.92],
   });
-  const ambientScale = ambientPulse.interpolate({
+  const auraDashOffset = shimmerProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.94, 1.08],
-  });
-  const logoScale = logoFloat.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.985, 1.015],
-  });
-  const logoTranslateY = logoFloat.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -6],
+    outputRange: [0, -LOGO_AURA_TRACK_LENGTH],
   });
 
   return (
     <View style={styles.root}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ambientCircleLarge,
-          {
-            opacity: ambientOpacity,
-            transform: [{ scale: ambientScale }],
-          },
-        ]}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ambientCircleSmall,
-          {
-            opacity: ambientOpacity,
-            transform: [{ scale: ambientScale }],
-          },
-        ]}
-      />
+      <CosmicOnboardingDarkBackground showAccentLines={false} style={StyleSheet.absoluteFillObject} />
 
-      <Animated.View
-        style={[
-          styles.logoShell,
-          {
-            width: logoWidth,
-            transform: [{ translateY: logoTranslateY }, { scale: logoScale }],
-          },
-        ]}
-      >
-        <Image
-          source={require('../../../assets/horojob-logo-lockup.png')}
-          style={{ width: logoWidth, height: logoHeight }}
-          resizeMode="contain"
-        />
-      </Animated.View>
+      <View style={styles.content}>
+        <View
+          style={[styles.logoWrap, { width: logoSize, height: logoSize }]}
+          shouldRasterizeIOS
+          renderToHardwareTextureAndroid
+        >
+          <BrandAstroWheelMark
+            size={logoSize}
+            glowColor={adaptColorOpacity('rgba(201,168,76,0.15)', channels.glowOpacityMultiplier)}
+            goldColor={adaptColorOpacity('#C9A84C', channels.textOpacityMultiplier)}
+            goldHighlightColor={adaptColorOpacity('#FFF1BF', channels.glowOpacityMultiplier)}
+            walkerFlightProgress={walkerAnimationState.flightProgress}
+            walkerStridePhase={walkerAnimationState.stridePhase}
+            walkerTravelProgress={walkerAnimationState.travelProgress}
+          />
+          <Svg
+            pointerEvents="none"
+            width={logoSize}
+            height={logoSize}
+            viewBox={`0 0 ${LOGO_VIEWBOX_SIZE} ${LOGO_VIEWBOX_SIZE}`}
+            style={styles.logoShine}
+          >
+            <AnimatedSvgPath
+              d={BRAND_ASCENT_ARROW_TRACK_PATH}
+              fill="none"
+              stroke={adaptColorOpacity(BRAND_STARTUP_SHINE_SOFT, channels.glowOpacityMultiplier)}
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={`${LOGO_ARROW_SOFT_SEGMENT} ${LOGO_ARROW_TRACK_LENGTH}`}
+              strokeDashoffset={arrowDashOffset}
+            />
+            <AnimatedSvgPath
+              d={BRAND_ASCENT_ARROW_TRACK_PATH}
+              fill="none"
+              stroke={adaptColorOpacity(BRAND_STARTUP_SHINE_CORE, channels.glowOpacityMultiplier)}
+              strokeWidth={1.0}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={`${LOGO_ARROW_CORE_SEGMENT} ${LOGO_ARROW_TRACK_LENGTH}`}
+              strokeDashoffset={arrowDashOffset}
+            />
+            <AnimatedSvgPath
+              d={BRAND_ASCENT_AURA_TRACK_PATH}
+              fill="none"
+              stroke={adaptColorOpacity(BRAND_STARTUP_SHINE_SOFT, channels.glowOpacityMultiplier)}
+              strokeWidth={1.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={`${LOGO_AURA_SOFT_SEGMENT} ${LOGO_AURA_TRACK_LENGTH}`}
+              strokeDashoffset={auraDashOffset}
+            />
+            <AnimatedSvgPath
+              d={BRAND_ASCENT_AURA_TRACK_PATH}
+              fill="none"
+              stroke={adaptColorOpacity(BRAND_STARTUP_SHINE_CORE, channels.glowOpacityMultiplier)}
+              strokeWidth={0.56}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={`${LOGO_AURA_CORE_SEGMENT} ${LOGO_AURA_TRACK_LENGTH}`}
+              strokeDashoffset={auraDashOffset}
+            />
+          </Svg>
+        </View>
 
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-      {showIndicator ? <ActivityIndicator style={styles.indicator} size="small" color={BRAND_STARTUP_ACCENT} /> : null}
+        {subtitle ? (
+          <Text style={[styles.subtitle, { color: adaptColorOpacity(BRAND_STARTUP_SUBTITLE, channels.textOpacityMultiplier) }]}>
+            {subtitle}
+          </Text>
+        ) : null}
+        {showIndicator ? (
+          <ActivityIndicator
+            style={[styles.indicator, { opacity: adaptOpacity(1, channels.glowOpacityMultiplier) }]}
+            size="small"
+            color={adaptColorOpacity(BRAND_STARTUP_ACCENT, channels.glowOpacityMultiplier)}
+          />
+        ) : null}
+      </View>
     </View>
   );
 };
@@ -135,23 +198,25 @@ export const BrandStartupLoader = ({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: BRAND_STARTUP_BACKGROUND,
+    overflow: 'hidden',
+  },
+  content: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: BRAND_STARTUP_BACKGROUND,
     paddingHorizontal: 28,
   },
-  logoShell: {
-    borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: BRAND_STARTUP_SHELL,
-    shadowColor: BRAND_STARTUP_SHADOW,
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.14,
-    shadowRadius: 28,
-    elevation: 10,
+  logoWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoShine: {
+    ...StyleSheet.absoluteFillObject,
   },
   subtitle: {
-    marginTop: 28,
+    marginTop: 12,
     color: BRAND_STARTUP_SUBTITLE,
     fontSize: 15,
     letterSpacing: 0.3,
@@ -159,19 +224,5 @@ const styles = StyleSheet.create({
   },
   indicator: {
     marginTop: 18,
-  },
-  ambientCircleLarge: {
-    position: 'absolute',
-    width: 380,
-    height: 380,
-    borderRadius: 999,
-    backgroundColor: BRAND_STARTUP_AMBIENT_GOLD,
-  },
-  ambientCircleSmall: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 999,
-    backgroundColor: BRAND_STARTUP_AMBIENT_SLATE,
   },
 });

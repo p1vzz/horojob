@@ -76,6 +76,47 @@ test('push notifications service returns already_synced when token did not chang
   assert.deepEqual(result, { status: 'already_synced', token: 'ExponentPushToken[abc]' });
 });
 
+test('push notifications service force syncs unchanged token for explicit notification opt-ins', async () => {
+  const calls: Array<{ kind: string; payload?: unknown }> = [];
+  const service = createPushNotificationsService({
+    platformOs: 'ios',
+    appVersion: '1.0.0',
+    getProjectId: () => 'project-id',
+    getStoredToken: async () => 'ExponentPushToken[abc]',
+    setStoredToken: async (key, value) => {
+      calls.push({ kind: 'setStoredToken', payload: { key, value } });
+    },
+    removeStoredToken: async () => {},
+    getPermissionsAsync: async () => ({ status: 'granted' }),
+    requestPermissionsAsync: async () => ({ status: 'granted' }),
+    getExpoPushTokenAsync: async () => ({ data: 'ExponentPushToken[abc]' }),
+    upsertPushNotificationToken: async (input) => {
+      calls.push({ kind: 'upsert', payload: input });
+    },
+  });
+
+  const result = await service.registerPushTokenForUser('user-1', { forceSync: true });
+
+  assert.deepEqual(result, { status: 'synced', token: 'ExponentPushToken[abc]' });
+  assert.deepEqual(calls, [
+    {
+      kind: 'upsert',
+      payload: {
+        token: 'ExponentPushToken[abc]',
+        platform: 'ios',
+        appVersion: '1.0.0',
+      },
+    },
+    {
+      kind: 'setStoredToken',
+      payload: {
+        key: 'push-token-sync:v1:user-1',
+        value: 'ExponentPushToken[abc]',
+      },
+    },
+  ]);
+});
+
 test('push notifications service syncs token and stores marker on android', async () => {
   const calls: Array<{ kind: string; payload?: unknown }> = [];
   const service = createPushNotificationsService({

@@ -38,8 +38,49 @@ export function createDefaultDashboardInsightsState(): DashboardInsightsState {
   };
 }
 
+export function createUnavailableDashboardInsightsState(): DashboardInsightsState {
+  return {
+    burnout: {
+      snapshot: FROZEN_BURNOUT_SNAPSHOT,
+      source: 'fallback',
+      isHydrating: false,
+      lastSyncedAt: null,
+    },
+    lunar: {
+      snapshot: FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT,
+      source: 'fallback',
+      isHydrating: false,
+      lastSyncedAt: null,
+    },
+  };
+}
+
 export function shouldFetchDashboardInsights(plan: SubscriptionPlan) {
   return plan === 'premium';
+}
+
+export function shouldDisplayBurnoutCard(plan: BurnoutPlanResponse) {
+  return plan.risk.severity !== 'none';
+}
+
+export function shouldDisplayLunarCard(plan: LunarProductivityPlanResponse) {
+  return plan.risk.impactDirection !== null;
+}
+
+export function shouldAcknowledgeBurnoutCard(plan: BurnoutPlanResponse) {
+  return (
+    shouldDisplayBurnoutCard(plan) &&
+    plan.settings.enabled &&
+    (plan.timing.status === 'planned' || plan.timing.status === 'not_scheduled')
+  );
+}
+
+export function shouldAcknowledgeLunarCard(plan: LunarProductivityPlanResponse) {
+  return (
+    shouldDisplayLunarCard(plan) &&
+    plan.settings.enabled &&
+    (plan.timing.status === 'planned' || plan.timing.status === 'not_scheduled')
+  );
 }
 
 function resolveBurnoutInsight(

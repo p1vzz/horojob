@@ -103,13 +103,14 @@ const LockedInterviewCard = ({ onPress, isLight }: { onPress: () => void; isLigh
   );
 };
 
-export const InterviewStrategy = () => {
+export const InterviewStrategy = ({ onReady }: { onReady?: () => void }) => {
   const navigation = useNavigation<AppNavigationProp>();
   const { isLight, theme } = useThemeMode();
   const [isPremium, setIsPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [slots, setSlots] = useState<InterviewSlotRow[]>(FALLBACK_INTERVIEW_SLOTS);
   const [insightText, setInsightText] = useState(FALLBACK_INTERVIEW_INSIGHT);
+  const hasSignaledReadyRef = useRef(false);
   const waveLayers = useRef(
     INTERVIEW_STRATEGY_WAVE_LAYER_SPECS.map((spec) => ({
       ...spec,
@@ -197,6 +198,13 @@ export const InterviewStrategy = () => {
       loops.forEach((loop) => loop.stop());
     };
   }, [waveLayers]);
+
+  useEffect(() => {
+    if (!isLoading && !hasSignaledReadyRef.current) {
+      hasSignaledReadyRef.current = true;
+      onReady?.();
+    }
+  }, [isLoading, onReady]);
 
   const topSlots = useMemo(() => slots.slice(0, 3), [slots]);
   const topPickSlotId = useMemo(() => {

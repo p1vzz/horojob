@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,16 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Clock, MapPin, Info, User } from 'lucide-react-native';
+import { CosmicOnboardingDarkBackground } from '../components/backgrounds/CosmicOnboardingDarkBackground';
+import { CosmicOnboardingLightBackground } from '../components/backgrounds/CosmicOnboardingLightBackground';
 import { OnboardingWheel } from '../components/OnboardingWheel';
 import { GlassDatePicker, GlassTimePicker } from '../components/GlassDateTimePicker';
 import { useOnboardingForm } from '../hooks/useOnboardingForm';
-import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useThemeMode } from '../theme/ThemeModeProvider';
+import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
+import type { BrightnessBoostChannels } from '../contexts/brightnessAdaptationCore';
+import { adaptColorOpacity } from '../utils/brightnessAdaptation';
+import type { AppScreenProps } from '../types/navigation';
 
 const ONBOARDING_WHEEL_TUNING = {
   heightFactor: 0.42,
@@ -35,28 +40,31 @@ const ONBOARDING_WHEEL_TUNING = {
   cityFocusMinLiftIos: 6,
 } as const;
 
+const TOOLTIP_POPOVER_TUNING = {
+  maxWidth: 260,
+  minSideInset: 16,
+  verticalGap: 10,
+  arrowSize: 12,
+  minArrowInset: 18,
+} as const;
+
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
+type TooltipAnchor = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type OnboardingPalette = {
-  glowTopStart: string;
-  glowTopMid: string;
-  glowBottomStart: string;
-  glowBottomMid: string;
-  mist0: string;
-  mist1: string;
-  mist2: string;
-  mist3: string;
-  greenLineMidA: string;
-  greenLineMidB: string;
-  greenLineSecondary: string;
-  introTitle: string;
-  introSubtitle: string;
   fieldLabel: string;
   inputBg: string;
   inputBorder: string;
   inputBorderActive: string;
   icon: string;
+  infoIcon: string;
   textPrimary: string;
   placeholder: string;
   tooltipBg: string;
@@ -73,33 +81,21 @@ type OnboardingPalette = {
 };
 
 const ONBOARDING_DARK_PALETTE: OnboardingPalette = {
-  glowTopStart: 'rgba(90,58,204,0.26)',
-  glowTopMid: 'rgba(90,58,204,0.08)',
-  glowBottomStart: 'rgba(201,168,76,0.18)',
-  glowBottomMid: 'rgba(201,168,76,0.05)',
-  mist0: 'rgba(255,255,255,0.008)',
-  mist1: 'rgba(255,255,255,0.012)',
-  mist2: 'rgba(255,255,255,0.03)',
-  mist3: 'rgba(255,255,255,0.014)',
-  greenLineMidA: 'rgba(113,163,103,0.16)',
-  greenLineMidB: 'rgba(162,190,114,0.11)',
-  greenLineSecondary: 'rgba(109,159,100,0.1)',
-  introTitle: '#C9A84C',
-  introSubtitle: 'rgba(212,212,224,0.6)',
   fieldLabel: 'rgba(212,212,224,0.45)',
   inputBg: 'rgba(255,255,255,0.03)',
   inputBorder: 'rgba(255,255,255,0.06)',
   inputBorderActive: 'rgba(201,168,76,0.3)',
   icon: 'rgba(201,168,76,0.6)',
+  infoIcon: 'rgba(212,212,224,0.4)',
   textPrimary: 'rgba(212,212,224,0.9)',
   placeholder: 'rgba(212,212,224,0.35)',
-  tooltipBg: 'rgba(14,14,30,0.9)',
+  tooltipBg: 'rgba(22,20,28,0.98)',
   tooltipBorder: 'rgba(255,255,255,0.08)',
   tooltipText: 'rgba(212,212,224,0.7)',
   checkboxBorder: 'rgba(255,255,255,0.2)',
   checkboxFill: 'rgba(201,168,76,0.3)',
-  helperText: 'rgba(212,212,224,0.5)',
-  cityListBg: 'rgb(20, 20, 35)',
+  helperText: 'rgba(212,212,224,0.3)',
+  cityListBg: 'rgba(20,20,35,0.96)',
   cityListBorder: 'rgba(255,255,255,0.15)',
   cityListItemSeparator: 'rgba(255,255,255,0.05)',
   cityListText: 'rgba(212,212,224,0.85)',
@@ -107,43 +103,67 @@ const ONBOARDING_DARK_PALETTE: OnboardingPalette = {
 };
 
 const ONBOARDING_LIGHT_PALETTE: OnboardingPalette = {
-  glowTopStart: 'rgba(125,98,220,0.16)',
-  glowTopMid: 'rgba(125,98,220,0.05)',
-  glowBottomStart: 'rgba(190,154,84,0.16)',
-  glowBottomMid: 'rgba(190,154,84,0.04)',
-  mist0: 'rgba(255,255,255,0.05)',
-  mist1: 'rgba(255,255,255,0.07)',
-  mist2: 'rgba(255,255,255,0.12)',
-  mist3: 'rgba(255,255,255,0.08)',
-  greenLineMidA: 'rgba(110,148,91,0.2)',
-  greenLineMidB: 'rgba(151,176,106,0.14)',
-  greenLineSecondary: 'rgba(104,141,86,0.14)',
-  introTitle: '#B86A2D',
-  introSubtitle: 'rgba(108,93,76,0.86)',
   fieldLabel: 'rgba(123,108,88,0.88)',
-  inputBg: 'rgba(255,255,255,0.82)',
-  inputBorder: 'rgba(169,145,107,0.26)',
-  inputBorderActive: 'rgba(181,139,60,0.46)',
+  inputBg: 'rgba(255,255,255,0.08)',
+  inputBorder: 'rgba(169,145,107,0.18)',
+  inputBorderActive: 'rgba(181,139,60,0.34)',
   icon: 'rgba(181,139,60,0.9)',
+  infoIcon: 'rgba(123,108,88,0.64)',
   textPrimary: 'rgba(64,55,45,0.95)',
   placeholder: 'rgba(133,116,94,0.7)',
-  tooltipBg: 'rgba(255,255,255,0.95)',
-  tooltipBorder: 'rgba(169,145,107,0.28)',
+  tooltipBg: 'rgba(250,245,236,0.98)',
+  tooltipBorder: 'rgba(169,145,107,0.18)',
   tooltipText: 'rgba(94,79,59,0.92)',
   checkboxBorder: 'rgba(158,135,99,0.52)',
   checkboxFill: 'rgba(181,139,60,0.44)',
   helperText: 'rgba(112,97,77,0.82)',
-  cityListBg: 'rgba(255,255,255,0.98)',
-  cityListBorder: 'rgba(169,145,107,0.32)',
+  cityListBg: 'rgba(255,255,255,0.88)',
+  cityListBorder: 'rgba(169,145,107,0.18)',
   cityListItemSeparator: 'rgba(169,145,107,0.14)',
   cityListText: 'rgba(64,55,45,0.94)',
   submitError: '#C65A74',
 };
 
-export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
-  const { theme, isLight } = useThemeMode();
-  const palette = isLight ? ONBOARDING_LIGHT_PALETTE : ONBOARDING_DARK_PALETTE;
+function buildOnboardingPalette(
+  basePalette: OnboardingPalette,
+  channels: BrightnessBoostChannels
+): OnboardingPalette {
+  const stableTooltipGlowMultiplier = Math.max(1, channels.glowOpacityMultiplier);
+  const stableTooltipBorderMultiplier = Math.max(1, channels.borderOpacityMultiplier);
 
+  return {
+    fieldLabel: adaptColorOpacity(basePalette.fieldLabel, channels.textOpacityMultiplier),
+    inputBg: adaptColorOpacity(basePalette.inputBg, channels.glowOpacityMultiplier),
+    inputBorder: adaptColorOpacity(basePalette.inputBorder, channels.borderOpacityMultiplier),
+    inputBorderActive: adaptColorOpacity(basePalette.inputBorderActive, channels.borderOpacityMultiplier),
+    icon: adaptColorOpacity(basePalette.icon, channels.textOpacityMultiplier),
+    infoIcon: adaptColorOpacity(basePalette.infoIcon, channels.textOpacityMultiplier),
+    textPrimary: adaptColorOpacity(basePalette.textPrimary, channels.textOpacityMultiplier),
+    placeholder: adaptColorOpacity(basePalette.placeholder, channels.textOpacityMultiplier),
+    tooltipBg: adaptColorOpacity(basePalette.tooltipBg, stableTooltipGlowMultiplier),
+    tooltipBorder: adaptColorOpacity(basePalette.tooltipBorder, stableTooltipBorderMultiplier),
+    tooltipText: adaptColorOpacity(basePalette.tooltipText, channels.textOpacityMultiplier),
+    checkboxBorder: adaptColorOpacity(basePalette.checkboxBorder, channels.borderOpacityMultiplier),
+    checkboxFill: adaptColorOpacity(basePalette.checkboxFill, channels.glowOpacityMultiplier),
+    helperText: adaptColorOpacity(basePalette.helperText, channels.textOpacityMultiplier),
+    cityListBg: adaptColorOpacity(basePalette.cityListBg, channels.glowOpacityMultiplier),
+    cityListBorder: adaptColorOpacity(basePalette.cityListBorder, channels.borderOpacityMultiplier),
+    cityListItemSeparator: adaptColorOpacity(
+      basePalette.cityListItemSeparator,
+      channels.borderOpacityMultiplier
+    ),
+    cityListText: adaptColorOpacity(basePalette.cityListText, channels.textOpacityMultiplier),
+    submitError: adaptColorOpacity(basePalette.submitError, channels.textOpacityMultiplier),
+  };
+}
+
+export const OnboardingScreen = ({ navigation }: AppScreenProps<'Onboarding'>) => {
+  const { theme, isLight } = useThemeMode();
+  const { channels } = useBrightnessAdaptation();
+  const palette = useMemo(
+    () => buildOnboardingPalette(isLight ? ONBOARDING_LIGHT_PALETTE : ONBOARDING_DARK_PALETTE, channels),
+    [channels, isLight]
+  );
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const viewportHeight = Math.max(0, windowHeight - insets.top - insets.bottom);
@@ -162,15 +182,11 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
       widthLimitedMaxWheelSize
     )
   );
-  const centerRingRadius = Math.max(windowWidth, windowHeight) * 0.42;
-  const centerRingCx = windowWidth * 0.25;
-  const centerRingCy = windowHeight * 0.77;
 
   const {
     name,
     birthDate,
     birthTime,
-    city,
     cityQuery,
     cityResults,
     cityInputHeight,
@@ -180,17 +196,18 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
     dateValue,
     timeValue,
     unknownTime,
-    showTooltip,
+    citySelected,
     collapseDateTime,
     isCityFocused,
+    isNameValid,
     dateTimeAnim,
     pageEnter,
     wheelFilledCount,
     setShowDatePicker,
     setShowTimePicker,
     setCityInputHeight,
-    toggleTooltip,
     handleNameChange,
+    handleNameBlur,
     handleDateConfirm,
     handleTimeConfirm,
     handleUnknownTimeToggle,
@@ -200,59 +217,70 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
     handleCitySelect,
     handleSubmit,
   } = useOnboardingForm(navigation);
-  const [showMainContent, setShowMainContent] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
   const [cityLift, setCityLift] = useState(0);
-  const introTextOpacity = useRef(new Animated.Value(0)).current;
-  const introTextScale = useRef(new Animated.Value(1)).current;
-  const mainContentProgress = useRef(new Animated.Value(0)).current;
+  const [isNameFocused, setIsNameFocused] = useState(false);
+  const [showBirthTimePopover, setShowBirthTimePopover] = useState(false);
+  const [birthTimePopoverAnchor, setBirthTimePopoverAnchor] = useState<TooltipAnchor | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const cityFieldRef = useRef<View>(null);
+  const birthTimeInfoRef = useRef<View>(null);
 
-  useEffect(() => {
-    introTextOpacity.setValue(0);
-    introTextScale.setValue(1);
-    const introSequence = Animated.sequence([
-      Animated.timing(introTextOpacity, {
-        toValue: 1,
-        duration: 380,
-        useNativeDriver: true,
-      }),
-      Animated.delay(4000),
-      Animated.sequence([
-        Animated.timing(introTextScale, {
-          toValue: 1.12,
-          duration: 420,
-          useNativeDriver: true,
-        }),
-        Animated.timing(introTextScale, {
-          toValue: 1,
-          duration: 420,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.timing(introTextOpacity, {
-        toValue: 0,
-        duration: 340,
-        useNativeDriver: true,
-      }),
-    ]);
+  const nameBorderColor =
+    isNameFocused || isNameValid ? palette.inputBorderActive : palette.inputBorder;
+  const dateBorderColor =
+    showDatePicker || Boolean(birthDate) ? palette.inputBorderActive : palette.inputBorder;
+  const timeBorderColor =
+    showTimePicker || Boolean(birthTime) || unknownTime
+      ? palette.inputBorderActive
+      : palette.inputBorder;
+  const cityBorderColor =
+    isCityFocused || citySelected ? palette.inputBorderActive : palette.inputBorder;
+  const birthTimePopoverWidth = Math.min(
+    TOOLTIP_POPOVER_TUNING.maxWidth,
+    Math.max(200, windowWidth - TOOLTIP_POPOVER_TUNING.minSideInset * 2)
+  );
+  const birthTimePopoverLeft = birthTimePopoverAnchor
+    ? clamp(
+        birthTimePopoverAnchor.x + birthTimePopoverAnchor.width / 2 - birthTimePopoverWidth / 2,
+        TOOLTIP_POPOVER_TUNING.minSideInset,
+        windowWidth - birthTimePopoverWidth - TOOLTIP_POPOVER_TUNING.minSideInset
+      )
+    : TOOLTIP_POPOVER_TUNING.minSideInset;
+  const birthTimePopoverTop = birthTimePopoverAnchor
+    ? Math.max(
+        insets.top + TOOLTIP_POPOVER_TUNING.minSideInset,
+        birthTimePopoverAnchor.y + birthTimePopoverAnchor.height + TOOLTIP_POPOVER_TUNING.verticalGap
+      )
+    : insets.top + 48;
+  const birthTimePopoverArrowLeft = birthTimePopoverAnchor
+    ? clamp(
+        birthTimePopoverAnchor.x + birthTimePopoverAnchor.width / 2 - birthTimePopoverLeft - TOOLTIP_POPOVER_TUNING.arrowSize / 2,
+        TOOLTIP_POPOVER_TUNING.minArrowInset,
+        birthTimePopoverWidth - TOOLTIP_POPOVER_TUNING.minArrowInset - TOOLTIP_POPOVER_TUNING.arrowSize
+      )
+    : TOOLTIP_POPOVER_TUNING.minArrowInset;
 
-    introSequence.start(({ finished }) => {
-      if (!finished) return;
-      setShowMainContent(true);
-      Animated.timing(mainContentProgress, {
-        toValue: 1,
-        duration: 420,
-        useNativeDriver: true,
-      }).start();
+  const closeBirthTimePopover = () => {
+    setShowBirthTimePopover(false);
+    setBirthTimePopoverAnchor(null);
+  };
+
+  const openBirthTimePopover = () => {
+    birthTimeInfoRef.current?.measureInWindow((x, y, width, height) => {
+      setBirthTimePopoverAnchor({ x, y, width, height });
+      setShowBirthTimePopover(true);
     });
+  };
 
-    return () => {
-      introSequence.stop();
-    };
-  }, [introTextOpacity, introTextScale, mainContentProgress]);
+  const handleBirthTimeInfoPress = () => {
+    if (showBirthTimePopover) {
+      closeBirthTimePopover();
+      return;
+    }
+    openBirthTimePopover();
+  };
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -329,87 +357,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
         pointerEvents="none"
         style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
       >
-        <Svg height={windowHeight} width={windowWidth}>
-          <Defs>
-            <RadialGradient
-              id="onboardingBgGlowTop"
-              cx="38%"
-              cy="-8%"
-              rx="72%"
-              ry="54%"
-              fx="38%"
-              fy="-8%"
-              gradientUnits="userSpaceOnUse"
-            >
-              <Stop offset="0%" stopColor={palette.glowTopStart} stopOpacity={1} />
-              <Stop offset="54%" stopColor={palette.glowTopMid} stopOpacity={1} />
-              <Stop offset="100%" stopColor="transparent" stopOpacity="0" />
-            </RadialGradient>
-            <RadialGradient
-              id="onboardingBgGlowBottom"
-              cx="84%"
-              cy="108%"
-              rx="70%"
-              ry="52%"
-              fx="84%"
-              fy="108%"
-              gradientUnits="userSpaceOnUse"
-            >
-              <Stop offset="0%" stopColor={palette.glowBottomStart} stopOpacity={1} />
-              <Stop offset="58%" stopColor={palette.glowBottomMid} stopOpacity={1} />
-              <Stop offset="100%" stopColor="transparent" stopOpacity="0" />
-            </RadialGradient>
-            <RadialGradient
-              id="onboardingBgMistCenter"
-              cx={centerRingCx}
-              cy={centerRingCy}
-              r={centerRingRadius}
-              fx={centerRingCx}
-              fy={centerRingCy}
-              gradientUnits="userSpaceOnUse"
-            >
-              <Stop offset="0%" stopColor={palette.mist0} stopOpacity={1} />
-              <Stop offset="18%" stopColor={palette.mist1} stopOpacity={1} />
-              <Stop offset="48%" stopColor={palette.mist2} stopOpacity={1} />
-              <Stop offset="74%" stopColor={palette.mist3} stopOpacity={1} />
-              <Stop offset="100%" stopColor="transparent" stopOpacity="0" />
-            </RadialGradient>
-            <LinearGradient
-              id="onboardingBgGreenLine"
-              x1={windowWidth * 0.08}
-              y1={windowHeight * 0.94}
-              x2={windowWidth * 1.08}
-              y2={windowHeight * 0.84}
-              gradientUnits="userSpaceOnUse"
-            >
-              <Stop offset="0%" stopColor="rgba(113,163,103,0)" stopOpacity="0" />
-              <Stop offset="42%" stopColor={palette.greenLineMidA} stopOpacity={1} />
-              <Stop offset="72%" stopColor={palette.greenLineMidB} stopOpacity={1} />
-              <Stop offset="100%" stopColor="transparent" stopOpacity="0" />
-            </LinearGradient>
-          </Defs>
-
-          <Rect x="0" y="0" width={windowWidth} height={windowHeight} fill="url(#onboardingBgGlowTop)" />
-          <Rect x="0" y="0" width={windowWidth} height={windowHeight} fill="url(#onboardingBgGlowBottom)" />
-          <Circle
-            cx={centerRingCx}
-            cy={centerRingCy}
-            r={centerRingRadius}
-            fill="url(#onboardingBgMistCenter)"
-          />
-          <Path
-            d={`M ${windowWidth * 0.08} ${windowHeight * 0.93} C ${windowWidth * 0.34} ${windowHeight * 0.82}, ${windowWidth * 0.68} ${windowHeight * 1.02}, ${windowWidth * 1.08} ${windowHeight * 0.86}`}
-            fill="none"
-            stroke="url(#onboardingBgGreenLine)"
-            strokeWidth={1.4}
-          />
-          <Path
-            d={`M ${windowWidth * 0.2} ${windowHeight * 0.98} C ${windowWidth * 0.48} ${windowHeight * 0.88}, ${windowWidth * 0.8} ${windowHeight * 1.04}, ${windowWidth * 1.12} ${windowHeight * 0.9}`}
-            fill="none"
-            stroke={palette.greenLineSecondary}
-            strokeWidth={1}
-          />
-        </Svg>
+        {isLight ? <CosmicOnboardingLightBackground /> : <CosmicOnboardingDarkBackground />}
       </View>
 
       <SafeAreaView className="flex-1">
@@ -425,6 +373,8 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            removeClippedSubviews={Platform.OS === 'android'}
+            scrollEventThrottle={16}
           >
             <Animated.View
               style={{
@@ -444,50 +394,18 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
               }}
               className="px-6 pt-8"
             >
-              {!showMainContent ? (
-                <Animated.View
-                  className="pb-8"
-                  style={{
-                    opacity: introTextOpacity,
-                    minHeight: mainBlockMinHeight,
-                    justifyContent: 'center',
-                    transform: [{ scale: introTextScale }],
-                  }}
-                >
-                  <Text
-                    className="text-center text-[20px] font-semibold mb-2"
-                    style={{ color: palette.introTitle }}
-                  >
-                    Unlock Your Career Map
-                  </Text>
-                  <Text
-                    className="text-center text-[13px]"
-                    style={{ color: palette.introSubtitle }}
-                  >
-                    Enter your birth details to reveal your cosmic career profile
-                  </Text>
-                </Animated.View>
-              ) : (
-                <Animated.View
-                  style={{
-                    opacity: mainContentProgress,
-                    minHeight: mainBlockMinHeight,
-                    justifyContent: 'flex-start',
-                    transform: [
-                      {
-                        translateY: mainContentProgress.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [10, 0],
-                        }),
-                      },
-                    ],
-                  }}
-                >
+              <Animated.View
+                style={{
+                  minHeight: mainBlockMinHeight,
+                  justifyContent: 'flex-start',
+                }}
+              >
                   <View style={{ marginBottom: ONBOARDING_WHEEL_TUNING.wheelToFormGap }}>
                     <OnboardingWheel
                       filledCount={wheelFilledCount}
                       onReveal={handleSubmit}
                       size={dynamicWheelHeight}
+                      brightnessChannels={channels}
                     />
                   </View>
 
@@ -531,9 +449,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                               className="flex-row items-center px-4 py-3.5 rounded-[16px]"
                               style={{
                                 backgroundColor: palette.inputBg,
-                                borderColor: name.trim()
-                                  ? palette.inputBorderActive
-                                  : palette.inputBorder,
+                                borderColor: nameBorderColor,
                                 borderWidth: 1,
                               }}
                             >
@@ -551,6 +467,11 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                                 style={{ color: palette.textPrimary }}
                                 autoCapitalize="words"
                                 returnKeyType="next"
+                                onFocus={() => setIsNameFocused(true)}
+                                onBlur={() => {
+                                  setIsNameFocused(false);
+                                  handleNameBlur();
+                                }}
                               />
                             </View>
                           </View>
@@ -569,9 +490,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                                     className="flex-row items-center px-4 py-3.5 rounded-[16px]"
                                     style={{
                                       backgroundColor: palette.inputBg,
-                                      borderColor: birthDate
-                                        ? palette.inputBorderActive
-                                        : palette.inputBorder,
+                                      borderColor: dateBorderColor,
                                       borderWidth: 1,
                                     }}
                                   >
@@ -602,37 +521,18 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                                   >
                                     Time of Birth
                                   </Text>
-                                  <Pressable onPress={toggleTooltip}>
-                                    <Info size={14} color={palette.helperText} />
-                                  </Pressable>
-                                </View>
-                                {showTooltip && (
-                                  <View
-                                    className="mb-2 px-3 py-2 rounded-[12px]"
-                                    style={{
-                                      backgroundColor: palette.tooltipBg,
-                                      borderColor: palette.tooltipBorder,
-                                      borderWidth: 1,
-                                    }}
-                                  >
-                                    <Text
-                                      className="text-[11px]"
-                                      style={{ color: palette.tooltipText }}
-                                    >
-                                      Birth time determines your Ascendant and house placements, which
-                                      shape career insights.
-                                    </Text>
+                                  <View ref={birthTimeInfoRef} collapsable={false}>
+                                    <Pressable onPress={handleBirthTimeInfoPress}>
+                                      <Info size={14} color={palette.infoIcon} />
+                                    </Pressable>
                                   </View>
-                                )}
+                                </View>
                                 <Pressable onPress={() => !unknownTime && setShowTimePicker(true)}>
                                   <View
                                     className="flex-row items-center px-4 py-3.5 rounded-[16px]"
                                     style={{
                                       backgroundColor: palette.inputBg,
-                                      borderColor:
-                                        birthTime || unknownTime
-                                          ? palette.inputBorderActive
-                                          : palette.inputBorder,
+                                      borderColor: timeBorderColor,
                                       borderWidth: 1,
                                       opacity: unknownTime ? 0.5 : 1,
                                     }}
@@ -673,7 +573,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                               />
                               <Text
                                 className="text-[12px]"
-                                style={{ color: palette.helperText }}
+                                style={{ color: palette.fieldLabel }}
                               >
                                 I don't know my birth time
                               </Text>
@@ -699,7 +599,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                           className="flex-row items-center px-4 py-3.5 rounded-[16px]"
                           style={{
                             backgroundColor: palette.inputBg,
-                            borderColor: city ? palette.inputBorderActive : palette.inputBorder,
+                            borderColor: cityBorderColor,
                             borderWidth: 1,
                           }}
                           onLayout={(e) => setCityInputHeight(e.nativeEvent.layout.height)}
@@ -747,7 +647,7 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                                   key={cityResult.id}
                                   onPress={() => handleCitySelect(cityResult)}
                                   className="px-4 py-3"
-                                  style={{ borderBottomWidth: 1, borderBottomColor: palette.cityListItemSeparator }}
+                                  style={{ borderBottomColor: palette.cityListItemSeparator, borderBottomWidth: 1 }}
                                 >
                                   <Text style={{ color: palette.cityListText }}>
                                     {cityResult.label}
@@ -773,11 +673,78 @@ export const OnboardingScreen = ({ navigation }: { navigation: any }) => {
                     ) : null}
                   </View>
                 </Animated.View>
-              )}
             </Animated.View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {showBirthTimePopover ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 2000,
+            elevation: 20,
+          }}
+        >
+          <Pressable
+            onPress={closeBirthTimePopover}
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+          />
+          <View
+            pointerEvents="box-none"
+            style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+          >
+            <View
+              style={{
+                position: 'absolute',
+                top: birthTimePopoverTop,
+                left: birthTimePopoverLeft,
+                width: birthTimePopoverWidth,
+              }}
+            >
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -TOOLTIP_POPOVER_TUNING.arrowSize / 2,
+                  left: birthTimePopoverArrowLeft,
+                  width: TOOLTIP_POPOVER_TUNING.arrowSize,
+                  height: TOOLTIP_POPOVER_TUNING.arrowSize,
+                  backgroundColor: palette.tooltipBg,
+                  borderLeftWidth: 1,
+                  borderTopWidth: 1,
+                  borderLeftColor: palette.tooltipBorder,
+                  borderTopColor: palette.tooltipBorder,
+                  transform: [{ rotate: '45deg' }],
+                }}
+              />
+              <View
+                className="px-3 py-2 rounded-[12px]"
+                style={{
+                  backgroundColor: palette.tooltipBg,
+                  borderColor: palette.tooltipBorder,
+                  borderWidth: 1,
+                  shadowColor: '#000',
+                  shadowOpacity: isLight ? 0.08 : 0.22,
+                  shadowRadius: 18,
+                  shadowOffset: { width: 0, height: 10 },
+                  elevation: 10,
+                }}
+              >
+                <Text
+                  className="text-[11px]"
+                  style={{ color: palette.tooltipText }}
+                >
+                  Birth time determines your Ascendant and house placements, which shape career
+                  insights.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       <GlassDatePicker
         visible={showDatePicker}

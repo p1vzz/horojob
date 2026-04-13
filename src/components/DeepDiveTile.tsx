@@ -99,13 +99,14 @@ const LockedDeepDiveCard = ({ onPress, isLight }: { onPress: () => void; isLight
   </TouchableOpacity>
 );
 
-export const DeepDiveTile = () => {
+export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) => {
   const navigation = useNavigation<AppNavigationProp>();
   const { isLight } = useThemeMode();
   const [isPremium, setIsPremium] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [snapshot, setSnapshot] = useState<DeepDiveSnapshot>(FALLBACK_DEEP_DIVE_SNAPSHOT);
+  const hasSignaledReadyRef = React.useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -144,6 +145,13 @@ export const DeepDiveTile = () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && !hasSignaledReadyRef.current) {
+      hasSignaledReadyRef.current = true;
+      onReady?.();
+    }
+  }, [isLoading, onReady]);
 
   const handleOpenAnalysis = () => navigation.navigate('FullNatalCareerAnalysis');
 
@@ -396,4 +404,4 @@ export const DeepDiveTile = () => {
       )}
     </View>
   );
-};
+});

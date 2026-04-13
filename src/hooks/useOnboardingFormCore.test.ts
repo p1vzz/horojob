@@ -5,6 +5,9 @@ import {
   countOnboardingFilledFields,
   formatOnboardingDate,
   formatOnboardingTime,
+  isValidOnboardingName,
+  normalizeOnboardingNameInput,
+  normalizeOnboardingNameValue,
   resolveOnboardingSubmitError,
 } from './useOnboardingFormCore';
 
@@ -36,11 +39,22 @@ test('onboarding core counts filled wheel fields', () => {
     }),
     3
   );
+
+  assert.equal(
+    countOnboardingFilledFields({
+      name: '   ',
+      birthDate: '30/03/2026',
+      birthTime: '08:05',
+      unknownTime: false,
+      citySelected: true,
+    }),
+    3
+  );
 });
 
 test('onboarding core builds payload with normalized values', () => {
   const payload = buildOnboardingSubmitPayload({
-    name: '  Alex  ',
+    name: '  Alex   42   Doe  ',
     birthDate: '30/03/2026',
     birthTime: '08:05',
     unknownTime: false,
@@ -54,7 +68,7 @@ test('onboarding core builds payload with normalized values', () => {
   });
 
   assert.deepEqual(payload, {
-    name: 'Alex',
+    name: 'Alex Doe',
     birthDate: '30/03/2026',
     birthTime: '08:05',
     unknownTime: false,
@@ -76,6 +90,16 @@ test('onboarding core builds payload with normalized values', () => {
 
   assert.equal(unknownTimePayload.birthTime, null);
   assert.equal(unknownTimePayload.latitude, null);
+});
+
+test('onboarding core normalizes and validates names', () => {
+  assert.equal(normalizeOnboardingNameInput('  Alex   42   Doe  '), 'Alex Doe ');
+  assert.equal(normalizeOnboardingNameValue('  Alex   42   Doe  '), 'Alex Doe');
+  assert.equal(normalizeOnboardingNameInput('   '), '');
+  assert.equal(isValidOnboardingName('Alex Doe'), true);
+  assert.equal(isValidOnboardingName(' Alex '), true);
+  assert.equal(isValidOnboardingName('123'), false);
+  assert.equal(isValidOnboardingName('   '), false);
 });
 
 test('onboarding core resolves submit error messages', () => {

@@ -59,7 +59,7 @@ const premiumFeatureRows: PremiumFeatureRow[] = [
   {
     id: 'burnout',
     title: 'Burnout Alerts',
-    subtitle: 'Receive push notifications for energy warnings',
+    subtitle: 'Get nudges when workload pressure needs a lighter plan',
     Icon: Bell,
     iconColor: '#FF6B8A',
     iconBg: 'rgba(255,107,138,0.12)',
@@ -67,7 +67,7 @@ const premiumFeatureRows: PremiumFeatureRow[] = [
   {
     id: 'lunar',
     title: 'Lunar Productivity',
-    subtitle: 'Receive moon-adapted focus and workload alerts',
+    subtitle: 'Get action-ready nudges for strong and disruptive focus windows',
     Icon: MoonStar,
     iconColor: '#F5F7FF',
     iconBg: 'rgba(245,247,255,0.14)',

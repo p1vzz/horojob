@@ -8,6 +8,8 @@ import { JobProfileCard } from '../../components/JobProfileCard';
 import { CompatibilityBreakdown } from '../../components/CompatibilityBreakdown';
 import { InterviewStrategy } from '../../components/InterviewStrategy';
 import { PremiumScansCard } from '../../components/PremiumScansCard';
+import { useBrightnessAdaptation } from '../../contexts/BrightnessAdaptationContext';
+import { adaptColorOpacity } from '../../utils/brightnessAdaptation';
 import { formatScreenshotConfidence } from '../scannerUtilsCore';
 
 type ScannerAnalysisSectionProps = {
@@ -16,6 +18,7 @@ type ScannerAnalysisSectionProps = {
 
 export function ScannerAnalysisSection(props: ScannerAnalysisSectionProps) {
   const { analysis } = props;
+  const { channels } = useBrightnessAdaptation();
   if (!analysis) {
     return null;
   }
@@ -27,7 +30,10 @@ export function ScannerAnalysisSection(props: ScannerAnalysisSectionProps) {
   return (
     <>
       <View className="items-center mt-8 mb-2">
-        <Text className="text-[11px] uppercase tracking-[2.5px] mb-3" style={{ color: 'rgba(201,168,76,0.7)' }}>
+        <Text
+          className="text-[11px] uppercase tracking-[2.5px] mb-3"
+          style={{ color: adaptColorOpacity('rgba(201,168,76,0.7)', channels.textOpacityMultiplier) }}
+        >
           NATAL ALIGNMENT
         </Text>
         <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}>
@@ -36,17 +42,23 @@ export function ScannerAnalysisSection(props: ScannerAnalysisSectionProps) {
           </View>
           <MatchScoreGauge score={compatibilityScore} size={150} />
         </View>
-        <Text className="text-[12px] mt-3 text-center" style={{ color: 'rgba(212,212,224,0.5)' }}>
+        <Text
+          className="text-[12px] mt-3 text-center"
+          style={{ color: adaptColorOpacity('rgba(212,212,224,0.5)', channels.textOpacityMultiplier) }}
+        >
           Compatibility
         </Text>
         <View
           className="mt-2 px-3 py-1 rounded-full border"
           style={{
-            borderColor: 'rgba(101,184,255,0.4)',
-            backgroundColor: 'rgba(101,184,255,0.12)',
+            borderColor: adaptColorOpacity('rgba(101,184,255,0.4)', channels.borderOpacityMultiplier),
+            backgroundColor: adaptColorOpacity('rgba(101,184,255,0.12)', channels.glowOpacityMultiplier),
           }}
         >
-          <Text className="text-[11px] font-semibold" style={{ color: '#8AC9FF' }}>
+          <Text
+            className="text-[11px] font-semibold"
+            style={{ color: adaptColorOpacity('#8AC9FF', channels.textOpacityMultiplier) }}
+          >
             Overall Fit: {overallScore}%
           </Text>
         </View>
@@ -57,21 +69,33 @@ export function ScannerAnalysisSection(props: ScannerAnalysisSectionProps) {
           <View
             className="rounded-[16px] p-4"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              borderColor: 'rgba(255,255,255,0.08)',
+              backgroundColor: adaptColorOpacity('rgba(255,255,255,0.04)', channels.glowOpacityMultiplier),
+              borderColor: adaptColorOpacity('rgba(255,255,255,0.08)', channels.borderOpacityMultiplier),
               borderWidth: 1,
             }}
           >
-            <Text className="text-[10px] uppercase tracking-[2px]" style={{ color: 'rgba(212,212,224,0.55)' }}>
+            <Text
+              className="text-[10px] uppercase tracking-[2px]"
+              style={{ color: adaptColorOpacity('rgba(212,212,224,0.55)', channels.textOpacityMultiplier) }}
+            >
               Screenshot Parsing
             </Text>
-            <Text className="text-[12px] mt-2" style={{ color: 'rgba(233,233,242,0.9)' }}>
+            <Text
+              className="text-[12px] mt-2"
+              style={{ color: adaptColorOpacity('rgba(233,233,242,0.9)', channels.textOpacityMultiplier) }}
+            >
               Images: {analysis.screenshot.imageCount}
             </Text>
-            <Text className="text-[12px] mt-1" style={{ color: 'rgba(233,233,242,0.9)' }}>
+            <Text
+              className="text-[12px] mt-1"
+              style={{ color: adaptColorOpacity('rgba(233,233,242,0.9)', channels.textOpacityMultiplier) }}
+            >
               Confidence: {formatScreenshotConfidence(analysis.screenshot.confidence)}
             </Text>
-            <Text className="text-[11px] mt-2" style={{ color: 'rgba(212,212,224,0.55)' }}>
+            <Text
+              className="text-[11px] mt-2"
+              style={{ color: adaptColorOpacity('rgba(212,212,224,0.55)', channels.textOpacityMultiplier) }}
+            >
               {analysis.screenshot.reason}
             </Text>
           </View>

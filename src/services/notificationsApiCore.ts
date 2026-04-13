@@ -6,6 +6,7 @@ import type {
 export type PushTokenPlatform = 'ios' | 'android' | 'web';
 export type BurnoutSeverity = 'none' | 'warn' | 'high' | 'critical';
 export type LunarProductivitySeverity = 'none' | 'warn' | 'high' | 'critical';
+export type LunarProductivityImpactDirection = 'supportive' | 'disruptive';
 
 export type BurnoutSettings = {
   enabled: boolean;
@@ -81,6 +82,7 @@ export type LunarProductivityPlanResponse = {
     algorithmVersion: string;
     score: number;
     severity: LunarProductivitySeverity;
+    impactDirection: LunarProductivityImpactDirection | null;
     components: {
       moonPhaseLoad: number;
       emotionalTide: number;
@@ -115,6 +117,21 @@ export type LunarProductivityPlanResponse = {
     scheduledDateKey: string | null;
     scheduledSeverity: Exclude<LunarProductivitySeverity, 'none'> | null;
   };
+};
+
+export type LunarProductivitySeenResponse = {
+  acknowledged: boolean;
+  reason: 'already_sent' | 'outside_display_range' | 'date_mismatch' | null;
+  dateKey: string;
+  impactDirection: LunarProductivityImpactDirection | null;
+  timingStatus: LunarProductivityPlanResponse['timing']['status'];
+};
+
+export type BurnoutSeenResponse = {
+  acknowledged: boolean;
+  reason: 'already_sent' | 'below_threshold' | 'date_mismatch' | null;
+  dateKey: string;
+  timingStatus: BurnoutPlanResponse['timing']['status'];
 };
 
 export type PushTokenResponse = {
@@ -213,6 +230,19 @@ export function createNotificationsApi(deps: NotificationsApiDeps) {
     return payload as BurnoutPlanResponse;
   };
 
+  const markBurnoutSeen = async (input: { dateKey: string }) => {
+    const response = await deps.authorizedFetch('/api/notifications/burnout-seen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const payload = await deps.parseJsonBody(response);
+    if (!response.ok) {
+      throw new deps.ApiError(response.status, 'Failed to acknowledge burnout insight', payload);
+    }
+    return payload as BurnoutSeenResponse;
+  };
+
   const upsertLunarProductivitySettings = async (input: {
     enabled: boolean;
     timezoneIana: string;
@@ -240,6 +270,19 @@ export function createNotificationsApi(deps: NotificationsApiDeps) {
       throw new deps.ApiError(response.status, 'Failed to fetch lunar productivity plan', payload);
     }
     return payload as LunarProductivityPlanResponse;
+  };
+
+  const markLunarProductivitySeen = async (input: { dateKey: string }) => {
+    const response = await deps.authorizedFetch('/api/notifications/lunar-productivity-seen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const payload = await deps.parseJsonBody(response);
+    if (!response.ok) {
+      throw new deps.ApiError(response.status, 'Failed to acknowledge lunar productivity insight', payload);
+    }
+    return payload as LunarProductivitySeenResponse;
   };
 
   const upsertInterviewStrategySettings = async (input: {
@@ -281,8 +324,10 @@ export function createNotificationsApi(deps: NotificationsApiDeps) {
     upsertPushNotificationToken,
     upsertBurnoutSettings,
     fetchBurnoutPlan,
+    markBurnoutSeen,
     upsertLunarProductivitySettings,
     fetchLunarProductivityPlan,
+    markLunarProductivitySeen,
     upsertInterviewStrategySettings,
     fetchInterviewStrategyPlan,
   };

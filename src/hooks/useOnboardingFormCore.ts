@@ -17,6 +17,36 @@ type OnboardingSubmitPayload = {
   admin1: string | null;
 };
 
+const ONBOARDING_NAME_WORD_REGEX = /^\p{L}+(?: \p{L}+)*$/u;
+
+function stripUnsupportedNameCharacters(value: string) {
+  return Array.from(value.normalize('NFC'))
+    .filter((char) => /\p{L}/u.test(char) || /\s/u.test(char))
+    .join('');
+}
+
+export function normalizeOnboardingNameInput(value: string) {
+  const filtered = stripUnsupportedNameCharacters(value);
+  const withoutLeadingWhitespace = filtered.replace(/^\s+/u, '');
+  const collapsedWhitespace = withoutLeadingWhitespace.replace(/\s+/gu, ' ');
+  const trimmedEnd = collapsedWhitespace.replace(/\s+$/u, '');
+
+  if (trimmedEnd.length === 0) {
+    return '';
+  }
+
+  return /\s$/u.test(filtered) ? `${trimmedEnd} ` : trimmedEnd;
+}
+
+export function normalizeOnboardingNameValue(value: string) {
+  return normalizeOnboardingNameInput(value).trim();
+}
+
+export function isValidOnboardingName(value: string) {
+  const normalized = normalizeOnboardingNameValue(value);
+  return normalized.length > 0 && ONBOARDING_NAME_WORD_REGEX.test(normalized);
+}
+
 export function formatOnboardingDate(date: Date) {
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -38,7 +68,7 @@ export function countOnboardingFilledFields(input: {
   citySelected: boolean;
 }) {
   let count = 0;
-  if (input.name.trim()) count++;
+  if (isValidOnboardingName(input.name)) count++;
   if (input.birthDate) count++;
   if (input.birthTime || input.unknownTime) count++;
   if (input.citySelected) count++;
@@ -54,7 +84,7 @@ export function buildOnboardingSubmitPayload(input: {
   cityGeo: CityGeoState | null;
 }): OnboardingSubmitPayload {
   return {
-    name: input.name.trim(),
+    name: normalizeOnboardingNameValue(input.name),
     birthDate: input.birthDate,
     birthTime: input.unknownTime ? null : input.birthTime,
     unknownTime: input.unknownTime,

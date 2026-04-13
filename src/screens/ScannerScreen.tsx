@@ -26,9 +26,12 @@ import { ScannerFeedbackCard } from './scanner/ScannerFeedbackCard';
 import { ScannerHistorySection } from './scanner/ScannerHistorySection';
 import { ScannerSearchPanel } from './scanner/ScannerSearchPanel';
 import { useScannerRuntime } from './useScannerRuntime';
+import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
+import { adaptOpacity } from '../utils/brightnessAdaptation';
 
 export const ScannerScreen = () => {
   const { theme } = useThemeMode();
+  const { channels } = useBrightnessAdaptation();
   const pageAnim = useRef(new Animated.Value(0)).current;
   const { width, height } = Dimensions.get('window');
   const navigation = useNavigation<AppNavigationProp<'Scanner'>>();
@@ -100,8 +103,16 @@ export const ScannerScreen = () => {
               fy="-5%"
               gradientUnits="userSpaceOnUse"
             >
-              <Stop offset="0%" stopColor="rgba(90,58,204,0.35)" stopOpacity="0.35" />
-              <Stop offset="55%" stopColor="rgba(90,58,204,0.08)" stopOpacity="0.08" />
+              <Stop
+                offset="0%"
+                stopColor="rgba(90,58,204,0.35)"
+                stopOpacity={adaptOpacity(0.35, channels.glowOpacityMultiplier).toString()}
+              />
+              <Stop
+                offset="55%"
+                stopColor="rgba(90,58,204,0.08)"
+                stopOpacity={adaptOpacity(0.08, channels.glowOpacityMultiplier).toString()}
+              />
               <Stop offset="100%" stopColor="transparent" stopOpacity="0" />
             </RadialGradient>
             <RadialGradient
@@ -114,8 +125,16 @@ export const ScannerScreen = () => {
               fy="105%"
               gradientUnits="userSpaceOnUse"
             >
-              <Stop offset="0%" stopColor="rgba(201,168,76,0.18)" stopOpacity="0.18" />
-              <Stop offset="55%" stopColor="rgba(201,168,76,0.05)" stopOpacity="0.05" />
+              <Stop
+                offset="0%"
+                stopColor="rgba(201,168,76,0.18)"
+                stopOpacity={adaptOpacity(0.18, channels.glowOpacityMultiplier).toString()}
+              />
+              <Stop
+                offset="55%"
+                stopColor="rgba(201,168,76,0.05)"
+                stopOpacity={adaptOpacity(0.05, channels.glowOpacityMultiplier).toString()}
+              />
               <Stop offset="100%" stopColor="rgba(201,168,76,0)" stopOpacity="0" />
             </RadialGradient>
           </Defs>

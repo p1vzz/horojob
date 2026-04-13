@@ -7,12 +7,15 @@ import { ensureAuthSession } from '../services/authSession';
 import type { AppNavigationProp } from '../types/navigation';
 import { loadOnboardingForUser } from '../utils/onboardingStorage';
 import { useAppTheme } from '../theme/ThemeModeProvider';
+import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
+import { adaptColorOpacity } from '../utils/brightnessAdaptation';
 import { buildDashboardMiniPositions, resolveDashboardGreeting } from './dashboardHeaderCore';
 
 const miniPositions = buildDashboardMiniPositions();
 
 export const DashboardHeader = () => {
   const theme = useAppTheme();
+  const { channels } = useBrightnessAdaptation();
   const navigation = useNavigation<AppNavigationProp>();
   const insets = useSafeAreaInsets();
   const greeting = resolveDashboardGreeting(new Date().getHours());
@@ -63,11 +66,17 @@ export const DashboardHeader = () => {
   return (
     <View className="flex-row items-center justify-between px-5 pb-2" style={{ paddingTop: Math.max(insets.top + 6, 18) }}>
       <View>
-        <Text className="text-[12px] uppercase tracking-[2px] mb-1" style={{ color: 'rgba(212, 212, 224, 0.6)' }}>
+        <Text
+          className="text-[12px] uppercase tracking-[2px] mb-1"
+          style={{ color: adaptColorOpacity('rgba(212, 212, 224, 0.6)', channels.textOpacityMultiplier) }}
+        >
           {greeting}
         </Text>
         <View className="flex-row items-center">
-          <Text className="text-[22px] font-semibold tracking-tight" style={{ color: '#E9E9F2' }}>
+          <Text
+            className="text-[22px] font-semibold tracking-tight"
+            style={{ color: adaptColorOpacity('#E9E9F2', channels.textOpacityMultiplier) }}
+          >
             {displayName}
           </Text>
           <TouchableOpacity
@@ -75,12 +84,12 @@ export const DashboardHeader = () => {
             onPress={() => navigation.navigate('Settings')}
             className="ml-2 w-9 h-9 rounded-full items-center justify-center"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              borderColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: adaptColorOpacity('rgba(255,255,255,0.03)', channels.glowOpacityMultiplier),
+              borderColor: adaptColorOpacity('rgba(255,255,255,0.1)', channels.borderOpacityMultiplier),
               borderWidth: 1,
             }}
           >
-            <Settings size={16} color="rgba(140,124,255,0.9)" />
+            <Settings size={16} color={adaptColorOpacity('rgba(140,124,255,0.9)', channels.textOpacityMultiplier)} />
           </TouchableOpacity>
         </View>
       </View>
@@ -90,8 +99,8 @@ export const DashboardHeader = () => {
         onPress={() => navigation.navigate('NatalChart')}
         className="w-11 h-11 rounded-full justify-center items-center"
         style={{
-          backgroundColor: 'rgba(201, 168, 76, 0.08)',
-          borderColor: 'rgba(201, 168, 76, 0.15)',
+          backgroundColor: adaptColorOpacity('rgba(201, 168, 76, 0.08)', channels.glowOpacityMultiplier),
+          borderColor: adaptColorOpacity('rgba(201, 168, 76, 0.15)', channels.borderOpacityMultiplier),
           borderWidth: 1,
           shadowColor: theme.colors.gold,
           shadowOffset: { width: 0, height: 0 },
@@ -115,7 +124,7 @@ export const DashboardHeader = () => {
               key={i}
               style={{
                 position: 'absolute',
-                color: 'rgba(201, 168, 76, 0.5)',
+                color: adaptColorOpacity('rgba(201, 168, 76, 0.5)', channels.textOpacityMultiplier),
                 fontSize: 8,
                 fontWeight: 'normal',
                 transform: [{ translateX: p.x }, { translateY: p.y }],

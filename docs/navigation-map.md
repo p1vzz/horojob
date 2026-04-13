@@ -1,6 +1,6 @@
 # Navigation Map
 **Status:** Active  
-**Last synced:** 2026-03-29
+**Last synced:** 2026-04-12
 
 ## Root Stack
 
@@ -31,8 +31,9 @@ Routes:
 ## Cross-Screen Navigation Triggers
 
 - Notification action:
-  - push payload `type=burnout_alert` -> navigate to `Dashboard`
-  - other alert types do not have dedicated app-side routing yet
+  - push payload `type=burnout_alert` -> navigate to `Dashboard` with `alertFocus=burnout`
+  - push payload `type=lunar_productivity_alert` -> navigate to `Dashboard` with `alertFocus=lunar`
+  - `Dashboard` scrolls/highlights the target card after its readiness gate clears
 - Premium flows:
   - gated actions route to `PremiumPurchase`
   - post-purchase/restore sync refreshes session tier and premium surfaces
@@ -44,7 +45,6 @@ Routes:
 
 From `Settings` users can manage:
 
-- appearance (`light/dark` mode)
 - interview strategy controls and calendar integration
 - premium and restore-related operations
 - widget setup/variant picker entry points

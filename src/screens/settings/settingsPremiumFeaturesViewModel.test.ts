@@ -170,14 +170,19 @@ test('settings premium features view model reflects premium feature state detail
     burnoutStatus: {
       score: 67,
       severity: 'high',
+      nextPlannedAt: '2026-03-31T09:10:00.000Z',
+      status: 'planned',
     },
     handleBurnoutToggle: noop,
     isSavingBurnoutSettings: false,
     isSyncingBurnout: false,
     lunarSettings: createLunarSettings(true),
     lunarStatus: {
-      score: 41,
-      severity: 'warn',
+      score: 84,
+      severity: 'high',
+      impactDirection: 'disruptive',
+      nextPlannedAt: '2026-03-31T09:25:00.000Z',
+      status: 'planned',
     },
     handleLunarProductivityToggle: noop,
     isSavingLunarSettings: true,
@@ -199,14 +204,64 @@ test('settings premium features view model reflects premium feature state detail
   assert.equal(result.premiumFeatureStates.widget.statusLabel, 'Syncing...');
   assert.deepEqual(result.premiumFeatureStates.widget.detailLines, ['Peak Strip (4x1)', 'AI 88%']);
   assert.equal(result.premiumFeatureStates.burnout.statusLabel, 'Enabled');
-  assert.deepEqual(result.premiumFeatureStates.burnout.detailLines, ['Risk 67%', 'HIGH']);
+  assert.deepEqual(result.premiumFeatureStates.burnout.detailLines, [
+    'High strain 67%',
+    'Cut switching before taking on more work',
+    'Push armed for today',
+  ]);
   assert.equal(result.premiumFeatureStates.lunar.statusLabel, 'Syncing...');
-  assert.deepEqual(result.premiumFeatureStates.lunar.detailLines, ['Risk 41%', 'WARN']);
+  assert.deepEqual(result.premiumFeatureStates.lunar.detailLines, [
+    'Disruptive 84%',
+    'Protect focus and cut switching',
+    'Push armed for today',
+  ]);
   assert.equal(result.premiumFeatureStates.calendar.statusLabel, 'Auto');
   assert.deepEqual(result.premiumFeatureStates.calendar.detailLines, [
     '2 slots',
     'Calendar granted',
     'Target Work - Google',
     'Filled until 2026-04-07',
+  ]);
+});
+
+test('settings premium features view model keeps lunar row useful outside the dashboard display range', () => {
+  const result = buildSettingsPremiumFeaturesViewModel({
+    plan: 'premium',
+    briefing: null,
+    handleWidgetSetup: noop,
+    isSyncingWidget: false,
+    setupState: 'enabled',
+    widgetVariant: DEFAULT_MORNING_BRIEFING_WIDGET_VARIANT,
+    burnoutSettings: createBurnoutSettings(true),
+    burnoutStatus: null,
+    handleBurnoutToggle: noop,
+    isSavingBurnoutSettings: false,
+    isSyncingBurnout: false,
+    lunarSettings: createLunarSettings(true),
+    lunarStatus: {
+      score: 67,
+      severity: 'high',
+      impactDirection: null,
+      nextPlannedAt: null,
+      status: 'not_scheduled',
+    },
+    handleLunarProductivityToggle: noop,
+    isSavingLunarSettings: false,
+    isSyncingLunar: false,
+    handleInterviewFeatureRowPress: noop,
+    handleInterviewStrategyToggle: noop,
+    interviewCalendarPermissionStatus: null,
+    interviewPlan: null,
+    interviewSelectedCalendarId: null,
+    interviewSettings: null,
+    isGeneratingInterviewPlan: false,
+    isSavingInterviewSettings: false,
+    isSyncingInterviewCalendar: false,
+    selectedInterviewCalendarOption: null,
+  });
+
+  assert.deepEqual(result.premiumFeatureStates.lunar.detailLines, [
+    'Elevated 67%',
+    'Keep complex work earlier and lighter',
   ]);
 });

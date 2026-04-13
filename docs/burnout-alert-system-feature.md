@@ -11,19 +11,25 @@ Primary outcomes:
 2. Keep alerts useful and non-spammy (cooldowns + quiet hours).
 3. Keep gating aligned with existing `subscriptionTier` (`free|premium`).
 
-## 2. Current State (March 21, 2026)
+## 2. Current State (April 13, 2026)
 - `Burnout Alerts` is wired in settings UI with backend calls:
   - `PUT /api/notifications/push-token`
   - `PUT /api/notifications/burnout-settings`
   - `GET /api/notifications/burnout-plan`
-- Dashboard burnout card now hydrates through `src/hooks/useDashboardInsights.ts`, using live `/api/notifications/burnout-plan` for premium users and frozen fallback snapshot data when the plan is unavailable or fetch fails.
+  - `POST /api/notifications/burnout-seen`
+- Dashboard burnout card now hydrates through `src/hooks/useDashboardInsights.ts`, using live `/api/notifications/burnout-plan` for premium users.
+- Dashboard burnout card is visible only when current-day burnout severity is `warn`, `high`, or `critical`; below-threshold days do not render the card.
+- The degraded unavailable state is reserved for burnout push-entry recovery when live hydration fails after a user taps a push.
 - Mobile uses `src/services/dashboardInsightSnapshots.ts` as the adapter layer that converts `BurnoutPlanResponse` into dashboard-card snapshot shape.
-- Backend scheduler is running for burnout planning + Expo dispatch.
+- Dashboard burnout copy is action-oriented and no longer shows QA-only source/version badges, the derived-model footnote, or the old background glow sphere.
+- Backend scheduler is running for burnout planning + Expo dispatch, and it does not start when the server has no global Expo push access token.
+- Backend timing state is scoped to the active `profileHash`; stale same-day jobs from previous onboarding/profile edits are ignored for plan status and cancelled before dispatch.
+- If the user sees an in-threshold burnout card in-app before a same-day push is sent, mobile acknowledges it with `POST /burnout-seen` and backend cancels the pending push for that `dateKey`.
+- Tapping a burnout push opens `Dashboard`, waits for the readiness gate, then scrolls to and briefly highlights the burnout card.
 - Existing backend already computes daily transit and morning briefing:
   - `GET /api/astrology/daily-transit`
   - `GET /api/astrology/morning-briefing` (premium-only)
-- Current timing implementation uses `delay + quiet/workday/cooldown` and pushes one alert per local day.
-- The intraday hourly re-scan model in section 7.2 is a target behavior, not yet implemented.
+- Current timing implementation uses a deterministic local hourly stress scan over fixed workday samples, then applies lead-time, quiet-hours, workday, cooldown, and dedupe rules.
 
 ## 3. User Experience
 1. Premium user enables `Burnout Alerts` in settings.
@@ -160,18 +166,23 @@ Schedule push only if all are true:
 4. `burnoutRiskScore >= 55`
 
 ### 7.2 Intraday stress scan
-To estimate stress peak time, sample transit chart in local timezone at fixed hours:
+To estimate stress peak time, the backend samples deterministic local workday windows:
 - `[08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00]`
 
-For each sample hour `h`, call astrology provider with same day/location but `hour=h`.
-Compute:
+The scan reuses the current daily transit/risk document rather than making extra astrology-provider calls for each sample hour. For each sample hour `h`, it derives:
 - `hourHardStrength(h)`
 - `hourPositiveStrength(h)`
 - `hourSaturnHard(h)`
 - `hourMoonHard(h)`
 - `hourSaturnMoonHard(h)`
-- `hourSaturnHousePressure(h)`
-- `hourMoonHousePressure(h)`
+- `hourSaturnHousePressure`
+- `hourMoonHousePressure`
+
+The target stress hour is weighted by:
+- Saturn house peak hour
+- Moon house peak hour
+- user workday midpoint
+- focus/energy momentum shift
 
 Hourly stress:
 ```text
@@ -182,8 +193,8 @@ hourlyStress(h) =
     + hourSaturnHard(h) * 8
     + hourMoonHard(h) * 7
     + hourSaturnMoonHard(h) * 10
-    + hourSaturnHousePressure(h) * 0.9
-    + hourMoonHousePressure(h) * 0.8
+    + hourSaturnHousePressure * saturnAlignment(h) * 0.9
+    + hourMoonHousePressure * moonAlignment(h) * 0.8
     - hourPositiveStrength(h) * 4,
     0, 100
   )
@@ -218,14 +229,14 @@ If skipped for today:
 - Minimum `20h` between sends for same user.
 - Do not send duplicate for same `{dateKey, severity}`.
 
-## 8. Delivery Pipeline (Planned)
+## 8. Delivery Pipeline
 1. Mobile registers push token after permission grant.
 2. Mobile saves burnout settings via backend API.
-3. Backend scheduler (every 10 min) plans next 36h jobs.
+3. Backend scheduler runs on `BURNOUT_ALERT_CHECK_INTERVAL_SECONDS` (default `5m`) to plan and dispatch due jobs.
 4. Worker dispatches pushes at scheduled UTC timestamp.
 5. Delivery result is persisted for retries/analytics.
 
-## 9. Planned API Contracts
+## 9. API Contracts
 
 ### 9.1 `PUT /api/notifications/push-token`
 - Auth required.
@@ -257,7 +268,18 @@ If skipped for today:
 - Auth + premium required.
 - Returns current computed risk and next planned fire time (for QA/support).
 
-## 10. Data Model (Planned)
+### 9.4 `POST /api/notifications/burnout-seen`
+- Auth + premium required.
+- Body:
+```json
+{
+  "dateKey": "2026-04-12"
+}
+```
+- Returns acknowledgement status and resulting timing state.
+- Used by dashboard hydration to cancel a pending same-day burnout push once the user has already seen the in-app card.
+
+## 10. Data Model
 Collections:
 1. `push_notification_tokens`
 - `userId`, `token`, `platform`, `active`, `lastSeenAt`, `createdAt`, `updatedAt`
@@ -269,12 +291,14 @@ Collections:
 - unique index `{ userId: 1 }`
 
 3. `burnout_alert_jobs`
-- `userId`, `dateKey`, `severity`, `riskScore`, `predictedPeakAt`, `scheduledAt`, `status`, `providerMessageId`, `lastError`
+- `userId`, `profileHash`, `dateKey`, `severity`, `riskScore`, `predictedPeakAt`, `scheduledAt`, `status`, `providerMessageId`, `lastError`, `seenAt`
 - unique index `{ userId: 1, dateKey: 1 }`
 - index `{ status: 1, scheduledAt: 1 }`
 
 4. `burnout_alert_events`
-- delivery and interaction events for QA and tuning
+- durable event trail for QA and tuning
+- event types: `planned`, `skipped`, `cancelled`, `sent`, `failed`, `seen`
+- stores user/job/date context, severity, score, reason, provider message id, optional metadata, and created timestamp
 
 ## 11. What Is Required From You (Current Status)
 
@@ -343,16 +367,16 @@ Confirmed:
 5. QA with premium test user across at least 2 timezones.
 6. Enable production with feature flag and monitor send success/error rates.
 
-## 13. Approved Push Copy (v1)
+## 13. Approved Push Copy
 
-### 13.1 `warn` (Low / Gentle Reminder)
-- Headline: `Cosmic Battery: 40%`
-- Body: `The stars suggest slowing down. Your Career Score is dipping today; maybe reschedule that big meeting for tomorrow?`
+### 13.1 `warn`
+- Headline: `Protect Your Energy Today`
+- Body: `Workload pressure is rising. Keep one priority task, batch messages, and leave a real break before the next push.`
 
-### 13.2 `high` (Serious Warning)
-- Headline: `Burnout Risk: High`
-- Body: `Mars is opposing your productivity. Don't try to outdo yourself today; save your strength for a breakthrough this Thursday.`
+### 13.2 `high`
+- Headline: `Cut Context Switching Now`
+- Body: `Burnout pressure is high. Finish the main task first, move low-value meetings, and avoid taking on new work today.`
 
-### 13.3 `critical` (Immediate Action)
-- Headline: `System Overheat!`
-- Body: `Your Energy Level is at a critical low. Close your laptop now. Even Saturn doesn't work 24/7, and neither should you.`
+### 13.3 `critical`
+- Headline: `Reduce Load Before It Spikes`
+- Body: `Your recovery buffer is thin. Pause new commitments, close one critical item, and schedule recovery time before more deep work.`

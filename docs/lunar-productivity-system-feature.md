@@ -4,14 +4,15 @@
 **Owner:** Backend + Mobile
 
 ## 1. Goal
-Ship a premium-only `Lunar Productivity` feature that predicts low-focus windows from moon-driven transit signals and sends proactive push notifications before productivity dips.
+Ship a premium-only `Lunar Productivity` feature that spots disruptive and supportive work windows from moon-driven transit signals and turns them into action-ready guidance.
 
 Primary outcomes:
-1. Protect deep work by warning before lunar focus drops.
-2. Reuse the proven burnout delivery pipeline (gating, quiet hours, dedupe, cooldown).
-3. Keep API and settings ergonomics symmetric with `Burnout Alerts`.
+1. Protect deep work on disruptive lunar days before focus starts to break.
+2. Help users use unusually strong focus windows on supportive lunar days.
+3. Reuse the proven burnout delivery pipeline (gating, quiet hours, dedupe, cooldown).
+4. Keep API and settings ergonomics symmetric with `Burnout Alerts`.
 
-## 2. Current State (March 22, 2026)
+## 2. Current State (April 13, 2026)
 - Mobile app includes `Lunar Productivity` in premium surfaces:
   - Dashboard insight card (`LunarProductivityInsightTile`) in lunar-white theme.
   - Settings premium row with enable/disable flow and push-token checks.
@@ -19,16 +20,23 @@ Primary outcomes:
 - Mobile API client contracts are wired for:
   - `PUT /api/notifications/lunar-productivity-settings`
   - `GET /api/notifications/lunar-productivity-plan`
-- Dashboard lunar card now hydrates through `src/hooks/useDashboardInsights.ts`, using live `/api/notifications/lunar-productivity-plan` for premium users and frozen fallback snapshot data when the plan is unavailable or fetch fails.
+  - `POST /api/notifications/lunar-productivity-seen`
+- Dashboard lunar card now hydrates through `src/hooks/useDashboardInsights.ts`, using live `/api/notifications/lunar-productivity-plan` for premium users. Regular dashboard opens keep the card hidden when the plan is unavailable; lunar push-entry can show a degraded unavailable state if live hydration fails.
 - Mobile uses `src/services/dashboardInsightSnapshots.ts` as the adapter layer that converts `LunarProductivityPlanResponse` into dashboard-card snapshot shape.
-- Backend route implementation is pending and should mirror burnout route patterns.
+- Backend now ships:
+  - lunar risk calculation (`lunar-productivity-risk-v1`)
+  - lunar planner/dispatcher scheduler (`lunar-productivity-timing-v1`)
+  - Mongo-backed `lunar_productivity_jobs` persistence with current-day timing lookup
+  - Expo push delivery using direction-aware action copy for supportive and disruptive windows
+  - in-app acknowledge route that cancels same-day unsent lunar pushes once the dashboard card has already been surfaced
+  - scheduler startup guard that disables lunar planning/dispatch when the server has no global Expo push access token
 
 ## 3. User Experience
 1. Premium user enables `Lunar Productivity` in settings.
 2. App validates push permission/token and saves lunar settings.
 3. Backend computes current moon-adapted productivity score and next planned push time.
-4. If threshold is met, backend schedules one proactive push before expected dip.
-5. User receives short guidance to protect deep-focus windows.
+4. If threshold is met, backend schedules one proactive push before the selected disruptive or supportive work window.
+5. User receives short guidance to either protect deep-focus work or use the next strong focus block.
 6. Free users see the locked premium row and are redirected to paywall.
 
 ## 4. Scope (v1)
@@ -38,6 +46,8 @@ Included:
 - Deterministic local send-time planning.
 - Quiet hours, cooldown, dedupe.
 - Expo push delivery (same infra as burnout).
+- Direction-aware dashboard card display (`Supportive Window` / `Disruptive Window`) only when the current-day score is inside the shipped display range.
+- In-app suppression of same-day unsent lunar pushes after the dashboard card has already been shown.
 
 Not included:
 - Multi-alert per day strategy.
@@ -130,11 +140,13 @@ rawRisk =
 lunarProductivityScore = clamp(round(rawRisk), 0, 100)
 ```
 
-### 6.3 Severity
+### 6.3 Risk Severity
 - `< 55` -> `none` (no push)
 - `55..69` -> `warn`
 - `70..84` -> `high`
 - `>= 85` -> `critical`
+
+Risk severity remains risk-oriented and still describes negative lunar load. Push eligibility is broader and may also trigger on strongly supportive low-risk days.
 
 ## 7. Push Fire-Time Algorithm (`lunar-productivity-timing-v1`)
 
@@ -143,7 +155,12 @@ Schedule push only if all are true:
 1. `subscriptionTier === premium`
 2. lunar productivity alerts are enabled
 3. valid push token exists
-4. `lunarProductivityScore >= 55`
+4. `lunarProductivityScore <= 25` or `lunarProductivityScore >= 80`
+
+Impact direction:
+- `<= 25` -> `supportive`
+- `26..79` -> no lunar push
+- `>= 80` -> `disruptive`
 
 ### 7.2 Intraday lunar scan
 Sample local hours:
@@ -163,9 +180,10 @@ hourlyDip(h) =
   )
 ```
 
-Peak dip slot:
-- `dipHour = argmax(hourlyDip(h))` (tie-breaker: earliest hour)
-- `predictedDipLocal = dipHour + 20m`
+Window selection:
+- `disruptive`: `dipHour = argmax(hourlyDip(h))` (tie-breaker: earliest hour)
+- `supportive`: `focusHour = argmin(hourlyDip(h))` (tie-breaker: earliest hour)
+- predicted local event time is `selectedHour + 20m`
 
 ### 7.3 Lead time by severity
 - `warn` -> `30` minutes
@@ -173,8 +191,12 @@ Peak dip slot:
 - `critical` -> `80` minutes
 
 ```text
-candidateSendLocal = predictedDipLocal - leadMinutes(severity)
+candidateSendLocal = predictedEventLocal - leadMinutes(severity)
 ```
+
+Implementation note:
+- `disruptive` windows use the risk severity bands above.
+- `supportive` windows currently schedule as a gentle `warn` push.
 
 ### 7.4 Quiet hours + workday constraints
 Apply in order:
@@ -188,7 +210,7 @@ Apply in order:
 - Minimum `20h` between sends for same user.
 - No duplicate for same `{dateKey, severity}`.
 
-## 8. Planned API Contracts
+## 8. API Contracts
 
 ### 8.1 `PUT /api/notifications/push-token`
 - Shared with burnout/interview flows.
@@ -215,7 +237,7 @@ Apply in order:
   - `risk` (`algorithmVersion`, `score`, `severity`, lunar components/signals)
   - `timing` (`algorithmVersion`, `nextPlannedAt`, status metadata)
 
-## 9. Data Model (Planned)
+## 9. Data Model
 1. `lunar_productivity_settings`
 - `userId`, settings fields, `updatedAt`
 - unique index `{ userId: 1 }`
@@ -230,21 +252,32 @@ Apply in order:
 
 ## 10. Approved Push Copy (v1)
 
-### 10.1 `warn`
-- Headline: `Lunar Focus Dip Ahead`
-- Body: `Your moon cycle suggests lighter focus soon. Protect your next deep-work block.`
+### 10.1 Supportive `warn`
+- Headline: `Start Your Priority Task Soon`
+- Body: `A supportive focus window is opening. Use the next block for hard work before meetings or admin.`
 
-### 10.2 `high`
-- Headline: `Lunar Productivity Risk: High`
-- Body: `Moon pressure is climbing. Finish priority tasks now and reduce context switching.`
+### 10.2 Supportive `high`
+- Headline: `Protect Your Best Work Block`
+- Body: `Focus conditions are unusually supportive soon. Put your hardest task first and keep interruptions out.`
 
-### 10.3 `critical`
-- Headline: `Focus Shield Needed`
-- Body: `A sharp lunar dip is approaching. Pause new tasks and recover before your next sprint.`
+### 10.3 Supportive `critical`
+- Headline: `Use Your Strongest Focus Window`
+- Body: `Today's clearest work block is approaching. Start the task that needs your best thinking and guard it.`
+
+### 10.4 Disruptive `warn`
+- Headline: `Protect Your Next Focus Block`
+- Body: `A weaker focus stretch is coming. Finish one priority task now and push admin or chat later.`
+
+### 10.5 Disruptive `high`
+- Headline: `Finish Priority Work Early`
+- Body: `Focus conditions are getting noisier. Close the main task now and avoid extra context switching.`
+
+### 10.6 Disruptive `critical`
+- Headline: `Shield Deep Work Now`
+- Body: `A disruptive focus stretch is close. Stop adding new tasks, wrap the priority item, and leave recovery space.`
 
 ## 11. Rollout Plan
-1. Implement backend `lunar-productivity-settings` + `lunar-productivity-plan` routes.
-2. Add lunar score/timing calculators and scheduler jobs.
-3. Verify mobile settings row + dashboard card with premium test users.
-4. Validate push delivery across at least 2 timezones.
-5. Release behind feature flag and monitor send success + opt-out rate.
+1. Verify mobile settings row + dashboard card with premium test users.
+2. Validate push delivery across at least 2 timezones.
+3. Decide whether dashboard/settings should expose next planned send time more explicitly.
+4. Monitor send success, disabled-token churn, and opt-out rate after release.

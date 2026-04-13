@@ -16,6 +16,14 @@ export function shouldForceStartupLoader(rawValue: string | null | undefined, is
   return isDev && parseBooleanEnv(rawValue);
 }
 
+export function shouldShowStartupLoaderGate(input: {
+  forceStartupLoader: boolean;
+  hasMetStartupLoaderMinimum: boolean;
+  isAppReady: boolean;
+}) {
+  return input.forceStartupLoader || !input.hasMetStartupLoaderMinimum || !input.isAppReady;
+}
+
 export function resolveInitialRouteName(input: {
   hasOnboarded: boolean;
   forceOnboardingEntry: boolean;

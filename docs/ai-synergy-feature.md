@@ -66,6 +66,15 @@ Indexes:
 - `GET /api/astrology/ai-synergy/history?days=30&limit=30`
   - returns stored history items
 
+## Mobile Client Runtime (Current)
+
+- `DashboardScreen` renders `AiSynergyTile`, and that tile now loads its data through `src/hooks/queries/useAiSynergy.ts` instead of keeping request state in component-local `useEffect` code.
+- `useAiSynergy()` calls `fetchDailyTransit()`, validates the full payload with `DailyTransitResponseSchema`, and then returns the extracted `aiSynergy` object used by the tile.
+- Query policy for the tile is `['aiSynergy', 'today']` with `5m` stale time, `30m` GC, refetch on mount, and refetch on reconnect.
+- Request retry and cache-hit/cache-miss reporting flow through `src/services/aiOrchestration.ts` and `src/services/aiTelemetry.ts`.
+- `src/hooks/queries/useAiSynergy.ts` also exports `useDailyTransit()` for future consumers that need the full transit payload rather than only the synergy slice.
+- `AiSynergyTile` is wrapped in `React.memo(...)` because it sits inside the dashboard's animated tile stack and no longer needs to re-render for unrelated parent updates.
+
 ## Narrative Templates
 
 Descriptions are built from large template pools (headline/openers/tech/collab/risk/recommendation banks) and selected by deterministic seeded hashing per user+day. `v2` adds `styleProfile` and `narrativeVariantId` to increase deterministic variety while keeping scores fixed.

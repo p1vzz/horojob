@@ -1,8 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { createAppTheme, syncLegacyTheme, type AppTheme, type ThemeMode } from './index';
 
-const THEME_MODE_STORAGE_KEY = 'horojob-theme-mode:v1';
+const V1_APP_THEME_MODE: ThemeMode = 'dark';
+const V1_APP_THEME = createAppTheme(V1_APP_THEME_MODE);
 
 type ThemeModeContextValue = {
   mode: ThemeMode;
@@ -11,67 +11,32 @@ type ThemeModeContextValue = {
   isLight: boolean;
   isDark: boolean;
   isReady: boolean;
+  hasExplicitModeSelection: boolean;
   setMode: (mode: ThemeMode) => void;
   toggleMode: () => void;
 };
 
 const ThemeModeContext = createContext<ThemeModeContextValue | null>(null);
 
-function normalizeThemeMode(raw: string | null): ThemeMode {
-  return raw === 'light' ? 'light' : 'dark';
-}
-
 export function ThemeModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>('dark');
-  const [isReady, setIsReady] = useState(false);
-
   useEffect(() => {
-    let mounted = true;
-
-    void (async () => {
-      try {
-        const storedValue = await AsyncStorage.getItem(THEME_MODE_STORAGE_KEY);
-        if (!mounted) return;
-        setModeState(normalizeThemeMode(storedValue));
-      } catch {
-        if (!mounted) return;
-        setModeState('dark');
-      } finally {
-        if (mounted) setIsReady(true);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
+    // App light theme is parked for v2. Widgets keep their own day/night resources.
+    syncLegacyTheme(V1_APP_THEME);
   }, []);
-
-  const resolvedTheme = useMemo(() => createAppTheme(mode), [mode]);
-
-  useEffect(() => {
-    // Transitional bridge while legacy `theme` imports are still in the codebase.
-    syncLegacyTheme(resolvedTheme);
-  }, [resolvedTheme]);
-
-  const applyThemeMode = (nextMode: ThemeMode) => {
-    setModeState(nextMode);
-    void AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, nextMode).catch(() => {
-      // Keep runtime mode even if persistence fails.
-    });
-  };
 
   const value = useMemo<ThemeModeContextValue>(
     () => ({
-      mode,
-      theme: resolvedTheme,
-      colors: resolvedTheme.colors,
-      isLight: resolvedTheme.isLight,
-      isDark: resolvedTheme.isDark,
-      isReady,
-      setMode: applyThemeMode,
-      toggleMode: () => applyThemeMode(mode === 'light' ? 'dark' : 'light'),
+      mode: V1_APP_THEME.mode,
+      theme: V1_APP_THEME,
+      colors: V1_APP_THEME.colors,
+      isLight: V1_APP_THEME.isLight,
+      isDark: V1_APP_THEME.isDark,
+      isReady: true,
+      hasExplicitModeSelection: false,
+      setMode: () => {},
+      toggleMode: () => {},
     }),
-    [isReady, mode, resolvedTheme]
+    []
   );
 
   return <ThemeModeContext.Provider value={value}>{children}</ThemeModeContext.Provider>;

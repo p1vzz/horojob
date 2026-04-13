@@ -14,7 +14,10 @@ export type LunarProductivityMetricRow = LunarProductivityMetric & {
 
 export const LUNAR_PRODUCTIVITY_TILE_COPY = {
   badge: 'Lunar Productivity',
-  footnote: 'Derived using the lunar productivity scoring model used for push planning.',
+  fallbackHeadline: 'Could not update lunar guidance',
+  fallbackSummary:
+    "Today's lunar productivity guidance is temporarily unavailable. No score is shown until current data loads.",
+  fallbackAction: 'Try Again',
 } as const;
 
 export function clampLunarProductivityValue(value: number) {

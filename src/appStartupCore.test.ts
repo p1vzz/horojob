@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveInitialRouteName, shouldForceOnboardingEntry, shouldForceStartupLoader } from './appStartupCore';
+import {
+  resolveInitialRouteName,
+  shouldForceOnboardingEntry,
+  shouldForceStartupLoader,
+  shouldShowStartupLoaderGate,
+} from './appStartupCore';
 
 test('app startup core resolves initial route from onboarding state and override flag', () => {
   assert.equal(resolveInitialRouteName({ hasOnboarded: true, forceOnboardingEntry: false }), 'Dashboard');
@@ -26,4 +31,31 @@ test('app startup core only enables startup loader override in development for t
   assert.equal(shouldForceStartupLoader('true', false), false);
   assert.equal(shouldForceStartupLoader('false', true), false);
   assert.equal(shouldForceStartupLoader(undefined, true), false);
+});
+
+test('app startup core keeps startup loader visible until minimum duration and app readiness are satisfied', () => {
+  assert.equal(
+    shouldShowStartupLoaderGate({
+      forceStartupLoader: false,
+      hasMetStartupLoaderMinimum: false,
+      isAppReady: true,
+    }),
+    true
+  );
+  assert.equal(
+    shouldShowStartupLoaderGate({
+      forceStartupLoader: false,
+      hasMetStartupLoaderMinimum: true,
+      isAppReady: false,
+    }),
+    true
+  );
+  assert.equal(
+    shouldShowStartupLoaderGate({
+      forceStartupLoader: false,
+      hasMetStartupLoaderMinimum: true,
+      isAppReady: true,
+    }),
+    false
+  );
 });

@@ -1,20 +1,22 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Keyboard } from 'react-native';
+import { Animated, Easing, InteractionManager, Keyboard } from 'react-native';
 import { saveOnboardingForUser } from '../utils/onboardingStorage';
 import { upsertBirthProfile } from '../services/astrologyApi';
 import { ensureAuthSession } from '../services/authSession';
 import { searchCities, type CitySearchItem } from '../services/citiesApi';
+import type { AppNavigationProp } from '../types/navigation';
 import {
   buildOnboardingSubmitPayload,
   countOnboardingFilledFields,
   formatOnboardingDate,
   formatOnboardingTime,
+  isValidOnboardingName,
+  normalizeOnboardingNameInput,
+  normalizeOnboardingNameValue,
   resolveOnboardingSubmitError,
 } from './useOnboardingFormCore';
 
-type OnboardingNavigation = {
-  replace: (routeName: string) => void;
-};
+type OnboardingNavigation = Pick<AppNavigationProp<'Onboarding'>, 'replace'>;
 
 type CityGeoState = {
   latitude: number | null;
@@ -44,7 +46,6 @@ export function useOnboardingForm(navigation: OnboardingNavigation) {
   const [dateValue, setDateValue] = useState(new Date());
   const [timeValue, setTimeValue] = useState(new Date());
   const [unknownTime, setUnknownTime] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
   const [isCityFocused, setIsCityFocused] = useState(false);
   const [collapseDateTime, setCollapseDateTime] = useState(false);
   const [deferWheelComplete, setDeferWheelComplete] = useState(false);
@@ -81,6 +82,7 @@ export function useOnboardingForm(navigation: OnboardingNavigation) {
       }),
     [name, birthDate, birthTime, unknownTime, citySelected]
   );
+  const isNameValid = useMemo(() => isValidOnboardingName(name), [name]);
 
   const isComplete = filledCount === 4;
   const wheelFilledCount = deferWheelComplete ? Math.min(filledCount, 3) : filledCount;
@@ -143,19 +145,21 @@ export function useOnboardingForm(navigation: OnboardingNavigation) {
     const requestId = citySearchRequestRef.current + 1;
     citySearchRequestRef.current = requestId;
 
-    const timeoutId = setTimeout(async () => {
-      try {
-        const results = await searchCities(query, { count: CITY_RESULTS_LIMIT, language: 'en' });
-        if (!active || requestId !== citySearchRequestRef.current) return;
-        startTransition(() => {
-          setCityResults(results);
-        });
-      } catch {
-        if (!active || requestId !== citySearchRequestRef.current) return;
-        startTransition(() => {
-          setCityResults([]);
-        });
-      }
+    const timeoutId = setTimeout(() => {
+      InteractionManager.runAfterInteractions(async () => {
+        try {
+          const results = await searchCities(query, { count: CITY_RESULTS_LIMIT, language: 'en' });
+          if (!active || requestId !== citySearchRequestRef.current) return;
+          startTransition(() => {
+            setCityResults(results);
+          });
+        } catch {
+          if (!active || requestId !== citySearchRequestRef.current) return;
+          startTransition(() => {
+            setCityResults([]);
+          });
+        }
+      });
     }, CITY_SEARCH_DEBOUNCE_MS);
 
     return () => {
@@ -228,12 +232,12 @@ export function useOnboardingForm(navigation: OnboardingNavigation) {
     setCityResults([]);
   };
 
-  const toggleTooltip = () => {
-    setShowTooltip((prev) => !prev);
+  const handleNameChange = (text: string) => {
+    setName(normalizeOnboardingNameInput(text));
   };
 
-  const handleNameChange = (text: string) => {
-    setName(text);
+  const handleNameBlur = () => {
+    setName((currentName) => normalizeOnboardingNameValue(currentName));
   };
 
   const handleSubmit = async () => {
@@ -277,17 +281,18 @@ export function useOnboardingForm(navigation: OnboardingNavigation) {
     dateValue,
     timeValue,
     unknownTime,
-    showTooltip,
+    citySelected,
     collapseDateTime,
     isCityFocused,
+    isNameValid,
     dateTimeAnim,
     pageEnter,
     wheelFilledCount,
     setShowDatePicker,
     setShowTimePicker,
     setCityInputHeight,
-    toggleTooltip,
     handleNameChange,
+    handleNameBlur,
     handleDateConfirm,
     handleTimeConfirm,
     handleUnknownTimeToggle,

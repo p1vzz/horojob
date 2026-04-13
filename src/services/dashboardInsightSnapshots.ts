@@ -17,6 +17,7 @@ export type BurnoutInsightSnapshot = {
   algorithmVersion: string;
   score: number;
   severityLabel: string;
+  pressureHint: string;
   dateLabel: string;
   headline: string;
   summary: string;
@@ -28,6 +29,9 @@ export type LunarProductivitySnapshot = {
   algorithmVersion: string;
   score: number;
   severityLabel: string;
+  directionLabel: string | null;
+  directionTone: 'supportive' | 'disruptive' | 'neutral';
+  pressureHint: string;
   dateLabel: string;
   headline: string;
   summary: string;
@@ -42,41 +46,45 @@ export const FROZEN_BURNOUT_SNAPSHOT: BurnoutInsightSnapshot = {
   algorithmVersion: 'burnout-risk-v1',
   score: 85,
   severityLabel: 'Critical',
+  pressureHint: 'Critical strain today: reduce commitments before starting another deep-work block.',
   dateLabel: 'Today',
-  headline: 'System Strain Detected',
+  headline: 'Reduce Load Before It Spikes',
   summary:
-    'Saturn and Moon pressure are stacking above your recovery buffer. Protect deep focus and reduce switching today.',
+    'Do not stack deep work today. Close the most important item, move optional meetings, and leave recovery space before any new push.',
   reasons: [
-    'Saturn hard-aspect load is elevated, increasing pressure on sustained effort.',
-    'Moon volatility adds emotional drag and weaker energy recovery loops.',
-    'Context-switch and rush-bias tags are higher than your stabilization baseline.',
+    'Sustained-load pressure is elevated, so avoid adding new commitments before the priority item is closed.',
+    'Emotional load is running hot; use shorter decision loops and avoid stacking sensitive conversations.',
+    'Recovery buffer is thin, so schedule a real pause before the next demanding block.',
   ],
   components: [
-    { label: 'Saturn Load', value: 47, color: '#FF6B6B' },
-    { label: 'Moon Load', value: 34, color: '#FF8A8A' },
-    { label: 'Mismatch', value: 23, color: '#FFB26B' },
+    { label: 'Sustained Load', value: 47, color: '#FF6B6B' },
+    { label: 'Emotional Load', value: 34, color: '#FF8A8A' },
+    { label: 'Workload Friction', value: 23, color: '#FFB26B' },
     { label: 'Recovery Buffer', value: 18, color: '#F8D0A0' },
   ],
 };
 
 export const FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT: LunarProductivitySnapshot = {
   algorithmVersion: 'lunar-productivity-risk-v1',
-  score: 78,
+  score: 84,
   severityLabel: 'High',
+  directionLabel: 'Disruptive Window',
+  directionTone: 'disruptive',
+  pressureHint: 'High lunar pressure today means your focus needs protection.',
   dateLabel: 'Today',
-  headline: 'Lunar Focus Window Shifting',
+  headline: 'Protect Your Focus Window',
   summary:
-    'Moon phase pressure is rising into your core work block. Protect deep-focus tasks and reduce context switching before peak hours.',
+    'Focus conditions are getting noisier. Finish one priority task early, reduce switching, and move lighter work into the weaker block.',
   reasons: [
-    'Waxing-phase acceleration is increasing decision velocity and interruption risk.',
-    'Moon hard aspects are pulling attention into reactive loops during your midday window.',
-    'Focus momentum is below lunar rhythm baseline, so recovery time should be scheduled earlier.',
+    'Attention is more likely to break under switching, so avoid opening multiple threads at once.',
+    'Energy and focus are not lining up cleanly, which makes lighter work safer later in the day.',
+    'Recovery will matter more than usual, so leave space between blocks instead of stacking tasks back to back.',
   ],
   components: [
-    { label: 'Phase Load', value: 42, color: '#F5F7FF' },
-    { label: 'Emotion Tide', value: 36, color: '#DCE7FF' },
-    { label: 'Focus Resonance', value: 28, color: '#C8D8FF' },
-    { label: 'Recovery Buffer', value: 21, color: '#AFC2F3' },
+    { label: 'Rhythm Pressure', value: 42, color: '#F5F7FF' },
+    { label: 'Interruption Risk', value: 36, color: '#DCE7FF' },
+    { label: 'Focus Drag', value: 28, color: '#C8D8FF' },
+    { label: 'Recovery Capacity', value: 21, color: '#AFC2F3' },
   ],
 };
 
@@ -126,10 +134,12 @@ export function formatDashboardInsightDateLabel(dateKey: string, referenceDate: 
   return `${MONTH_LABELS[parsed.getMonth()]} ${parsed.getDate()}`;
 }
 
-export function formatDashboardInsightSourceLabel(mode: DashboardInsightSourceMode) {
-  if (mode === 'live') return 'LIVE';
-  if (mode === 'fallback') return 'FALLBACK';
-  return 'PREVIEW';
+function formatDashboardInsightDayContext(dateKey: string, referenceDate: Date = new Date()) {
+  const label = formatDashboardInsightDateLabel(dateKey, referenceDate);
+  if (label === 'Today') return 'today';
+  if (label === 'Tomorrow') return 'tomorrow';
+  if (label === 'Yesterday') return 'yesterday';
+  return `on ${label}`;
 }
 
 export function formatDashboardInsightSyncLabel(lastSyncedAt: string | null | undefined, referenceDate: Date = new Date()) {
@@ -166,54 +176,106 @@ function formatLunarSeverityLabel(severity: LunarProductivitySeverity) {
   return 'Low';
 }
 
-function resolveBurnoutHeadline(severity: BurnoutSeverity) {
-  if (severity === 'critical') return 'System Strain Detected';
-  if (severity === 'high') return 'Burnout Pressure Building';
-  if (severity === 'warn') return 'Recovery Buffer Tightening';
-  return 'Recovery Window Stable';
+function formatLunarImpactDirectionLabel(direction: LunarProductivityPlanResponse['risk']['impactDirection']) {
+  if (direction === 'supportive') return 'Supportive Window';
+  if (direction === 'disruptive') return 'Disruptive Window';
+  return null;
 }
 
-function resolveLunarHeadline(severity: LunarProductivitySeverity) {
-  if (severity === 'critical') return 'Lunar Focus Window Collapsing';
-  if (severity === 'high') return 'Lunar Focus Window Shifting';
-  if (severity === 'warn') return 'Lunar Focus Drift Emerging';
-  return 'Lunar Rhythm Stable';
+function resolveLunarPressureHint(payload: LunarProductivityPlanResponse) {
+  if (payload.risk.impactDirection === 'supportive') {
+    return 'Low lunar pressure today means cleaner focus is available.';
+  }
+  if (payload.risk.impactDirection === 'disruptive') {
+    return 'High lunar pressure today means your focus needs protection.';
+  }
+  return 'Middle lunar pressure usually means no special focus action is needed.';
+}
+
+function resolveBurnoutHeadline(severity: BurnoutSeverity) {
+  if (severity === 'critical') return 'Reduce Load Before It Spikes';
+  if (severity === 'high') return 'Cut Context Switching Now';
+  if (severity === 'warn') return 'Protect Recovery Space';
+  return 'Keep the Day Steady';
+}
+
+function resolveLunarHeadline(payload: LunarProductivityPlanResponse) {
+  if (payload.risk.impactDirection === 'supportive') return 'Use Your Best Focus Window';
+  const severity = payload.risk.severity;
+  if (severity === 'critical') return 'Shield Your Deep Work';
+  if (severity === 'high') return 'Protect Your Focus Window';
+  if (severity === 'warn') return 'Watch Your Focus Load';
+  return 'Focus Conditions Look Stable';
+}
+
+function resolveBurnoutPressureHint(payload: BurnoutPlanResponse) {
+  if (payload.risk.severity === 'critical') {
+    return 'Critical strain today: reduce commitments before starting another deep-work block.';
+  }
+  if (payload.risk.severity === 'high') {
+    return 'High strain today: narrow the day to one priority lane and cut switching.';
+  }
+  if (payload.risk.severity === 'warn') {
+    return 'Recovery buffer is tightening: keep the next block simple and add a real break.';
+  }
+  return 'Workload strain looks manageable: keep the pace steady and avoid late overbooking.';
 }
 
 function resolveBurnoutSummary(payload: BurnoutPlanResponse, referenceDate: Date = new Date()) {
-  const severityLabel = formatBurnoutSeverityLabel(payload.risk.severity).toLowerCase();
-  return `Burnout risk is ${payload.risk.score}% (${severityLabel}) based on Saturn pressure, Moon load, and the current recovery buffer for ${formatDashboardInsightDateLabel(
-    payload.dateKey,
-    referenceDate
-  ).toLowerCase()}.`;
+  const dayContext = formatDashboardInsightDayContext(payload.dateKey, referenceDate);
+  if (payload.risk.severity === 'critical') {
+    return `Do not stack deep work ${dayContext}. Close the most important item, move optional meetings, and leave recovery space before any new push.`;
+  }
+  if (payload.risk.severity === 'high') {
+    return `Finish one priority task before taking on more work ${dayContext}. Batch messages/admin and protect at least one recovery break.`;
+  }
+  if (payload.risk.severity === 'warn') {
+    return `Keep the workload narrower than usual ${dayContext}. Avoid multitasking, add a break after deep work, and push low-value tasks later.`;
+  }
+  return `Workload strain looks manageable ${dayContext}. Keep the current pace, but avoid packing the end of the day.`;
 }
 
 function resolveLunarSummary(payload: LunarProductivityPlanResponse, referenceDate: Date = new Date()) {
-  const severityLabel = formatLunarSeverityLabel(payload.risk.severity).toLowerCase();
-  const phase = payload.risk.signals.moonPhase.replace(/_/g, ' ');
-  return `Lunar productivity risk is ${payload.risk.score}% (${severityLabel}) with ${phase} conditions influencing focus stability and recovery timing ${formatDashboardInsightDateLabel(
-    payload.dateKey,
-    referenceDate
-  ).toLowerCase()}.`;
+  const dayContext = formatDashboardInsightDayContext(payload.dateKey, referenceDate);
+  if (payload.risk.impactDirection === 'supportive') {
+    return `A stronger focus block is likely ${dayContext}. Use it for the task that needs your best thinking and keep meetings, chat, and admin outside it.`;
+  }
+  if (payload.risk.severity === 'critical') {
+    return `Deep work looks fragile ${dayContext}. Stop adding new tasks, wrap the priority item, and leave recovery space before the next push.`;
+  }
+  if (payload.risk.severity === 'high') {
+    return `Focus conditions are getting noisier ${dayContext}. Finish one priority task early, reduce switching, and move lighter work into the weaker block.`;
+  }
+  return `Your focus window looks easier to break ${dayContext}. Protect the next deep-work block and batch chat, email, and admin together.`;
 }
 
 function buildBurnoutReasons(payload: BurnoutPlanResponse) {
+  const sustainedLoad = clampInsightValue(payload.risk.components.saturnLoad);
+  const emotionalLoad = clampInsightValue(payload.risk.components.moonLoad);
+  const workloadFriction = clampInsightValue(
+    (payload.risk.components.workloadMismatch + payload.risk.components.tagPressure) / 2
+  );
+  const recoveryBuffer = clampInsightValue(payload.risk.components.recoveryBuffer);
+
   return [
-    `Saturn load is ${clampInsightValue(payload.risk.components.saturnLoad)}, signalling sustained pressure on effort and pacing.`,
-    `Moon load is ${clampInsightValue(payload.risk.components.moonLoad)}, increasing emotional drag across the workday.`,
-    `Mismatch pressure combines workload strain and tag pressure at ${clampInsightValue(
-      (payload.risk.components.workloadMismatch + payload.risk.components.tagPressure) / 2
-    )}, so stabilizing breaks should start earlier than usual.`,
+    `Sustained-load pressure is ${sustainedLoad}/100, so keep expectations realistic and avoid adding new commitments.`,
+    `Emotional load is ${emotionalLoad}/100; use shorter decision loops and avoid stacking sensitive conversations.`,
+    `Workload friction is ${workloadFriction}/100 while recovery is ${recoveryBuffer}/100, so schedule a real pause before the next demanding block.`,
   ];
 }
 
 function buildLunarReasons(payload: LunarProductivityPlanResponse) {
+  if (payload.risk.impactDirection === 'supportive') {
+    return [
+      'Single-task work should hold better than usual, so this is a strong window for writing, planning, or problem solving.',
+      'Recovery capacity is stronger today, which makes a longer focus block safer than back-to-back reactive work.',
+      'Interruptions are less likely to derail momentum, but only if you keep meetings and chat out of the best block.',
+    ];
+  }
   return [
-    `Phase load is ${clampInsightValue(payload.risk.components.moonPhaseLoad)} during the ${payload.risk.signals.moonPhase.replace(/_/g, ' ')} cycle.`,
-    `Emotional tide is ${clampInsightValue(payload.risk.components.emotionalTide)} with ${payload.risk.signals.hardAspectCount} hard lunar aspects in play.`,
-    `Focus resonance compresses alignment and circadian drag into ${clampInsightValue(
-      (payload.risk.components.focusResonance + payload.risk.components.circadianAlignment) / 2
-    )}, so recovery blocks should be scheduled earlier.`,
+    'Attention is more likely to break under switching, so avoid opening multiple threads at once.',
+    'Energy and focus are not lining up cleanly, which makes shallow work safer than complex work later in the day.',
+    'Recovery will matter more than usual, so leave space between blocks instead of stacking tasks back to back.',
   ];
 }
 
@@ -225,15 +287,16 @@ export function toBurnoutInsightSnapshotFromPlan(
     algorithmVersion: payload.risk.algorithmVersion,
     score: clampInsightValue(payload.risk.score),
     severityLabel: formatBurnoutSeverityLabel(payload.risk.severity),
+    pressureHint: resolveBurnoutPressureHint(payload),
     dateLabel: formatDashboardInsightDateLabel(payload.dateKey, referenceDate),
     headline: resolveBurnoutHeadline(payload.risk.severity),
     summary: resolveBurnoutSummary(payload, referenceDate),
     reasons: buildBurnoutReasons(payload),
     components: [
-      { label: 'Saturn Load', value: clampInsightValue(payload.risk.components.saturnLoad), color: '#FF6B6B' },
-      { label: 'Moon Load', value: clampInsightValue(payload.risk.components.moonLoad), color: '#FF8A8A' },
+      { label: 'Sustained Load', value: clampInsightValue(payload.risk.components.saturnLoad), color: '#FF6B6B' },
+      { label: 'Emotional Load', value: clampInsightValue(payload.risk.components.moonLoad), color: '#FF8A8A' },
       {
-        label: 'Mismatch',
+        label: 'Workload Friction',
         value: clampInsightValue((payload.risk.components.workloadMismatch + payload.risk.components.tagPressure) / 2),
         color: '#FFB26B',
       },
@@ -254,30 +317,33 @@ export function toLunarProductivityInsightSnapshotFromPlan(
     algorithmVersion: payload.risk.algorithmVersion,
     score: clampInsightValue(payload.risk.score),
     severityLabel: formatLunarSeverityLabel(payload.risk.severity),
+    directionLabel: formatLunarImpactDirectionLabel(payload.risk.impactDirection),
+    directionTone: payload.risk.impactDirection ?? 'neutral',
+    pressureHint: resolveLunarPressureHint(payload),
     dateLabel: formatDashboardInsightDateLabel(payload.dateKey, referenceDate),
-    headline: resolveLunarHeadline(payload.risk.severity),
+    headline: resolveLunarHeadline(payload),
     summary: resolveLunarSummary(payload, referenceDate),
     reasons: buildLunarReasons(payload),
     components: [
       {
-        label: 'Phase Load',
+        label: 'Rhythm Pressure',
         value: clampInsightValue(payload.risk.components.moonPhaseLoad),
         color: '#F5F7FF',
       },
       {
-        label: 'Emotion Tide',
+        label: 'Interruption Risk',
         value: clampInsightValue(payload.risk.components.emotionalTide),
         color: '#DCE7FF',
       },
       {
-        label: 'Focus Resonance',
+        label: 'Focus Drag',
         value: clampInsightValue(
           (payload.risk.components.focusResonance + payload.risk.components.circadianAlignment) / 2
         ),
         color: '#C8D8FF',
       },
       {
-        label: 'Recovery Buffer',
+        label: 'Recovery Capacity',
         value: clampInsightValue(payload.risk.components.recoveryBuffer),
         color: '#AFC2F3',
       },

@@ -1,6 +1,6 @@
 <resources>
-  <color name="splashscreen_background">#EEE7DA</color>
-  <color name="iconBackground">#EEE7DA</color>
+  <color name="splashscreen_background">#06060C</color>
+  <color name="iconBackground">#F3F0E9</color>
   <color name="widget_card_bg_start">#101528</color>
   <color name="widget_card_bg_end">#0B1020</color>
   <color name="widget_card_stroke">#2FFFFFFF</color>

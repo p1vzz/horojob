@@ -20,6 +20,22 @@ Key requirements:
 5. If user is free, mobile shows premium-required state and CTA to `PremiumPurchase`.
 6. Public mobile UI does not expose regenerate action. `POST /api/astrology/full-natal-analysis/regenerate` remains admin/reset flow.
 
+## 2.1 Mobile Client Data Layer (Current)
+
+- Current shipped runtime still uses the direct service path:
+  - `DeepDiveTile` prefetches with `fetchFullNatalCareerAnalysis()`
+  - `FullNatalCareerAnalysisScreen` loads the report with the same service call
+- A parallel React Query layer now exists in `src/hooks/queries/useCareerAnalysis.ts`:
+  - `useCareerInsights()`
+  - `useFullNatalCareerAnalysis()`
+  - `useRegenerateNatalAnalysis()`
+- Those hooks validate payloads through `CareerInsightsResponseSchema` and `FullNatalCareerAnalysisResponseSchema`, then route retry and cache metrics through `src/services/aiOrchestration.ts`.
+- Current cache policy in the hook layer:
+  - career insights: `10m` stale, `1h` GC
+  - full natal analysis: `30m` stale, `2h` GC, `retry: 1`
+  - regenerate mutation writes the fresh payload back into `['fullNatalCareerAnalysis']`
+- Impact: the typed/cached abstraction is ready for screen migration, but current user-visible behavior is unchanged until the active screen path switches from direct service calls to these hooks.
+
 ## 3. API Contract (v1)
 
 ### 3.1 `GET /api/astrology/full-natal-analysis?refresh=false`

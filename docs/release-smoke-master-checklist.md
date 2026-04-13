@@ -31,10 +31,10 @@ Unified pre-release smoke checklist for the highest-risk user flows across onboa
 - [ ] Submit persists profile and routes to dashboard.
 - [ ] App restart keeps onboarded state for same user.
 
-### 3. Theme and dashboard rendering
-- [ ] Light theme toggle works in Settings.
-- [ ] Theme persists after app restart.
-- [ ] Core dashboard tiles render in both light and dark modes without contrast regressions.
+### 3. App theme and dashboard rendering
+- [ ] Startup loader and onboarding open on dark backgrounds without a light flash.
+- [ ] Settings does not expose the deferred app theme toggle in v1.
+- [ ] Core dashboard tiles render in the default dark app theme without contrast regressions.
 - [ ] Burnout and lunar dashboard cards hydrate live for premium user, or gracefully fall back without crash when plan fetch fails/unavailable.
 - [ ] Returning from `Settings` refreshes burnout/lunar dashboard card content on `Dashboard`.
 
@@ -61,7 +61,9 @@ Unified pre-release smoke checklist for the highest-risk user flows across onboa
 - [ ] Light/Dark system themes keep text readable.
 
 ### 8. Notification/deep-link behavior
-- [ ] Push response with `burnout_alert` type routes to `Dashboard`.
+- [ ] Push response with `burnout_alert` type routes to `Dashboard`, waits for readiness, then scrolls/highlights the burnout card.
+- [ ] Push response with `lunar_productivity_alert` type routes to `Dashboard`, waits for readiness, then scrolls/highlights the lunar card when visible.
+- [ ] Foreground notification banners appear for alert pushes on device.
 - [ ] No duplicate or looping navigation from stale responses.
 
 ### 9. Logout/offline resilience

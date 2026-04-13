@@ -71,8 +71,9 @@ export function createLunarPlan(overrides?: Partial<LunarProductivityPlanRespons
     },
     risk: overrides?.risk ?? {
       algorithmVersion: 'lunar-productivity-risk-v1',
-      score: 78,
+      score: 84,
       severity: 'high',
+      impactDirection: 'disruptive',
       components: {
         moonPhaseLoad: 42,
         emotionalTide: 36,

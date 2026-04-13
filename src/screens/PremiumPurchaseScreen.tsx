@@ -89,7 +89,7 @@ const FEATURES = [
   },
   {
     title: 'Lunar Productivity',
-    description: 'Receive moon-adapted productivity pushes before low-focus windows and protect your work rhythm.',
+    description: 'Get lunar guidance that tells you when to protect deep work and when to use your strongest focus window.',
     badge: 'Lunar Alerts',
     Icon: Moon,
     iconColor: '#F5F7FF',

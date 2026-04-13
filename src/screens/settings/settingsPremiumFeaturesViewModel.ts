@@ -3,6 +3,7 @@ import type { WritableCalendarOption } from '../../services/calendar';
 import type {
   BurnoutSettings,
   InterviewStrategySettings,
+  LunarProductivityImpactDirection,
   LunarProductivitySettings,
 } from '../../services/notificationsApi';
 import type { SubscriptionPlan } from '../../services/morningBriefingSync';
@@ -20,6 +21,19 @@ type RiskStatusSnapshot = {
   severity: string;
 };
 
+type AlertTimingStatus = 'planned' | 'sent' | 'failed' | 'skipped' | 'cancelled' | 'not_scheduled';
+
+type BurnoutStatusSnapshot = RiskStatusSnapshot & {
+  nextPlannedAt: string | null;
+  status: AlertTimingStatus;
+};
+
+type LunarStatusSnapshot = RiskStatusSnapshot & {
+  impactDirection: LunarProductivityImpactDirection | null;
+  nextPlannedAt: string | null;
+  status: AlertTimingStatus;
+};
+
 type BuildSettingsPremiumFeaturesViewModelArgs = {
   plan: SubscriptionPlan;
   briefing: MorningBriefingResponse | null;
@@ -28,12 +42,12 @@ type BuildSettingsPremiumFeaturesViewModelArgs = {
   setupState: MorningBriefingSetupState;
   widgetVariant: MorningBriefingWidgetVariantId;
   burnoutSettings: BurnoutSettings | null;
-  burnoutStatus: RiskStatusSnapshot | null;
+  burnoutStatus: BurnoutStatusSnapshot | null;
   handleBurnoutToggle: () => void;
   isSavingBurnoutSettings: boolean;
   isSyncingBurnout: boolean;
   lunarSettings: LunarProductivitySettings | null;
-  lunarStatus: RiskStatusSnapshot | null;
+  lunarStatus: LunarStatusSnapshot | null;
   handleLunarProductivityToggle: () => void;
   isSavingLunarSettings: boolean;
   isSyncingLunar: boolean;
@@ -88,6 +102,52 @@ function resolveWidgetStatusLabel(args: {
   if (setupState === 'enabled') return 'Enabled';
   if (setupState === 'pin_requested') return 'Pending';
   return 'Set up';
+}
+
+function formatLunarStatusHeadline(status: LunarStatusSnapshot) {
+  if (status.impactDirection === 'supportive') return `Supportive ${status.score}%`;
+  if (status.impactDirection === 'disruptive') return `Disruptive ${status.score}%`;
+  if (status.severity === 'critical' || status.severity === 'high' || status.severity === 'warn') {
+    return `Elevated ${status.score}%`;
+  }
+  return `Stable ${status.score}%`;
+}
+
+function formatLunarActionLine(status: LunarStatusSnapshot) {
+  if (status.impactDirection === 'supportive') return 'Use this window for hard tasks';
+  if (status.impactDirection === 'disruptive') return 'Protect focus and cut switching';
+  if (status.severity === 'critical' || status.severity === 'high' || status.severity === 'warn') {
+    return 'Keep complex work earlier and lighter';
+  }
+  return 'No special focus action today';
+}
+
+function formatLunarScheduleLine(status: LunarStatusSnapshot) {
+  if (status.status === 'planned' && status.nextPlannedAt) return 'Push armed for today';
+  if (status.status === 'sent') return 'Push already sent today';
+  if (status.status === 'cancelled') return 'Already surfaced in app today';
+  return null;
+}
+
+function formatBurnoutStatusHeadline(status: BurnoutStatusSnapshot) {
+  if (status.severity === 'critical') return `Critical strain ${status.score}%`;
+  if (status.severity === 'high') return `High strain ${status.score}%`;
+  if (status.severity === 'warn') return `Watch strain ${status.score}%`;
+  return `Stable ${status.score}%`;
+}
+
+function formatBurnoutActionLine(status: BurnoutStatusSnapshot) {
+  if (status.severity === 'critical') return 'Move optional work and protect recovery';
+  if (status.severity === 'high') return 'Cut switching before taking on more work';
+  if (status.severity === 'warn') return 'Keep one priority and add a real break';
+  return 'No load reduction needed today';
+}
+
+function formatBurnoutScheduleLine(status: BurnoutStatusSnapshot) {
+  if (status.status === 'planned' && status.nextPlannedAt) return 'Push armed for today';
+  if (status.status === 'sent') return 'Push already sent today';
+  if (status.status === 'cancelled') return 'Already surfaced in app today';
+  return null;
 }
 
 export function buildSettingsPremiumFeaturesViewModel(
@@ -187,8 +247,9 @@ export function buildSettingsPremiumFeaturesViewModel(
         activeTrackColor: 'rgba(201,168,76,0.32)',
         busy: isSavingBurnoutSettings || isSyncingBurnout,
         detailLines: toDetailLines([
-          burnoutStatus ? `Risk ${burnoutStatus.score}%` : null,
-          burnoutStatus ? burnoutStatus.severity.toUpperCase() : null,
+          burnoutStatus ? formatBurnoutStatusHeadline(burnoutStatus) : null,
+          burnoutStatus ? formatBurnoutActionLine(burnoutStatus) : null,
+          burnoutStatus ? formatBurnoutScheduleLine(burnoutStatus) : null,
         ]),
         onPress: handleBurnoutToggle,
         statusAccentColor: plan === 'premium' ? '#C9A84C' : 'rgba(212,212,224,0.46)',
@@ -201,8 +262,9 @@ export function buildSettingsPremiumFeaturesViewModel(
         activeTrackColor: 'rgba(245,247,255,0.34)',
         busy: isSavingLunarSettings || isSyncingLunar,
         detailLines: toDetailLines([
-          lunarStatus ? `Risk ${lunarStatus.score}%` : null,
-          lunarStatus ? lunarStatus.severity.toUpperCase() : null,
+          lunarStatus ? formatLunarStatusHeadline(lunarStatus) : null,
+          lunarStatus ? formatLunarActionLine(lunarStatus) : null,
+          lunarStatus ? formatLunarScheduleLine(lunarStatus) : null,
         ]),
         onPress: handleLunarProductivityToggle,
         statusAccentColor: plan === 'premium' ? '#F5F7FF' : 'rgba(212,212,224,0.46)',

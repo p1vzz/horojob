@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Line, Path, Rect } from 'react-native-svg';
+import { useBrightnessAdaptation } from '../../contexts/BrightnessAdaptationContext';
+import type { BrightnessBoostChannels } from '../../contexts/brightnessAdaptationCore';
+import { adaptColorOpacity, adaptOpacity } from '../../utils/brightnessAdaptation';
 import { ZODIAC_META, type ZodiacSign } from '../../utils/zodiac';
 
 export type LoaderAppearance = 'dark' | 'light';
@@ -12,6 +15,7 @@ type ZodiacCardLoaderProps = {
   size?: ZodiacCardLoaderSize;
   text?: string;
   appearance?: LoaderAppearance;
+  brightnessChannels?: BrightnessBoostChannels;
 };
 
 type ZodiacCardLoaderFullscreenProps = {
@@ -44,6 +48,12 @@ type LoaderPalette = {
 };
 
 const GOLD = '#C9A84C';
+const NEUTRAL_BRIGHTNESS_CHANNELS: BrightnessBoostChannels = {
+  intensityMultiplier: 1,
+  textOpacityMultiplier: 1,
+  borderOpacityMultiplier: 1,
+  glowOpacityMultiplier: 1,
+};
 
 const DARK_LOADER_PALETTE: LoaderPalette = {
   frameStrong: 'rgba(201,168,76,0.4)',
@@ -83,6 +93,32 @@ const LIGHT_LOADER_PALETTE: LoaderPalette = {
 
 function resolveLoaderPalette(appearance: LoaderAppearance): LoaderPalette {
   return appearance === 'light' ? LIGHT_LOADER_PALETTE : DARK_LOADER_PALETTE;
+}
+
+function applyBrightnessToLoaderPalette(
+  palette: LoaderPalette,
+  channels: BrightnessBoostChannels
+): LoaderPalette {
+  return {
+    frameStrong: adaptColorOpacity(palette.frameStrong, channels.borderOpacityMultiplier),
+    frameSoft: adaptColorOpacity(palette.frameSoft, channels.borderOpacityMultiplier),
+    frameDashed: adaptColorOpacity(palette.frameDashed, channels.borderOpacityMultiplier),
+    cardBorder: adaptColorOpacity(palette.cardBorder, channels.borderOpacityMultiplier),
+    cardBackground: palette.cardBackground,
+    cardGlow: adaptColorOpacity(palette.cardGlow, channels.glowOpacityMultiplier),
+    cardShadow: palette.cardShadow,
+    badgeFill: adaptColorOpacity(palette.badgeFill, channels.glowOpacityMultiplier),
+    badgeBorder: adaptColorOpacity(palette.badgeBorder, channels.borderOpacityMultiplier),
+    star: adaptColorOpacity(palette.star, channels.glowOpacityMultiplier),
+    loadingText: adaptColorOpacity(palette.loadingText, channels.textOpacityMultiplier),
+    fullscreenBackground: palette.fullscreenBackground,
+    fullscreenSubtitle: adaptColorOpacity(
+      palette.fullscreenSubtitle,
+      channels.textOpacityMultiplier
+    ),
+    ambientCircleA: adaptColorOpacity(palette.ambientCircleA, channels.glowOpacityMultiplier),
+    ambientCircleB: adaptColorOpacity(palette.ambientCircleB, channels.glowOpacityMultiplier),
+  };
 }
 
 const SIZE_CONFIG: Record<ZodiacCardLoaderSize, { width: number; height: number; illustration: number }> = {
@@ -405,12 +441,19 @@ const ILLUSTRATIONS: Record<ZodiacSign, React.ComponentType<IllustrationProps>> 
   pisces: PiscesIllustration,
 };
 
-export const ZodiacCardLoader = ({ sign, size = 'md', text, appearance = 'dark' }: ZodiacCardLoaderProps) => {
+export const ZodiacCardLoader = ({
+  sign,
+  size = 'md',
+  text,
+  appearance = 'dark',
+  brightnessChannels = NEUTRAL_BRIGHTNESS_CHANNELS,
+}: ZodiacCardLoaderProps) => {
   const cardPulse = useRef(new Animated.Value(0)).current;
   const innerPulse = useRef(new Animated.Value(0)).current;
   const textPulse = useRef(new Animated.Value(0)).current;
   const config = SIZE_CONFIG[size];
-  const palette = resolveLoaderPalette(appearance);
+  const palette = applyBrightnessToLoaderPalette(resolveLoaderPalette(appearance), brightnessChannels);
+  const accentGold = adaptColorOpacity(GOLD, brightnessChannels.textOpacityMultiplier);
 
   useEffect(() => {
     const cardLoop = Animated.loop(
@@ -503,6 +546,7 @@ export const ZodiacCardLoader = ({ sign, size = 'md', text, appearance = 'dark' 
             borderColor: palette.cardBorder,
             backgroundColor: palette.cardBackground,
             shadowColor: palette.cardShadow,
+            shadowOpacity: adaptOpacity(0.24, brightnessChannels.glowOpacityMultiplier),
             transform: [{ scale }],
           },
         ]}
@@ -535,7 +579,7 @@ export const ZodiacCardLoader = ({ sign, size = 'md', text, appearance = 'dark' 
 
         <View style={styles.badgeTop}>
           <View style={[styles.badgeTopCircle, { backgroundColor: palette.badgeFill, borderColor: palette.badgeBorder }]}>
-            <Text style={styles.badgeTopSymbol}>{meta.symbol}</Text>
+            <Text style={[styles.badgeTopSymbol, { color: accentGold }]}>{meta.symbol}</Text>
           </View>
         </View>
 
@@ -566,13 +610,13 @@ export const ZodiacCardLoader = ({ sign, size = 'md', text, appearance = 'dark' 
           ]}
         >
           <Svg width="100%" height="100%" viewBox="0 0 150 150">
-            <Illustration stroke={GOLD} />
+            <Illustration stroke={accentGold} />
           </Svg>
         </Animated.View>
 
         <View style={styles.badgeBottom}>
           <View style={[styles.badgeBottomPill, { backgroundColor: palette.badgeFill, borderColor: palette.badgeBorder }]}>
-            <Text style={styles.badgeBottomText}>{meta.name}</Text>
+            <Text style={[styles.badgeBottomText, { color: accentGold }]}>{meta.name}</Text>
           </View>
         </View>
       </Animated.View>
@@ -593,7 +637,8 @@ export const ZodiacCardLoaderFullscreen = ({
   appearance = 'dark',
 }: ZodiacCardLoaderFullscreenProps) => {
   const ambientPulse = useRef(new Animated.Value(0)).current;
-  const palette = resolveLoaderPalette(appearance);
+  const { channels } = useBrightnessAdaptation();
+  const palette = applyBrightnessToLoaderPalette(resolveLoaderPalette(appearance), channels);
 
   useEffect(() => {
     const ambientLoop = Animated.loop(
@@ -652,7 +697,13 @@ export const ZodiacCardLoaderFullscreen = ({
         ]}
       />
       <View style={styles.fullscreenContent}>
-        <ZodiacCardLoader sign={sign} size="lg" text={text} appearance={appearance} />
+        <ZodiacCardLoader
+          sign={sign}
+          size="lg"
+          text={text}
+          appearance={appearance}
+          brightnessChannels={channels}
+        />
         {subtitle ? <Text style={[styles.fullscreenSubtitle, { color: palette.fullscreenSubtitle }]}>{subtitle}</Text> : null}
       </View>
     </View>

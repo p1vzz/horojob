@@ -1,5 +1,5 @@
 # Project: Horojob Mobile (USA Market Focus)
-**Version:** 1.3 (synced on 2026-03-29)  
+**Version:** 1.4 (synced on 2026-04-07)  
 **Status:** Active (mobile app in production-oriented state, selected roadmap items still pending)
 
 ---
@@ -19,6 +19,8 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 ## 2. Technical Stack
 - **Frontend:** React Native + Expo (Android and iOS app targets; native widget implementation is Android-first)
 - **Styling:** NativeWind + custom token/theme layer in `src/theme`
+- **Data layer:** service modules + TanStack Query hooks for AI-heavy flows (incremental rollout)
+- **Runtime contract validation:** Zod schemas for AI, career-analysis, and job-analysis payloads
 - **Navigation:** React Navigation native stack
 - **Backend/DB:** Node + MongoDB (`../horojob-server`)
 - **Astrology APIs:** server-owned astrology endpoints consumed by mobile
@@ -40,7 +42,7 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 ### B. Retention & Habit Loop
 1. **Morning Career Briefing:** daily payload sync to app and widget bridge.
 2. **Burnout Alert System:** mobile settings + plan integration in place; full delivery pipeline still evolving.
-3. **Lunar Productivity:** mobile settings + plan integration in place; full delivery pipeline still evolving.
+3. **Lunar Productivity:** mobile settings + dashboard card + backend scheduler/dispatch pipeline are in place; pushes and dashboard visibility now follow the same extreme supportive/disruptive lunar bands and are framed as action-ready guidance for the current workday, while deeper timing UX is still being refined.
 4. **Interview Strategy:** server-authoritative planning + calendar sync + settings controls.
 5. **Home Screen Widgets:** Android multi-variant providers (light/dark aware), in-app variant picker.
 
@@ -48,13 +50,38 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 1. **Game loop** (product definition pending)
 2. **iOS native widget extension**
 
+### D. Cross-Cutting Client Data Layer
+1. `App.tsx` now mounts a global `QueryClientProvider` from `src/lib/queryClient.ts`.
+   - default query policy: `5m` stale, `30m` GC, `2` retries, reconnect refetch enabled
+   - features can still override those values per hook for heavier AI endpoints
+2. `src/services/aiOrchestration.ts` is the shared mobile entry point for AI request helpers.
+   - available helpers: retry, timeout, fallback, cache-hit/cache-miss tracking
+   - current hook adoption uses retry plus cache metrics; timeout/fallback helpers exist but are not yet wired into active screen flows
+3. `src/services/aiTelemetry.ts` is the shared observability adapter for AI requests.
+   - current state: development console logging for request/success/error/fallback/cache events
+   - future sink point: Sentry/LogRocket/custom analytics, not yet connected in production
+4. `src/schemas/aiSynergySchema.ts`, `src/schemas/careerAnalysisSchema.ts`, and `src/schemas/jobAnalysisSchema.ts` now own runtime validation and inferred mobile types for the main AI-backed payloads.
+5. Adoption status is partial by design.
+   - `AiSynergyTile` already reads through a React Query hook
+   - career-analysis and job-analysis hooks exist, but `FullNatalCareerAnalysisScreen`, `DeepDiveTile`, `useScannerRuntime`, and `useJobScreenshotUploadRuntime` still use the existing direct service/runtime path today
+6. Preferred extension pattern for new AI-backed mobile features:
+   - keep transport in `src/services/*`
+   - define runtime schema in `src/schemas/*`
+   - wrap request orchestration in a dedicated hook under `src/hooks/queries/*`
+   - use `aiOrchestrator` for retry/telemetry boundaries
+   - keep screens/components consuming typed hook output instead of raw transport payloads
+7. Current performance boundaries:
+   - `AiSynergyTile`, `JobCheckTile`, and `DeepDiveTile` are memoized to reduce unnecessary dashboard re-renders
+   - shared onboarding SVG backgrounds are memoized because the same heavy art is reused across startup and onboarding, while the light variant stays parked for a future v2 rollout
+
 ---
 
 ## 4. UI/UX Direction
-- Dark + light theme support with tokenized color system
+- Dark-first mobile app runtime for v1, with tokenized light-theme assets preserved for v2
 - Glass and aura visual language for premium blocks
 - Dashboard-first layout with modular insight tiles
 - Mobile-first interaction model with explicit premium-gated paths
+- Android widgets remain light/dark aware in native day/night resources
 
 ---
 
@@ -71,7 +98,7 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 - [x] React Native/Expo project and navigation foundation
 - [x] Onboarding + dashboard + scanner + settings + premium + natal analysis screens
 - [x] Service-layer architecture for API + local storage
-- [x] Themed design system migration in progress with active dark/light mode support
+- [x] Dark-first themed design system for the mobile app, with app light theme deferred to v2
 
 ### Phase 2: Session, Sync, and Platform Integration
 - [x] Session bootstrap and per-user onboarding/profile cache syncing
@@ -86,7 +113,7 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 - [x] Discover roles API and UI integration
 - [x] Interview strategy settings + backend plan + calendar sync
 - [ ] Burnout alert full delivery pipeline completion
-- [ ] Lunar productivity full delivery pipeline completion
+- [ ] Lunar productivity timing/status UX hardening
 
 ### Phase 4: Billing and Release
 - [x] RevenueCat mobile integration and backend sync usage in app startup/paywall
@@ -118,9 +145,8 @@ flowchart TD
   F --> O[PremiumPurchaseScreen]
   F --> P[JobScreenshotUploadScreen]
 
-  N --> Q[Theme toggle: light/dark]
-  N --> R[Interview Strategy controls]
-  N --> S[Widget variant setup]
+  N --> Q[Interview Strategy controls]
+  N --> R[Widget variant setup]
   O --> H
 
   I --> T[Widget shared payload storage]
@@ -130,7 +156,7 @@ flowchart TD
   P --> W[/api/jobs/analyze-screenshots/]
   L --> X[/api/astrology/full-natal-analysis/]
   M --> Y[/api/astrology/discover-roles/]
-  R --> Z[/api/notifications/interview-strategy-*/]
+  Q --> Z[/api/notifications/interview-strategy-*/]
 ```
 
 ---

@@ -1,23 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated } from 'react-native';
 import { Cpu, Activity } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line, Path, G } from 'react-native-svg';
-import { fetchDailyTransit } from '../services/astrologyApi';
 import { useAppTheme } from '../theme/ThemeModeProvider';
+import { useAiSynergy } from '../hooks/queries/useAiSynergy';
 import {
-  FALLBACK_AI_SYNERGY,
   resolveAiSynergyPalette,
   selectAiSynergyView,
-  type AiSynergyView,
 } from './aiSynergyTileCore';
 import { AI_SYNERGY_HELIX_POINTS } from './aiSynergyTileVisuals';
 
-export const AiSynergyTile = () => {
+export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) => {
   const theme = useAppTheme();
   const scanAnim = useRef(new Animated.Value(0)).current;
-  const [synergy, setSynergy] = useState<AiSynergyView>(FALLBACK_AI_SYNERGY);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: aiSynergy, isLoading } = useAiSynergy();
+  const hasSignaledReadyRef = useRef(false);
+
+  const synergy = selectAiSynergyView(aiSynergy);
 
   useEffect(() => {
     Animated.loop(
@@ -37,23 +37,11 @@ export const AiSynergyTile = () => {
   }, [scanAnim]);
 
   useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      try {
-        const payload = await fetchDailyTransit();
-        if (!mounted) return;
-        setSynergy(selectAiSynergyView(payload.aiSynergy));
-      } catch {
-        if (mounted) setSynergy(FALLBACK_AI_SYNERGY);
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (!isLoading && !hasSignaledReadyRef.current) {
+      hasSignaledReadyRef.current = true;
+      onReady?.();
+    }
+  }, [isLoading, onReady]);
 
   const scanTranslate = scanAnim.interpolate({
     inputRange: [0, 1],
@@ -154,4 +142,4 @@ export const AiSynergyTile = () => {
       </View>
     </View>
   );
-};
+});

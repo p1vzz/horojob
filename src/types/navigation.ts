@@ -8,9 +8,18 @@ export type ScannerImportedMeta = {
   provider: string | null;
 };
 
+export type DashboardAlertFocus = 'burnout' | 'lunar';
+
 export type RootStackParamList = {
   Onboarding: undefined;
-  Dashboard: undefined;
+  Dashboard:
+    | {
+        alertFocus?: DashboardAlertFocus;
+        alertFocusKey?: number;
+        openedFromPush?: boolean;
+        notificationType?: string | null;
+      }
+    | undefined;
   Scanner:
     | {
         importedAnalysis?: JobAnalyzeSuccessResponse;

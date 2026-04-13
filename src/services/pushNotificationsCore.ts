@@ -27,6 +27,10 @@ export type PushNotificationsCoreDeps = {
   }) => Promise<unknown>;
 };
 
+export type RegisterPushTokenOptions = {
+  forceSync?: boolean;
+};
+
 export function pushTokenSyncStorageKeyForUser(userId: string) {
   return `${PUSH_TOKEN_SYNC_PREFIX}:${userId}`;
 }
@@ -42,7 +46,10 @@ async function ensureNotificationPermissionGranted(deps: PushNotificationsCoreDe
 }
 
 export function createPushNotificationsService(deps: PushNotificationsCoreDeps) {
-  const registerPushTokenForUser = async (userId: string): Promise<PushTokenSyncResult> => {
+  const registerPushTokenForUser = async (
+    userId: string,
+    options: RegisterPushTokenOptions = {}
+  ): Promise<PushTokenSyncResult> => {
     if (deps.platformOs !== 'android' && deps.platformOs !== 'ios') {
       return { status: 'unsupported_platform' };
     }
@@ -72,7 +79,7 @@ export function createPushNotificationsService(deps: PushNotificationsCoreDeps) 
 
     const key = pushTokenSyncStorageKeyForUser(userId);
     const previousToken = await deps.getStoredToken(key);
-    if (previousToken === token) {
+    if (!options.forceSync && previousToken === token) {
       return { status: 'already_synced', token };
     }
 

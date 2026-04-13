@@ -37,6 +37,7 @@ Target: stable and deterministic output for similar inputs (minimal score jitter
 4. App calls `POST /api/jobs/analyze`.
 5. While request is running:
    - show blocking loader state;
+   - adapt loader ambient glow/text/borders to current screen brightness via `docs/brightness-adaptation-system.md`;
    - show source-specific error message if parser fails.
 6. If vacancy is blocked/closed/login-walled:
    - app offers screenshot fallback screen;
@@ -46,6 +47,7 @@ Target: stable and deterministic output for similar inputs (minimal score jitter
    - if screenshots are incomplete -> explicit error + missing fields guidance.
 7. On success:
    - render scores + breakdown + descriptors/tags;
+   - keep scanner chips, helper text, empty state, and error-state borders aligned with semantic brightness-adaptation channels;
    - mark as cached result on repeated open.
 
 ## 4. Current Backend Contract
@@ -55,6 +57,24 @@ Target: stable and deterministic output for similar inputs (minimal score jitter
 - `POST /api/jobs/analyze-screenshots`
 - `GET /api/jobs/metrics?windowHours=24`
 - `GET /api/jobs/alerts?windowHours=24`
+
+## 4.1 Mobile Client Data Layer (Current)
+
+- `src/hooks/queries/useJobAnalysis.ts` now provides typed React Query mutations for the existing scanner endpoints:
+  - `useJobPreflight()`
+  - `useJobAnalysis()`
+  - `useJobScreenshotAnalysis()`
+- These wrappers still call the existing `jobsApi` transport functions, but add:
+  - retry orchestration through `src/services/aiOrchestration.ts`
+  - runtime validation through `src/schemas/jobAnalysisSchema.ts`
+  - cache-hit/cache-miss telemetry derived from the server `cache.analysis.hit` fields
+- Retry profiles are intentionally heavier for slower work:
+  - URL analysis uses a wider retry window than preflight
+  - screenshot analysis uses the widest retry window of the three
+- Current runtime reality is still the pre-existing imperative flow:
+  - `src/screens/useScannerRuntime.ts` calls `preflightJobUrl()` and `analyzeJobUrl()` directly
+  - `src/screens/useJobScreenshotUploadRuntime.ts` calls `analyzeJobScreenshots()` directly
+- Impact: no backend contract or current scanner UX change yet; this is groundwork for a later migration onto the shared query/mutation layer.
 
 ## 5. Parsing + Analysis Pipeline (Implemented)
 ```text

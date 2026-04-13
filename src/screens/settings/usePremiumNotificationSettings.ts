@@ -9,6 +9,7 @@ import {
   upsertBurnoutSettings,
   type BurnoutPlanResponse,
   type BurnoutSettings,
+  type LunarProductivityImpactDirection,
   type LunarProductivityPlanResponse,
   type LunarProductivitySettings,
 } from '../../services/notificationsApi';
@@ -25,6 +26,7 @@ export type BurnoutStatusSnapshot = {
 export type LunarProductivityStatusSnapshot = {
   score: number;
   severity: LunarProductivityPlanResponse['risk']['severity'];
+  impactDirection: LunarProductivityImpactDirection | null;
   nextPlannedAt: string | null;
   status: LunarProductivityPlanResponse['timing']['status'];
 };
@@ -42,6 +44,7 @@ function toLunarStatusSnapshot(payload: LunarProductivityPlanResponse): LunarPro
   return {
     score: payload.risk.score,
     severity: payload.risk.severity,
+    impactDirection: payload.risk.impactDirection,
     nextPlannedAt: payload.timing.nextPlannedAt,
     status: payload.timing.status,
   };
@@ -145,7 +148,7 @@ export function usePremiumNotificationSettings(args: {
 
   const ensurePushNotificationsReady = async (featureName: 'burnout alerts' | 'lunar productivity alerts') => {
     const session = await ensureAuthSession();
-    const tokenSyncResult = await registerPushTokenForUser(session.user.id);
+    const tokenSyncResult = await registerPushTokenForUser(session.user.id, { forceSync: true });
 
     if (tokenSyncResult.status === 'permission_denied') {
       Alert.alert(
@@ -204,10 +207,10 @@ export function usePremiumNotificationSettings(args: {
         if (nextEnabled) {
           Alert.alert(
             'Burnout Alerts Enabled',
-            'Proactive burnout warnings are enabled for your local schedule.'
+            'Burnout guidance is enabled. You will get nudges when workload pressure needs a lighter plan.'
           );
         } else {
-          Alert.alert('Burnout Alerts Disabled', 'Burnout warning notifications are now turned off.');
+          Alert.alert('Burnout Alerts Disabled', 'Burnout guidance notifications are now turned off.');
         }
       } catch (error) {
         if (error instanceof ApiError) {
@@ -259,10 +262,10 @@ export function usePremiumNotificationSettings(args: {
         if (nextEnabled) {
           Alert.alert(
             'Lunar Productivity Enabled',
-            'Moon-adapted productivity alerts are enabled for your local schedule.'
+            'Action-ready lunar guidance is enabled. You will get nudges before disruptive dips and strong focus windows.'
           );
         } else {
-          Alert.alert('Lunar Productivity Disabled', 'Lunar productivity notifications are now turned off.');
+          Alert.alert('Lunar Productivity Disabled', 'Lunar guidance notifications are now turned off.');
         }
       } catch (error) {
         if (error instanceof ApiError) {

@@ -9,7 +9,6 @@ import { MorningBriefingWidgetVariantPicker } from '../components/MorningBriefin
 import type { AppNavigationProp } from '../types/navigation';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import {
-  SettingsAppearanceSection,
   SettingsBirthDetailsSection,
   SettingsInterviewStrategyPanel,
   SettingsPremiumFeaturesSection,
@@ -29,7 +28,7 @@ const { width, height } = Dimensions.get('window');
 
 export const SettingsScreen = () => {
   const navigation = useNavigation<AppNavigationProp<'Settings'>>();
-  const { mode, setMode, isLight, theme } = useThemeMode();
+  const { theme } = useThemeMode();
   const openPremiumPurchase = () => navigation.navigate('PremiumPurchase');
   const clearPremiumDependentState = () => {
     resetNotificationState();
@@ -140,8 +139,6 @@ export const SettingsScreen = () => {
     isSyncingInterviewCalendar,
     selectedInterviewCalendarOption,
   });
-  const isLightTheme = isLight || mode === 'light';
-
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <View className="absolute inset-0">
@@ -200,11 +197,6 @@ export const SettingsScreen = () => {
                 Settings
               </Text>
             </View>
-
-            <SettingsAppearanceSection
-              isLightTheme={isLightTheme}
-              onToggleTheme={(nextValue) => setMode(nextValue ? 'light' : 'dark')}
-            />
 
             <SettingsBirthDetailsSection />
 

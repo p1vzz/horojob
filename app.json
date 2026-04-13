@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#EEE7DA"
+      "backgroundColor": "#06060C"
     },
     "androidNavigationBar": {
       "backgroundColor": "#06060C",
@@ -22,7 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#EEE7DA"
+        "backgroundColor": "#F3F0E9"
       },
       "googleServicesFile": "./android/app/google-services.json",
       "edgeToEdgeEnabled": true,

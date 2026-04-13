@@ -13,13 +13,16 @@ import {
 import { clearInterviewStrategyStateForUser } from '../utils/interviewStrategyStorage';
 import { clearMorningBriefingWidget } from './morningBriefingWidgetBridge';
 import { createAuthSessionManager } from './authSessionCore';
+import { createFetchWithTimeout } from './fetchWithTimeout';
 import { pushTokenSyncStorageKeyForUser } from './pushNotificationsCore';
 
 export { ApiError } from './authSessionCore';
 
+const authFetch = createFetchWithTimeout(fetch);
+
 const authSessionManager = createAuthSessionManager({
   apiBaseUrl: API_BASE_URL,
-  fetchFn: fetch,
+  fetchFn: authFetch,
   loadAuthSession,
   saveAuthSession,
   clearAuthSession,

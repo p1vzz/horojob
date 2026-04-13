@@ -44,6 +44,78 @@ test('notifications api uses expected endpoint/method for lunar settings', async
   assert.equal(body.timezoneIana, 'Europe/Warsaw');
 });
 
+test('notifications api posts lunar insight acknowledge payload to the expected endpoint', async () => {
+  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const api = createNotificationsApi({
+    authorizedFetch: async (path, init) => {
+      calls.push({ path, init });
+      return new Response(
+        JSON.stringify({
+          acknowledged: true,
+          reason: null,
+          dateKey: '2026-04-10',
+          impactDirection: 'supportive',
+          timingStatus: 'cancelled',
+        }),
+        { status: 200 },
+      );
+    },
+    parseJsonBody: async () => ({
+      acknowledged: true,
+      reason: null,
+      dateKey: '2026-04-10',
+      impactDirection: 'supportive',
+      timingStatus: 'cancelled',
+    }),
+    ApiError: FakeApiError as never,
+  });
+
+  const payload = await api.markLunarProductivitySeen({ dateKey: '2026-04-10' });
+
+  assert.equal(payload.acknowledged, true);
+  assert.equal(calls.length, 1);
+  const call = calls[0];
+  assert.equal(call.path, '/api/notifications/lunar-productivity-seen');
+  assert.equal(call.init?.method, 'POST');
+  assert.equal((call.init?.headers as Record<string, string>)['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(String(call.init?.body)), { dateKey: '2026-04-10' });
+});
+
+test('notifications api posts burnout insight acknowledge payload to the expected endpoint', async () => {
+  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const api = createNotificationsApi({
+    authorizedFetch: async (path, init) => {
+      calls.push({ path, init });
+      return new Response(
+        JSON.stringify({
+          acknowledged: true,
+          reason: null,
+          dateKey: '2026-04-10',
+          timingStatus: 'cancelled',
+        }),
+        { status: 200 },
+      );
+    },
+    parseJsonBody: async () => ({
+      acknowledged: true,
+      reason: null,
+      dateKey: '2026-04-10',
+      timingStatus: 'cancelled',
+    }),
+    ApiError: FakeApiError as never,
+  });
+
+  const payload = await api.markBurnoutSeen({ dateKey: '2026-04-10' });
+
+  assert.equal(payload.acknowledged, true);
+  assert.equal(calls.length, 1);
+  const call = calls[0];
+  assert.equal(call.path, '/api/notifications/burnout-seen');
+  assert.equal(call.init?.method, 'POST');
+  assert.equal((call.init?.headers as Record<string, string>)['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(String(call.init?.body)), { dateKey: '2026-04-10' });
+});
+
 test('notifications api builds interview strategy refresh query', async () => {
   const calls: string[] = [];
   const api = createNotificationsApi({
