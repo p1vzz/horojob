@@ -6,10 +6,13 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.roundToInt
 
 enum class MorningBriefingWidgetVariant(
@@ -57,26 +60,39 @@ abstract class BaseMorningBriefingWidgetProvider : AppWidgetProvider() {
     private const val KEY_HEADLINE = "headline"
     private const val KEY_SUMMARY = "summary"
     private const val KEY_MODE_LABEL = "mode_label"
+    private const val KEY_PLAN_HEADLINE = "plan_headline"
+    private const val KEY_PRIMARY_ACTION = "primary_action"
+    private const val KEY_PEAK_WINDOW = "peak_window"
+    private const val KEY_RISK_GUARDRAIL = "risk_guardrail"
     private const val KEY_ENERGY = "energy"
     private const val KEY_FOCUS = "focus"
     private const val KEY_LUCK = "luck"
     private const val KEY_AI = "ai"
     private const val KEY_DATE_KEY = "date_key"
+    private const val KEY_GENERATED_AT = "generated_at"
+    private const val KEY_STALE_AFTER = "stale_after"
 
     private const val STATE_EMPTY = "empty"
     private const val STATE_READY = "ready"
     private const val STATE_LOCKED = "locked"
     private const val STATE_PROFILE_MISSING = "profile_missing"
+    private const val WIDGET_DEEP_LINK_URI = "horojob://career-vibe-plan"
 
     private data class Snapshot(
       val headline: String,
       val summary: String,
       val modeLabel: String,
+      val planHeadline: String,
+      val primaryAction: String,
+      val peakWindowOverride: String,
+      val riskGuardrail: String,
       val energy: Int,
       val focus: Int,
       val luck: Int,
       val ai: Int,
       val dateKey: String,
+      val generatedAt: String,
+      val staleAfter: String,
     )
 
     private data class Derived(
@@ -89,6 +105,7 @@ abstract class BaseMorningBriefingWidgetProvider : AppWidgetProvider() {
       val mercuryLabel: String,
       val dateVerbose: String,
       val peakWindow: String,
+      val isStale: Boolean,
     )
 
     private data class PlaceholderCopy(
@@ -152,11 +169,17 @@ abstract class BaseMorningBriefingWidgetProvider : AppWidgetProvider() {
         headline = prefs.getString(KEY_HEADLINE, "Morning Career Briefing") ?: "Morning Career Briefing",
         summary = prefs.getString(KEY_SUMMARY, "Open Horojob to refresh your insights.") ?: "Open Horojob to refresh your insights.",
         modeLabel = prefs.getString(KEY_MODE_LABEL, "Career Mode") ?: "Career Mode",
+        planHeadline = prefs.getString(KEY_PLAN_HEADLINE, "") ?: "",
+        primaryAction = prefs.getString(KEY_PRIMARY_ACTION, "") ?: "",
+        peakWindowOverride = prefs.getString(KEY_PEAK_WINDOW, "") ?: "",
+        riskGuardrail = prefs.getString(KEY_RISK_GUARDRAIL, "") ?: "",
         energy = prefs.getInt(KEY_ENERGY, 72).coerceIn(0, 100),
         focus = prefs.getInt(KEY_FOCUS, 69).coerceIn(0, 100),
         luck = prefs.getInt(KEY_LUCK, 74).coerceIn(0, 100),
         ai = prefs.getInt(KEY_AI, 85).coerceIn(0, 100),
         dateKey = prefs.getString(KEY_DATE_KEY, "") ?: "",
+        generatedAt = prefs.getString(KEY_GENERATED_AT, "") ?: "",
+        staleAfter = prefs.getString(KEY_STALE_AFTER, "") ?: "",
       )
       val derived = derive(snapshot)
       val views = RemoteViews(context.packageName, variant.layoutResId)
@@ -182,13 +205,16 @@ abstract class BaseMorningBriefingWidgetProvider : AppWidgetProvider() {
         context,
         if (derived.vibeDelta >= 0) R.color.widget_trend_positive else R.color.widget_trend_negative,
       )
+      val mutedColor = ContextCompat.getColor(context, R.color.widget_text_muted)
+      val actionLine = snapshot.primaryAction.ifBlank { snapshot.summary }.ifBlank { derived.trendLine }
+      val shortActionLine = if (derived.isStale) "Open app to refresh" else truncate(actionLine, 28)
       when (variant) {
         MorningBriefingWidgetVariant.SMALL_VIBE -> {
           safeSetText(views, R.id.widget_vibe_title, "Career Vibe")
           safeSetText(views, R.id.widget_vibe_delta, formatSignedPercent(derived.vibeDelta))
-          safeSetText(views, R.id.widget_vibe_trend, derived.trendLine)
+          safeSetText(views, R.id.widget_vibe_trend, shortActionLine)
           safeSetTextColor(views, R.id.widget_vibe_delta, trendColor)
-          safeSetTextColor(views, R.id.widget_vibe_trend, trendColor)
+          safeSetTextColor(views, R.id.widget_vibe_trend, if (derived.isStale) mutedColor else trendColor)
         }
 
         MorningBriefingWidgetVariant.SMALL_SCORE -> {
@@ -214,28 +240,32 @@ abstract class BaseMorningBriefingWidgetProvider : AppWidgetProvider() {
         }
 
         MorningBriefingWidgetVariant.MEDIUM_VIBE -> {
-          safeSetText(views, R.id.widget_medium_title, "Today's Career Vibe")
+          safeSetText(views, R.id.widget_medium_title, snapshot.planHeadline.ifBlank { "Today's Career Vibe" })
           safeSetText(views, R.id.widget_medium_date, derived.dateVerbose)
           safeSetText(views, R.id.widget_medium_delta, formatSignedPercent(derived.vibeDelta))
-          safeSetText(views, R.id.widget_medium_trend, derived.trendLine)
-          safeSetText(views, R.id.widget_medium_summary, truncate(snapshot.summary, 120))
+          safeSetText(views, R.id.widget_medium_trend, if (derived.isStale) "Open app" else derived.trendLine)
+          safeSetText(
+            views,
+            R.id.widget_medium_summary,
+            truncate(if (derived.isStale) "Stale. Open Horojob to refresh today's plan." else actionLine, 120),
+          )
           safeSetTextColor(views, R.id.widget_medium_delta, trendColor)
-          safeSetTextColor(views, R.id.widget_medium_trend, trendColor)
+          safeSetTextColor(views, R.id.widget_medium_trend, if (derived.isStale) mutedColor else trendColor)
         }
 
         MorningBriefingWidgetVariant.STRIP_PEAK -> {
           safeSetText(views, R.id.widget_strip_peak_title, "Career Vibe")
           safeSetText(views, R.id.widget_strip_peak_delta, formatSignedPercent(derived.vibeDelta))
-          safeSetText(views, R.id.widget_strip_peak_summary, truncate(snapshot.summary, 48))
+          safeSetText(views, R.id.widget_strip_peak_summary, truncate(if (derived.isStale) "Open Horojob to refresh." else actionLine, 48))
           safeSetText(views, R.id.widget_strip_peak_time, derived.peakWindow)
-          safeSetTextColor(views, R.id.widget_strip_peak_delta, trendColor)
+          safeSetTextColor(views, R.id.widget_strip_peak_delta, if (derived.isStale) mutedColor else trendColor)
         }
 
         MorningBriefingWidgetVariant.STRIP_MINIMAL -> {
           safeSetText(views, R.id.widget_strip_minimal_title, "Career Vibe")
           safeSetText(views, R.id.widget_strip_minimal_delta, formatSignedPercent(derived.vibeDelta))
           safeSetText(views, R.id.widget_strip_minimal_time, derived.peakWindow)
-          safeSetTextColor(views, R.id.widget_strip_minimal_delta, trendColor)
+          safeSetTextColor(views, R.id.widget_strip_minimal_delta, if (derived.isStale) mutedColor else trendColor)
         }
       }
     }
@@ -334,7 +364,10 @@ abstract class BaseMorningBriefingWidgetProvider : AppWidgetProvider() {
         moonPhase = moonPhase,
         mercuryLabel = mercuryLabel,
         dateVerbose = formatDateVerbose(snapshot.dateKey),
-        peakWindow = "${to12Hour(startHour24)}-${to12Hour(endHour24)} ${if (endHour24 >= 12) "PM" else "AM"}",
+        peakWindow = snapshot.peakWindowOverride.ifBlank {
+          "${to12Hour(startHour24)}-${to12Hour(endHour24)} ${if (endHour24 >= 12) "PM" else "AM"}"
+        },
+        isStale = isIsoTimestampPast(snapshot.staleAfter),
       )
     }
 
@@ -378,9 +411,32 @@ abstract class BaseMorningBriefingWidgetProvider : AppWidgetProvider() {
       return if (hour == 0) "12" else hour.toString()
     }
 
+    private fun isIsoTimestampPast(value: String): Boolean {
+      if (value.isBlank()) return false
+      val formats = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+      )
+      for (format in formats) {
+        try {
+          val parser = SimpleDateFormat(format, Locale.US)
+          parser.timeZone = TimeZone.getTimeZone("UTC")
+          val parsed = parser.parse(value) ?: continue
+          return parsed.before(Date())
+        } catch (_: Throwable) {
+          // Try the next ISO format.
+        }
+      }
+      return false
+    }
+
     private fun setLaunchIntent(context: Context, views: RemoteViews, appWidgetId: Int) {
-      val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-      launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+      val launchIntent = Intent(context, MainActivity::class.java).apply {
+        action = Intent.ACTION_VIEW
+        data = Uri.parse(WIDGET_DEEP_LINK_URI)
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        putExtra("source", "morning_briefing_widget")
+      }
       val pendingIntent = PendingIntent.getActivity(
         context,
         appWidgetId,

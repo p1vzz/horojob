@@ -20,13 +20,22 @@ export type ScreenshotAnalyzeApiErrorLike = {
   payload: unknown;
 };
 
-export const MAX_SCREENSHOTS = 4;
+export const MAX_SCREENSHOTS = 6;
+export const MAX_SCREENSHOT_IMAGE_BYTES = 1_600_000;
+export const MAX_SCREENSHOT_TOTAL_BYTES = 6_000_000;
 
 export const SCREENSHOT_UPLOAD_TEXTS = {
   screenTitle: 'Analyze From Screenshots',
   summaryTitle: 'Upload vacancy screenshots',
   summaryBody:
-    'If the vacancy page is closed or blocked, upload 1 to 4 screenshots. We will parse visible details and build compatibility score from your natal chart.',
+    'If the vacancy page is closed or blocked, upload 1 to 6 screenshots. We will parse visible details and build compatibility score from your natal chart.',
+  requirementsTitle: 'Minimum needed',
+  requirements: [
+    'Role title',
+    'Company name',
+    'Job description or responsibilities',
+  ],
+  requirementsHint: 'Helpful but optional: location, seniority, employment type.',
   selectedHeading: 'SELECTED SCREENSHOTS',
   pickAction: 'Upload Screenshots',
   pickActionDisabled: 'Max screenshots reached',
@@ -50,6 +59,20 @@ function asRecord(input: unknown) {
 
 export function toScreenshotMbText(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+export function validateScreenshotPayloadSize(items: JobScreenshotItem[]) {
+  const oversized = items.find((item) => item.bytes > MAX_SCREENSHOT_IMAGE_BYTES);
+  if (oversized) {
+    return `One screenshot is too large (${toScreenshotMbText(oversized.bytes)}). Crop it or choose a smaller image.`;
+  }
+
+  const totalBytes = items.reduce((sum, item) => sum + item.bytes, 0);
+  if (totalBytes > MAX_SCREENSHOT_TOTAL_BYTES) {
+    return `Selected screenshots are too large (${toScreenshotMbText(totalBytes)}). Remove one or choose smaller images.`;
+  }
+
+  return null;
 }
 
 export function selectionLimitForAdditionalScreenshots(currentCount: number, max = MAX_SCREENSHOTS) {

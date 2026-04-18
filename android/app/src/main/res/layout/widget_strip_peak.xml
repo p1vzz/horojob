@@ -8,17 +8,17 @@
   android:orientation="horizontal"
   android:paddingStart="10dp"
   android:paddingEnd="10dp"
-  android:paddingTop="7dp"
-  android:paddingBottom="7dp">
+  android:paddingTop="6dp"
+  android:paddingBottom="6dp">
 
   <TextView
-    android:layout_width="30dp"
-    android:layout_height="30dp"
+    android:layout_width="28dp"
+    android:layout_height="28dp"
     android:background="@drawable/widget_variant_icon_disc"
     android:gravity="center"
     android:text="☀"
     android:textColor="@color/widget_text_gold"
-    android:textSize="14sp"
+    android:textSize="13sp"
     android:textStyle="bold" />
 
   <LinearLayout
@@ -36,11 +36,14 @@
 
       <TextView
         android:id="@+id/widget_strip_peak_title"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:text="Career Vibe"
         android:textColor="@color/widget_text_primary"
-        android:textSize="19sp"
+        android:textSize="16sp"
         android:textStyle="bold" />
 
       <TextView
@@ -49,13 +52,13 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="6dp"
         android:background="@drawable/widget_variant_delta_badge"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp"
+        android:paddingStart="5dp"
+        android:paddingEnd="5dp"
         android:paddingTop="2dp"
         android:paddingBottom="2dp"
         android:text="+15%"
         android:textColor="@color/widget_trend_positive"
-        android:textSize="11sp"
+        android:textSize="10sp"
         android:textStyle="bold" />
     </LinearLayout>
 
@@ -67,11 +70,11 @@
       android:maxLines="1"
       android:text="Mercury trines Sun - great for presentations."
       android:textColor="@color/widget_text_secondary"
-      android:textSize="12sp" />
+      android:textSize="11sp" />
   </LinearLayout>
 
   <LinearLayout
-    android:layout_width="wrap_content"
+    android:layout_width="72dp"
     android:layout_height="wrap_content"
     android:layout_marginStart="8dp"
     android:gravity="end"
@@ -82,15 +85,18 @@
       android:layout_height="wrap_content"
       android:text="Peak"
       android:textColor="@color/widget_text_muted"
-      android:textSize="10sp" />
+      android:textSize="9sp" />
 
     <TextView
       android:id="@+id/widget_strip_peak_time"
-      android:layout_width="wrap_content"
+      android:layout_width="match_parent"
       android:layout_height="wrap_content"
+      android:ellipsize="end"
+      android:gravity="end"
+      android:maxLines="1"
       android:text="2-4 PM"
       android:textColor="@color/widget_text_gold"
-      android:textSize="24sp"
+      android:textSize="18sp"
       android:textStyle="bold" />
   </LinearLayout>
 </LinearLayout>

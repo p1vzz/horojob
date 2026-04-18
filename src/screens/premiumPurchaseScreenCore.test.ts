@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   mapPackageToPlan,
+  normalizePreviewSegments,
   packagePriority,
   sortPackages,
   type PremiumPackageTypes,
@@ -108,4 +109,25 @@ test('premium core maps annual, monthly, lifetime and unknown packages', () => {
     PACKAGE_TYPES
   );
   assert.equal(unknown.title, 'custom-plan');
+});
+
+test('premium core normalizes preview chart segments', () => {
+  const segments = normalizePreviewSegments([
+    { label: 'A', value: 2, color: '#111111' },
+    { label: 'B', value: 3, color: '#222222' },
+    { label: 'C', value: -10, color: '#333333' },
+  ]);
+
+  assert.deepEqual(
+    segments.map((segment) => segment.percentage),
+    [40, 60, 0]
+  );
+  assert.equal(segments[2]?.value, 0);
+
+  assert.deepEqual(
+    normalizePreviewSegments([{ label: 'Empty', value: 0, color: '#111111' }]).map(
+      (segment) => segment.percentage
+    ),
+    [0]
+  );
 });

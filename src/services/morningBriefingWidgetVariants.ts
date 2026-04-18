@@ -22,14 +22,14 @@ export const MORNING_BRIEFING_WIDGET_VARIANTS: MorningBriefingWidgetVariantOptio
   {
     id: 'small_vibe',
     title: 'Career Vibe',
-    subtitle: 'Compact delta card',
+    subtitle: 'Quick trend + action',
     sizeLabel: '2x2',
     family: 'small',
   },
   {
     id: 'small_score',
     title: 'Career Score',
-    subtitle: 'Score + cosmic hints',
+    subtitle: 'Score + timing cues',
     sizeLabel: '2x2',
     family: 'small',
   },

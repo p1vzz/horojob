@@ -1,47 +1,46 @@
 import React, { useMemo } from 'react';
-import { View, Text, TextInput, Pressable } from 'react-native';
-import { Search, Link as LinkIcon, ArrowRight } from 'lucide-react-native';
-import { ScanButton } from './ScanButton';
+import { View, Text, Pressable } from 'react-native';
+import { Search, ArrowRight } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../types/navigation';
 import { useAppTheme } from '../theme/ThemeModeProvider';
 import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
 import { adaptColorOpacity } from '../utils/brightnessAdaptation';
-import { buildJobCheckScannerParams, JOB_CHECK_TILE_COPY } from './jobCheckTileCore';
-import { JOB_CHECK_TILE_VISUALS } from './jobCheckTileVisuals';
+import { JOB_CHECK_SUPPORTED_SERVICES, JOB_CHECK_TILE_COPY } from './jobCheckTileCore';
+import { getJobCheckTileVisuals } from './jobCheckTileVisuals';
 
 export const JobCheckTile = React.memo(() => {
   const theme = useAppTheme();
   const { channels } = useBrightnessAdaptation();
   const navigation = useNavigation<AppNavigationProp>();
-  const [urlInput, setUrlInput] = React.useState('');
+  const baseVisuals = getJobCheckTileVisuals(theme.isLight);
   const visuals = useMemo(
     () => ({
-      actionIcon: adaptColorOpacity(JOB_CHECK_TILE_VISUALS.actionIcon, channels.textOpacityMultiplier),
-      descriptionText: adaptColorOpacity(JOB_CHECK_TILE_VISUALS.descriptionText, channels.textOpacityMultiplier),
-      inputBackground: adaptColorOpacity(
-        JOB_CHECK_TILE_VISUALS.inputBackground,
+      actionBackground: adaptColorOpacity(
+        baseVisuals.actionBackground,
         channels.glowOpacityMultiplier
       ),
-      inputBorder: adaptColorOpacity(JOB_CHECK_TILE_VISUALS.inputBorder, channels.borderOpacityMultiplier),
-      inputIcon: adaptColorOpacity(JOB_CHECK_TILE_VISUALS.inputIcon, channels.textOpacityMultiplier),
-      inputPlaceholder: adaptColorOpacity(
-        JOB_CHECK_TILE_VISUALS.inputPlaceholder,
+      actionBorder: adaptColorOpacity(baseVisuals.actionBorder, channels.borderOpacityMultiplier),
+      actionIcon: adaptColorOpacity(baseVisuals.actionIcon, channels.textOpacityMultiplier),
+      actionText: adaptColorOpacity(baseVisuals.actionText, channels.textOpacityMultiplier),
+      descriptionText: adaptColorOpacity(baseVisuals.descriptionText, channels.textOpacityMultiplier),
+      footnoteText: adaptColorOpacity(baseVisuals.footnoteText, channels.textOpacityMultiplier),
+      serviceBackground: adaptColorOpacity(baseVisuals.serviceBackground, channels.glowOpacityMultiplier),
+      serviceBorder: adaptColorOpacity(baseVisuals.serviceBorder, channels.borderOpacityMultiplier),
+      serviceDetailText: adaptColorOpacity(baseVisuals.serviceDetailText, channels.textOpacityMultiplier),
+      serviceDot: adaptColorOpacity(baseVisuals.serviceDot, channels.textOpacityMultiplier),
+      serviceLabelText: adaptColorOpacity(baseVisuals.serviceLabelText, channels.textOpacityMultiplier),
+      servicesLabelText: adaptColorOpacity(
+        baseVisuals.servicesLabelText,
         channels.textOpacityMultiplier
       ),
     }),
-    [channels]
+    [baseVisuals, channels]
   );
 
-  const navigateToScanner = (options?: { autoStart?: boolean }) => {
-    const scannerParams = buildJobCheckScannerParams(urlInput, options);
-    if (!scannerParams) {
-      navigation.navigate('Scanner');
-      return;
-    }
-
-    navigation.navigate('Scanner', scannerParams);
-  };
+  const navigateToScanner = React.useCallback(() => {
+    navigation.navigate('Scanner');
+  }, [navigation]);
 
   return (
     <View className="px-5 py-2">
@@ -58,7 +57,13 @@ export const JobCheckTile = React.memo(() => {
           <Text className="text-[13px] font-semibold ml-2" style={{ color: theme.colors.foreground }}>
             {JOB_CHECK_TILE_COPY.title}
           </Text>
-          <Pressable style={{ marginLeft: 'auto' }} onPress={() => navigateToScanner()}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open job scanner"
+            style={{ marginLeft: 'auto' }}
+            onPress={navigateToScanner}
+            hitSlop={8}
+          >
             <ArrowRight size={14} color={visuals.actionIcon} />
           </Pressable>
         </View>
@@ -67,29 +72,66 @@ export const JobCheckTile = React.memo(() => {
           {JOB_CHECK_TILE_COPY.description}
         </Text>
 
-        <View
-          className="flex-row items-center rounded-[14px] p-1.5"
-          style={{
-            backgroundColor: visuals.inputBackground,
-            borderColor: visuals.inputBorder,
-            borderWidth: 1,
-          }}
-        >
-          <View className="flex-1 flex-row items-center pl-3 pr-2">
-            <LinkIcon size={13} color={visuals.inputIcon} />
-            <TextInput
-              value={urlInput}
-              onChangeText={setUrlInput}
-              placeholder={JOB_CHECK_TILE_COPY.placeholder}
-              placeholderTextColor={visuals.inputPlaceholder}
-              className="flex-1 h-10 text-[13px] ml-2"
-              style={{ color: theme.colors.foreground }}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+        <Text className="text-[10px] font-semibold uppercase mb-2" style={{ color: visuals.servicesLabelText }}>
+          {JOB_CHECK_TILE_COPY.servicesLabel}
+        </Text>
 
-          <ScanButton onPress={() => navigateToScanner({ autoStart: true })} />
+        <View className="flex-row flex-wrap mb-2">
+          {JOB_CHECK_SUPPORTED_SERVICES.map((service, index) => (
+            <View
+              key={service.label}
+              className="rounded-[8px] px-3 py-2"
+              style={{
+                backgroundColor: visuals.serviceBackground,
+                borderColor: visuals.serviceBorder,
+                borderWidth: 1,
+                flexBasis: index === JOB_CHECK_SUPPORTED_SERVICES.length - 1 ? '100%' : '48%',
+                marginBottom: 8,
+                marginRight: index % 2 === 0 && index !== JOB_CHECK_SUPPORTED_SERVICES.length - 1 ? 8 : 0,
+              }}
+            >
+              <View className="flex-row items-center">
+                <View
+                  className="w-1.5 h-1.5 rounded-full mr-2"
+                  style={{ backgroundColor: visuals.serviceDot }}
+                />
+                <Text
+                  className="text-[12px] font-semibold"
+                  numberOfLines={1}
+                  style={{ color: visuals.serviceLabelText }}
+                >
+                  {service.label}
+                </Text>
+              </View>
+              <Text
+                className="text-[10px] mt-1"
+                numberOfLines={1}
+                style={{ color: visuals.serviceDetailText }}
+              >
+                {service.detail}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View className="flex-row items-center">
+          <Text className="flex-1 text-[11px] leading-[16px] pr-3" style={{ color: visuals.footnoteText }}>
+            {JOB_CHECK_TILE_COPY.footnote}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={navigateToScanner}
+            className="flex-row items-center rounded-[8px] px-3 py-2 border"
+            style={{
+              backgroundColor: visuals.actionBackground,
+              borderColor: visuals.actionBorder,
+            }}
+          >
+            <Text className="text-[11px] font-semibold mr-1.5" style={{ color: visuals.actionText }}>
+              {JOB_CHECK_TILE_COPY.actionLabel}
+            </Text>
+            <ArrowRight size={13} color={visuals.actionText} />
+          </Pressable>
         </View>
       </View>
     </View>

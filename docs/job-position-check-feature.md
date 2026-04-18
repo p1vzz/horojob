@@ -1,6 +1,6 @@
 # Job Position Check - Feature Implementation Plan
-**Version:** 1.6  
-**Status:** Active (post-Phase E backend ready)  
+**Version:** 1.7
+**Status:** Release candidate hardening
 **Owner:** Backend + Mobile
 
 ## 1. Feature Goal
@@ -18,7 +18,7 @@ Target: stable and deterministic output for similar inputs (minimal score jitter
 - No manual vacancy text typing flow in MVP.
 - If parsing fails: return explicit error state in app (no hidden fallback form).
 - Supported sources in MVP:
-  - LinkedIn (public jobs only),
+  - LinkedIn (public jobs only; `/jobs/view/<id>` and jobs links with numeric `currentJobId`),
   - Wellfound,
   - ZipRecruiter,
   - Indeed,
@@ -26,29 +26,43 @@ Target: stable and deterministic output for similar inputs (minimal score jitter
 - No Apify/Bright Data in current implementation scope.
 - Fetch strategy: HTTP-first, browser fallback only where policy allows.
 - Wellfound browser fallback: disabled by default (debug/manual path only).
+- Trial entry is intentionally not part of v1 Job Position Check monetization.
+- Scanner premium upsell is scoped to `10 Daily Job Checks`; Deep Reports and AI Insights are promoted from the natal chart surface.
 
 ## 3. User Flow (Mobile)
-1. User opens Job Position Check screen.
-2. User pastes vacancy URL.
-3. App calls `POST /api/jobs/preflight`:
+1. User sees the Job Posting Check dashboard card with the currently supported services.
+2. User opens Job Position Check screen.
+3. User pastes vacancy URL.
+4. App calls `POST /api/jobs/preflight`:
    - validates URL/source/path;
    - reads cache status;
    - returns next stage hint (`done`, `running_scoring`, `fetching_http_fetch`, `cooldown`, etc.).
-4. App calls `POST /api/jobs/analyze`.
-5. While request is running:
+5. App calls `POST /api/jobs/analyze`.
+6. While request is running:
    - show blocking loader state;
    - adapt loader ambient glow/text/borders to current screen brightness via `docs/brightness-adaptation-system.md`;
    - show source-specific error message if parser fails.
-6. If vacancy is blocked/closed/login-walled:
+7. If vacancy is blocked/closed/login-walled:
    - app offers screenshot fallback screen;
-   - user uploads 1 to 4 screenshots from phone gallery;
+   - user uploads 1 to 6 screenshots from phone gallery;
+   - upload screen explains the minimum visible fields: role title, company name, and job description/responsibilities;
    - app calls `POST /api/jobs/analyze-screenshots`;
    - if screenshots are not a vacancy -> explicit error;
    - if screenshots are incomplete -> explicit error + missing fields guidance.
-7. On success:
+8. On success:
    - render scores + breakdown + descriptors/tags;
    - keep scanner chips, helper text, empty state, and error-state borders aligned with semantic brightness-adaptation channels;
    - mark as cached result on repeated open.
+
+Dashboard entry point:
+- `src/components/JobCheckTile.tsx` presents supported sources and opens the scanner.
+- URL input remains on `ScannerScreen`, where source hints and screenshot fallback are available.
+- Saved scans live on `ScannerHistoryScreen`; tapping an item opens the full saved result on `Scanner`.
+- Manual Scan tap dismisses the keyboard before the request starts.
+
+Production gates:
+- Mobile hides technical scanner/provider/cache hints and the parser quality card when `EXPO_PUBLIC_APP_ENV=production`.
+- Backend disables job metrics/alerts endpoints in production and fails startup if production env explicitly enables parser metrics, disables usage limits, or enables the dev premium bypass.
 
 ## 4. Current Backend Contract
 - `GET /api/jobs/limits`
@@ -67,7 +81,7 @@ Target: stable and deterministic output for similar inputs (minimal score jitter
 - These wrappers still call the existing `jobsApi` transport functions, but add:
   - retry orchestration through `src/services/aiOrchestration.ts`
   - runtime validation through `src/schemas/jobAnalysisSchema.ts`
-  - cache-hit/cache-miss telemetry derived from the server `cache.analysis.hit` fields
+  - cache-hit/cache-miss telemetry derived from the normalized `cache.analysis` boolean
 - Retry profiles are intentionally heavier for slower work:
   - URL analysis uses a wider retry window than preflight
   - screenshot analysis uses the widest retry window of the three
@@ -119,15 +133,21 @@ url input
 ## 9. Limits and Monetization
 - Free plan: 1 successful parse per rolling 7 days.
 - Premium plan: 10 successful parses per UTC day.
-- Dev mode: limits can be disabled (`JOB_USAGE_LIMITS_ENABLED=false`).
+- Non-production only: limits can be disabled (`JOB_USAGE_LIMITS_ENABLED=false`).
 
 ## 10. Error Contract (App-facing)
 - `unsupported_path`: `This URL is not supported by the current parser.`
-- `login_wall`: `This job page requires sign-in, so data is unavailable in the current mode.`
-- `blocked`: `The source temporarily restricted access to this page. Please try again later.`
-- `not_found`: `The job posting was not found on the source page.`
+- `login_wall`: `This vacancy requires sign-in or is not public. Open it in your app or browser, take screenshots, and upload them here.`
+- `blocked`: `This job board is temporarily blocking automated access. Upload screenshots of the vacancy and we can scan the visible details.`
+- `not_found`: `This job posting may be closed or unavailable. If you can still see it in your browser, upload screenshots instead.`
+- `provider_failed`: `We could not read enough vacancy details from this link. Upload screenshots of the title, company, and job description.`
 - `screenshot_not_vacancy`: `Uploaded screenshots do not look like a vacancy page.`
-- `screenshot_incomplete_info`: `Not enough vacancy details are visible in screenshots.`
+- `screenshot_incomplete_info`: `Not enough vacancy details are visible in screenshots.` with core `missingFields`.
+
+Screenshot minimum data:
+- success requires a visible role title, company name, and substantial job description/responsibilities;
+- backend enforces a minimum merged description length of 80 characters;
+- location, seniority, and employment type are helpful but should not be treated as the core user-facing minimum.
 
 ## 11. Observability and Alerting
 - Metrics endpoint provides source-level quality diagnostics.

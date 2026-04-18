@@ -16,6 +16,7 @@ export const fetchNatalChart = astrologyApi.fetchNatalChart;
 export const fetchCareerInsights = astrologyApi.fetchCareerInsights;
 export const fetchDailyTransit = astrologyApi.fetchDailyTransit;
 export const fetchMorningBriefing = astrologyApi.fetchMorningBriefing;
+export const fetchCareerVibePlan = astrologyApi.fetchCareerVibePlan;
 export const fetchFullNatalCareerAnalysis = astrologyApi.fetchFullNatalCareerAnalysis;
 export const regenerateFullNatalCareerAnalysis = astrologyApi.regenerateFullNatalCareerAnalysis;
 export const fetchAiSynergyHistory = astrologyApi.fetchAiSynergyHistory;

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config/api';
+import { SHOULD_ALLOW_DEVELOPMENT_OVERRIDES } from '../config/appEnvironment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   clearAuthSession,
@@ -11,6 +12,10 @@ import {
   clearMorningBriefingWidgetVariantForUser,
 } from '../utils/morningBriefingStorage';
 import { clearInterviewStrategyStateForUser } from '../utils/interviewStrategyStorage';
+import { clearCareerVibePlanForUser } from '../utils/careerVibePlanStorage';
+import { clearJobScanHistoryForUser } from '../utils/jobScanHistoryStorage';
+import { clearLastJobScanForUser } from '../utils/jobScanStorage';
+import { clearSessionJobScansForUser } from '../utils/jobScanSessionCache';
 import { clearMorningBriefingWidget } from './morningBriefingWidgetBridge';
 import { createAuthSessionManager } from './authSessionCore';
 import { createFetchWithTimeout } from './fetchWithTimeout';
@@ -31,14 +36,18 @@ const authSessionManager = createAuthSessionManager({
       clearMorningBriefingForUser(userId),
       clearMorningBriefingSetupStateForUser(userId),
       clearMorningBriefingWidgetVariantForUser(userId),
+      clearCareerVibePlanForUser(userId),
       clearInterviewStrategyStateForUser(userId),
+      clearLastJobScanForUser(userId),
+      clearJobScanHistoryForUser(userId),
       AsyncStorage.removeItem(pushTokenSyncStorageKeyForUser(userId)),
     ]);
+    clearSessionJobScansForUser(userId);
   },
   clearGlobalState: async () => {
     await clearMorningBriefingWidget();
   },
-  isDev: __DEV__,
+  isDev: SHOULD_ALLOW_DEVELOPMENT_OVERRIDES,
 });
 
 export const ensureAuthSession = authSessionManager.ensureAuthSession;

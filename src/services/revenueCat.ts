@@ -6,12 +6,14 @@ import Purchases, {
   type PurchasesPackage,
 } from 'react-native-purchases';
 import { createRevenueCatService } from './revenueCatCore';
+import { APP_ENVIRONMENT } from '../config/appEnvironment';
 
 export * from './revenueCatCore';
 
 const revenueCatService = createRevenueCatService<LOG_LEVEL, PurchasesOffering, PurchasesPackage, CustomerInfo>({
   platformOs: Platform.OS,
   getEnv: (name) => process.env[name],
+  appEnvironment: APP_ENVIRONMENT,
   logLevels: {
     DEBUG: LOG_LEVEL.DEBUG,
     INFO: LOG_LEVEL.INFO,

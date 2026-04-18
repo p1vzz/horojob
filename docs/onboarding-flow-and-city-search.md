@@ -129,5 +129,5 @@ Form is considered complete when all 4 conditions are met:
 
 ## Related Startup Behavior
 
-- `App.tsx` supports an optional development-only onboarding override via `EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY=true`.
+- `App.tsx` supports an optional onboarding override via `EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY=true`, honored only when `EXPO_PUBLIC_APP_ENV=development`.
 - After force flag removal, onboarding route depends on stored/remote profile availability.

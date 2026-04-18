@@ -98,7 +98,7 @@ function SmallPreview({
             {metrics.moonLabel}
           </Text>
           <Text className="text-[8px]" style={{ color: '#E9D26A' }}>
-            Mercury Rx
+            Timing cue
           </Text>
         </View>
       </View>
@@ -203,16 +203,16 @@ function StripPreview({
   const metrics = toPreviewMetrics(briefing);
   if (variantId === 'strip_peak') {
     return (
-      <View className="h-[52px] w-full rounded-[16px] px-2.5 py-2 flex-row items-center" style={{ backgroundColor: 'rgba(12,16,34,0.9)' }}>
-        <View className="w-7 h-7 rounded-full items-center justify-center mr-2" style={{ backgroundColor: 'rgba(245,202,88,0.18)' }}>
+      <View className="h-[56px] w-full rounded-[16px] px-3 py-2 flex-row items-center" style={{ backgroundColor: 'rgba(12,16,34,0.9)' }}>
+        <View className="w-[26px] h-[26px] rounded-full items-center justify-center mr-2" style={{ backgroundColor: 'rgba(245,202,88,0.18)' }}>
           <Text style={{ color: '#E9D26A' }}>☀</Text>
         </View>
-        <View className="flex-1">
+        <View className="flex-1" style={{ minWidth: 0 }}>
           <View className="flex-row items-center">
-            <Text className="text-[14px] font-semibold" style={{ color: '#F6F7FB' }}>
+            <Text className="flex-1 text-[13px] font-semibold" numberOfLines={1} style={{ color: '#F6F7FB' }}>
               Career Vibe
             </Text>
-            <Text className="text-[10px] font-semibold ml-2 px-1.5 py-0.5 rounded-full" style={{ color: '#35C58A', backgroundColor: 'rgba(53,197,138,0.18)' }}>
+            <Text className="text-[9px] font-semibold ml-1.5 px-1.5 py-0.5 rounded-full" style={{ color: '#35C58A', backgroundColor: 'rgba(53,197,138,0.18)' }}>
               {metrics.deltaLabel}
             </Text>
           </View>
@@ -220,11 +220,11 @@ function StripPreview({
             {briefing?.summary ?? 'Mercury trines Sun - great for presentations.'}
           </Text>
         </View>
-        <View className="items-end ml-2">
+        <View className="items-end ml-2" style={{ width: 70 }}>
           <Text className="text-[8px]" style={{ color: '#8E96B0' }}>
             Peak
           </Text>
-          <Text className="text-[16px] font-bold" style={{ color: '#E9D26A' }}>
+          <Text className="text-[15px] font-bold" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={{ color: '#E9D26A' }}>
             {metrics.peakWindow}
           </Text>
         </View>
@@ -233,17 +233,17 @@ function StripPreview({
   }
 
   return (
-    <View className="h-[52px] w-full rounded-[16px] px-2.5 py-2 flex-row items-center" style={{ backgroundColor: 'rgba(12,16,34,0.9)' }}>
-      <View className="w-7 h-7 rounded-full items-center justify-center mr-2" style={{ backgroundColor: 'rgba(245,202,88,0.18)' }}>
+    <View className="h-[56px] w-full rounded-[16px] px-3 py-2 flex-row items-center" style={{ backgroundColor: 'rgba(12,16,34,0.9)' }}>
+      <View className="w-[26px] h-[26px] rounded-full items-center justify-center mr-2" style={{ backgroundColor: 'rgba(245,202,88,0.18)' }}>
         <Text style={{ color: '#E9D26A' }}>☀</Text>
       </View>
-      <Text className="flex-1 text-[14px] font-semibold" style={{ color: '#F6F7FB' }}>
+      <Text className="flex-1 text-[13px] font-semibold" numberOfLines={1} style={{ color: '#F6F7FB' }}>
         Career Vibe
       </Text>
-      <Text className="text-[29px] font-bold mr-2" style={{ color: '#E8A04A' }}>
+      <Text className="text-[24px] font-bold mx-2" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={{ color: '#E8A04A' }}>
         {metrics.deltaLabel}
       </Text>
-      <Text className="text-[15px] font-semibold" style={{ color: '#A9B0C8' }}>
+      <Text className="text-[14px] font-semibold text-right" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={{ width: 68, color: '#A9B0C8' }}>
         {metrics.peakWindow}
       </Text>
     </View>
@@ -275,8 +275,9 @@ export function MorningBriefingWidgetVariantPicker({
       <Pressable style={styles.overlayBackdrop} onPress={onClose} />
       <View className="flex-1 justify-end px-4 pb-7">
         <View
-          className="max-h-[84%] rounded-[24px] overflow-hidden"
+          className="rounded-[24px] overflow-hidden"
           style={{
+            ...styles.sheet,
             backgroundColor: 'rgba(15,19,36,0.98)',
             borderColor: 'rgba(255,255,255,0.12)',
             borderWidth: 1,
@@ -287,13 +288,14 @@ export function MorningBriefingWidgetVariantPicker({
               Widget Styles
             </Text>
             <Text className="text-[12px] mt-1" style={{ color: 'rgba(200,205,222,0.62)' }}>
-              Choose one style before Android pin flow. Widget light palette matches the app light direction.
+              Choose a style before Android asks to add it to your Home Screen.
             </Text>
           </View>
 
           <ScrollView
             className="px-4"
-            contentContainerStyle={{ paddingBottom: 16 }}
+            style={styles.variantList}
+            contentContainerStyle={styles.variantListContent}
             showsVerticalScrollIndicator={false}
           >
             {MORNING_BRIEFING_WIDGET_VARIANTS.map((variant) => {
@@ -336,7 +338,7 @@ export function MorningBriefingWidgetVariantPicker({
             })}
           </ScrollView>
 
-          <View className="px-4 pb-4 pt-2 flex-row">
+          <View className="px-4 pb-4 pt-2 flex-row" style={styles.footer}>
             <Pressable
               onPress={onClose}
               className="flex-1 h-[44px] rounded-[12px] items-center justify-center mr-2"
@@ -384,5 +386,19 @@ const styles = StyleSheet.create({
   overlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(2,5,12,0.72)',
+  },
+  sheet: {
+    maxHeight: '84%',
+  },
+  variantList: {
+    flexShrink: 1,
+  },
+  variantListContent: {
+    paddingBottom: 24,
+  },
+  footer: {
+    flexShrink: 0,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
   },
 });

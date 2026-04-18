@@ -46,15 +46,24 @@ Document how app startup resolves session state, onboarding state, and backgroun
    - `syncRevenueCatSubscription()` + `updateCurrentSessionUser(...)`
    - `syncMorningBriefingCache()`
 
+## Dashboard Readiness
+
+- `DashboardScreen` keeps its readiness gate visible until user-facing dashboard cards have completed their initial load.
+- During this gate, dashboard also calls `syncNatalChartCache()` to prepare the current user's natal chart through `POST /api/astrology/natal-chart`.
+- The sync writes the returned chart into local per-user cache and ensures backend-backed features such as `DiscoverRoles`, job matching, and full natal analysis can read the chart from server storage.
+- If the server profile is temporarily missing but local onboarding data exists, the sync retries the natal chart request with local birth details.
+- Natal chart sync failures do not permanently block dashboard rendering; dependent screens still show their own retry/error states.
+
 ## Navigation Decision
 
 - Default behavior:
   - if `hasOnboarded` -> `Dashboard`
   - else -> `Onboarding`
-- Optional development override:
+- Optional development-only override:
   - `EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY=true` keeps initial route on `Onboarding`
   - `EXPO_PUBLIC_FORCE_STARTUP_LOADER=true` keeps startup loader pinned for visual inspection
-  - override is honored in development builds only
+  - override is honored only when `EXPO_PUBLIC_APP_ENV=development`
+- App environment behavior is documented in `docs/app-environment-and-technical-surfaces.md`.
 
 ## Notification-Driven Navigation
 
@@ -82,6 +91,7 @@ Document how app startup resolves session state, onboarding state, and backgroun
 - `App.tsx`
 - `src/services/authSession.ts`
 - `src/services/astrologyApi.ts`
+- `src/services/natalChartSync.ts`
 - `src/services/billingApi.ts`
 - `src/services/pushNotifications.ts`
 - `src/services/morningBriefingSync.ts`

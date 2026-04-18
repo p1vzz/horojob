@@ -1,6 +1,15 @@
 type JobSource = 'linkedin' | 'wellfound' | 'ziprecruiter' | 'indeed' | 'glassdoor' | 'manual';
 type JobProviderName = 'http_fetch' | 'browser_fallback' | 'screenshot_vision';
 type UsagePlan = 'free' | 'premium';
+type JobsRequestInit = RequestInit & {
+  timeoutMs?: number;
+};
+
+export const JOBS_PREFLIGHT_TIMEOUT_MS = 10_000;
+export const JOBS_ANALYZE_TIMEOUT_MS = 60_000;
+export const JOBS_SCREENSHOT_ANALYZE_TIMEOUT_MS = 90_000;
+export const JOBS_METRICS_TIMEOUT_MS = 10_000;
+
 const JOB_SOURCES = ['linkedin', 'wellfound', 'ziprecruiter', 'indeed', 'glassdoor', 'manual'] as const;
 const JOB_PROVIDERS = ['http_fetch', 'browser_fallback', 'screenshot_vision'] as const;
 const USAGE_PLANS = ['free', 'premium'] as const;
@@ -388,7 +397,7 @@ export type JobMetricsAlertsReport = {
 };
 
 export type JobsApiDeps = {
-  authorizedFetch: (path: string, init?: RequestInit) => Promise<Response>;
+  authorizedFetch: (path: string, init?: JobsRequestInit) => Promise<Response>;
   parseJsonBody: (response: Response) => Promise<unknown>;
   ApiError: new (status: number, message: string, payload: unknown) => Error;
 };
@@ -399,6 +408,7 @@ export function createJobsApi(deps: JobsApiDeps) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
+      timeoutMs: JOBS_PREFLIGHT_TIMEOUT_MS,
     });
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
@@ -412,6 +422,7 @@ export function createJobsApi(deps: JobsApiDeps) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, regenerate }),
+      timeoutMs: JOBS_ANALYZE_TIMEOUT_MS,
     });
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
@@ -428,6 +439,7 @@ export function createJobsApi(deps: JobsApiDeps) {
         screenshots: screenshots.map((dataUrl) => ({ dataUrl })),
         regenerate,
       }),
+      timeoutMs: JOBS_SCREENSHOT_ANALYZE_TIMEOUT_MS,
     });
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
@@ -437,7 +449,9 @@ export function createJobsApi(deps: JobsApiDeps) {
   };
 
   const fetchJobMetrics = async (windowHours = 24) => {
-    const response = await deps.authorizedFetch(`/api/jobs/metrics?windowHours=${windowHours}`);
+    const response = await deps.authorizedFetch(`/api/jobs/metrics?windowHours=${windowHours}`, {
+      timeoutMs: JOBS_METRICS_TIMEOUT_MS,
+    });
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
       throw new deps.ApiError(response.status, 'Failed to fetch parser metrics', payload);
@@ -446,7 +460,9 @@ export function createJobsApi(deps: JobsApiDeps) {
   };
 
   const fetchJobAlerts = async (windowHours = 24) => {
-    const response = await deps.authorizedFetch(`/api/jobs/alerts?windowHours=${windowHours}`);
+    const response = await deps.authorizedFetch(`/api/jobs/alerts?windowHours=${windowHours}`, {
+      timeoutMs: JOBS_METRICS_TIMEOUT_MS,
+    });
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
       throw new deps.ApiError(response.status, 'Failed to fetch parser alerts', payload);

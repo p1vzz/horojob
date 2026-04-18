@@ -10,6 +10,7 @@ Unified pre-release smoke checklist for the highest-risk user flows across onboa
 ## Preconditions
 
 - Backend API (`../horojob-server`) is running and reachable from mobile app.
+- Release/prod build uses `EXPO_PUBLIC_APP_ENV=production`; preview QA builds use `EXPO_PUBLIC_APP_ENV=staging`.
 - Test accounts are available:
   - one `free` user
   - one `premium` user
@@ -35,11 +36,16 @@ Unified pre-release smoke checklist for the highest-risk user flows across onboa
 - [ ] Startup loader and onboarding open on dark backgrounds without a light flash.
 - [ ] Settings does not expose the deferred app theme toggle in v1.
 - [ ] Core dashboard tiles render in the default dark app theme without contrast regressions.
+- [ ] `Career Vibe` opens the full plan screen and returns to dashboard.
+- [ ] `Career Vibe Plan` manual refresh updates or preserves the last successful plan with an inline error.
+- [ ] Career Vibe shows a saved plan, not sample copy, when network/API is temporarily unavailable after one successful sync.
+- [ ] Logout or missing profile does not keep showing a previous user's saved Career Vibe plan.
 - [ ] Burnout and lunar dashboard cards hydrate live for premium user, or gracefully fall back without crash when plan fetch fails/unavailable.
 - [ ] Returning from `Settings` refreshes burnout/lunar dashboard card content on `Dashboard`.
 
 ### 4. Scanner and job analysis
 - [ ] URL preflight + analyze success path works from `Scanner`.
+- [ ] Scanner `History` opens saved scans and tapping an item restores the full saved result.
 - [ ] Screenshot analyze flow works from `JobScreenshotUpload`.
 - [ ] Known error states are mapped (blocked/login wall/not found/limit) without crash.
 
@@ -58,6 +64,7 @@ Unified pre-release smoke checklist for the highest-risk user flows across onboa
 - [ ] Variant picker shows available widget variants.
 - [ ] Pin flow works from app and widget renders payload.
 - [ ] Widget updates after manual refresh.
+- [ ] Tapping the widget opens the full Career Vibe plan screen.
 - [ ] Light/Dark system themes keep text readable.
 
 ### 8. Notification/deep-link behavior

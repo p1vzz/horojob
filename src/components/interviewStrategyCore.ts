@@ -40,7 +40,7 @@ export const FALLBACK_INTERVIEW_SLOTS: InterviewSlotRow[] = [
 ];
 
 export const FALLBACK_INTERVIEW_INSIGHT =
-  'Mercury trines your natal Sun tomorrow. Communication flows naturally for first impressions and interview conversations.';
+  'Generate your interview strategy to find sparse, natal-aware windows for high-clarity conversations.';
 
 export function clampInterviewStrategyScore(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -103,6 +103,8 @@ export function buildInterviewStrategyInsight(
   const timeRange = formatInterviewStrategyTimeRange(slot.startAt, slot.endAt, options);
   const drivers: string[] = [];
 
+  if ((slot.breakdown.transitNatalScore ?? 0) >= 72) drivers.push('natal-transit timing is supportive');
+  if ((slot.breakdown.natalCommunicationScore ?? 0) >= 72) drivers.push('communication signals are elevated');
   if (slot.breakdown.dailyCareerScore >= 72) drivers.push('career momentum is elevated');
   if (slot.breakdown.aiSynergyScore >= 72) drivers.push('AI synergy is supportive');
   if (slot.breakdown.weekdayWeight >= 78) drivers.push('the weekday pattern is strong');

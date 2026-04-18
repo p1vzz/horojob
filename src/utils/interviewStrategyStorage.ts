@@ -4,6 +4,8 @@ import type {
   InterviewStrategyCalendarSyncMap,
   InterviewStrategyPlan,
   InterviewStrategyPreferences,
+  InterviewStrategyScoreBreakdown,
+  InterviewStrategySlot,
 } from '../types/interviewStrategy';
 import { normalizeInterviewStrategyPreferences } from '../services/interviewStrategy';
 
@@ -92,7 +94,23 @@ function parseInterviewPlan(raw: string | null): InterviewStrategyPlan | null {
           return null;
         }
 
-        return {
+        const normalizedBreakdown: InterviewStrategyScoreBreakdown = {
+          dailyCareerScore: Math.trunc(breakdown.dailyCareerScore),
+          aiSynergyScore: Math.trunc(breakdown.aiSynergyScore),
+          weekdayWeight: Math.trunc(breakdown.weekdayWeight),
+          hourWeight: Math.trunc(breakdown.hourWeight),
+          conflictPenalty: Math.trunc(breakdown.conflictPenalty),
+        };
+        const natalCommunicationScore = optionalScore(breakdown.natalCommunicationScore);
+        const transitNatalScore = optionalScore(breakdown.transitNatalScore);
+        const careerHouseScore = optionalScore(breakdown.careerHouseScore);
+        const rangeQualityScore = optionalScore(breakdown.rangeQualityScore);
+        if (natalCommunicationScore !== undefined) normalizedBreakdown.natalCommunicationScore = natalCommunicationScore;
+        if (transitNatalScore !== undefined) normalizedBreakdown.transitNatalScore = transitNatalScore;
+        if (careerHouseScore !== undefined) normalizedBreakdown.careerHouseScore = careerHouseScore;
+        if (rangeQualityScore !== undefined) normalizedBreakdown.rangeQualityScore = rangeQualityScore;
+
+        const normalizedSlot: InterviewStrategySlot = {
           id: slot.id,
           weekKey: slot.weekKey,
           startAt: slot.startAt,
@@ -100,14 +118,10 @@ function parseInterviewPlan(raw: string | null): InterviewStrategyPlan | null {
           timezoneIana: slot.timezoneIana,
           score: Math.trunc(slot.score),
           explanation: slot.explanation,
-          breakdown: {
-            dailyCareerScore: Math.trunc(breakdown.dailyCareerScore),
-            aiSynergyScore: Math.trunc(breakdown.aiSynergyScore),
-            weekdayWeight: Math.trunc(breakdown.weekdayWeight),
-            hourWeight: Math.trunc(breakdown.hourWeight),
-            conflictPenalty: Math.trunc(breakdown.conflictPenalty),
-          },
+          breakdown: normalizedBreakdown,
         };
+        if (typeof slot.calendarNote === 'string') normalizedSlot.calendarNote = slot.calendarNote;
+        return normalizedSlot;
       })
       .filter((slot): slot is InterviewStrategyPlan['slots'][number] => slot !== null);
 
@@ -143,6 +157,10 @@ function parseInterviewPlan(raw: string | null): InterviewStrategyPlan | null {
   } catch {
     return null;
   }
+}
+
+function optionalScore(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : undefined;
 }
 
 function parseSyncMap(raw: string | null): InterviewStrategyCalendarSyncMap {

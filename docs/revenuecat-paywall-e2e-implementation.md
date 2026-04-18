@@ -242,6 +242,7 @@ Use one canonical entitlement id (e.g. `premium`):
 ### 9.1 Mobile (`horojob/.env`)
 Required:
 - `EXPO_PUBLIC_API_BASE_URL`
+- `EXPO_PUBLIC_APP_ENV` (`development|staging|production`; also sent to RevenueCat as `app_env`)
 - `EXPO_PUBLIC_RC_IOS_API_KEY`
 - `EXPO_PUBLIC_RC_ANDROID_API_KEY`
 - `EXPO_PUBLIC_RC_ENTITLEMENT_PREMIUM`

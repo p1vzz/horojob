@@ -19,6 +19,7 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 ## 2. Technical Stack
 - **Frontend:** React Native + Expo (Android and iOS app targets; native widget implementation is Android-first)
 - **Styling:** NativeWind + custom token/theme layer in `src/theme`
+- **Environment:** `EXPO_PUBLIC_APP_ENV=development|staging|production` controls technical UI, QA/debug surfaces, and development-only overrides
 - **Data layer:** service modules + TanStack Query hooks for AI-heavy flows (incremental rollout)
 - **Runtime contract validation:** Zod schemas for AI, career-analysis, and job-analysis payloads
 - **Navigation:** React Navigation native stack
@@ -58,7 +59,7 @@ Career intelligence app that combines astrology signals with AI-oriented career 
    - available helpers: retry, timeout, fallback, cache-hit/cache-miss tracking
    - current hook adoption uses retry plus cache metrics; timeout/fallback helpers exist but are not yet wired into active screen flows
 3. `src/services/aiTelemetry.ts` is the shared observability adapter for AI requests.
-   - current state: development console logging for request/success/error/fallback/cache events
+   - current state: non-production console logging for request/success/error/fallback/cache events
    - future sink point: Sentry/LogRocket/custom analytics, not yet connected in production
 4. `src/schemas/aiSynergySchema.ts`, `src/schemas/careerAnalysisSchema.ts`, and `src/schemas/jobAnalysisSchema.ts` now own runtime validation and inferred mobile types for the main AI-backed payloads.
 5. Adoption status is partial by design.
@@ -87,8 +88,9 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 
 ## 5. Monetization Model
 - **Free:** limited scans, baseline insights
-- **Premium:** expanded scan capability, strategy modules, widget setup, deeper analytics/reporting
+- **Premium:** 10 successful job checks per UTC day, strategy modules, widget setup, Full Career Blueprint, and deeper AI work guidance
 - Gating remains anchored on backend `subscriptionTier` projection for compatibility
+- Trial is not part of the current release scope; revisit partial/full trial design after the premium feature set is less uneven.
 
 ---
 

@@ -1,6 +1,7 @@
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
+import type { JobScanHistoryEntry } from '../utils/jobScanHistoryStorage';
 
 export type ScannerImportedMeta = {
   source: string;
@@ -27,14 +28,22 @@ export type RootStackParamList = {
         importedUrl?: string;
         initialUrl?: string;
         autoStart?: boolean;
+        historyEntry?: JobScanHistoryEntry;
       }
     | undefined;
+  ScannerHistory: undefined;
   Profile: undefined;
   PremiumPurchase: undefined;
   NatalChart: undefined;
+  CareerVibePlan: undefined;
   FullNatalCareerAnalysis: undefined;
   DiscoverRoles: undefined;
-  Settings: undefined;
+  Settings:
+    | {
+        openWidgetSetup?: boolean;
+        widgetSetupKey?: number;
+      }
+    | undefined;
   JobScreenshotUpload:
     | {
         failedUrl?: string;

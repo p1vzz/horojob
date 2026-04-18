@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { useThemeMode } from '../../theme/ThemeModeProvider';
 import { useBrightnessAdaptation } from '../../contexts/BrightnessAdaptationContext';
 import { adaptColorOpacity } from '../../utils/brightnessAdaptation';
-import type { ScannerErrorState } from '../scannerUtils';
+import { SCREENSHOT_FALLBACK_GUIDANCE, type ScannerErrorState } from '../scannerUtilsCore';
 
 type ScannerFeedbackCardProps = {
   scanSummary: string | null;
@@ -12,6 +12,7 @@ type ScannerFeedbackCardProps = {
   canUseScreenshotFallback: boolean;
   hasAnalysis: boolean;
   isLoading: boolean;
+  showTechnicalHints: boolean;
   onUpgrade: () => void;
   onOpenScreenshotFallback: () => void;
 };
@@ -26,13 +27,14 @@ export function ScannerFeedbackCard(props: ScannerFeedbackCardProps) {
     onUpgrade,
     retryAtText,
     scanSummary,
+    showTechnicalHints,
   } = props;
   const { theme } = useThemeMode();
   const { channels } = useBrightnessAdaptation();
 
   return (
     <>
-      {scanSummary ? (
+      {showTechnicalHints && scanSummary ? (
         <Text
           className="text-[11px] mt-2"
           style={{ color: adaptColorOpacity('rgba(212,212,224,0.52)', channels.textOpacityMultiplier) }}
@@ -72,6 +74,14 @@ export function ScannerFeedbackCard(props: ScannerFeedbackCardProps) {
               Retry after: {retryAtText}
             </Text>
           ) : null}
+          {canUseScreenshotFallback ? (
+            <Text
+              className="text-[11px] mt-2"
+              style={{ color: adaptColorOpacity('rgba(255,191,205,0.9)', channels.textOpacityMultiplier) }}
+            >
+              {SCREENSHOT_FALLBACK_GUIDANCE}
+            </Text>
+          ) : null}
           {errorState.code === 'usage_limit_reached' ? (
             <Pressable
               onPress={onUpgrade}
@@ -99,7 +109,7 @@ export function ScannerFeedbackCard(props: ScannerFeedbackCardProps) {
                 className="text-[11px] font-semibold"
                 style={{ color: adaptColorOpacity('#8AF0C2', channels.textOpacityMultiplier) }}
               >
-                Upload screenshots instead
+                Scan from screenshots
               </Text>
             </Pressable>
           ) : null}

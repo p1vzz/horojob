@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
@@ -23,11 +24,11 @@ import {
 } from './scannerUtils';
 import { ScannerAnalysisSection } from './scanner/ScannerAnalysisSection';
 import { ScannerFeedbackCard } from './scanner/ScannerFeedbackCard';
-import { ScannerHistorySection } from './scanner/ScannerHistorySection';
 import { ScannerSearchPanel } from './scanner/ScannerSearchPanel';
 import { useScannerRuntime } from './useScannerRuntime';
 import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
 import { adaptOpacity } from '../utils/brightnessAdaptation';
+import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
 
 export const ScannerScreen = () => {
   const { theme } = useThemeMode();
@@ -39,11 +40,11 @@ export const ScannerScreen = () => {
   const {
     analysis,
     errorState,
+    historicalScan,
     isLoading,
-    onHistoryPress,
+    onReturnToActiveScan,
     onScanPress,
     phase,
-    scanHistory,
     scanMeta,
     setUrl,
     url,
@@ -86,7 +87,26 @@ export const ScannerScreen = () => {
     return `${source}${providerLabel}${scanMeta.cached ? ' - cached result' : ' - fresh scan'}`;
   }, [scanMeta]);
 
-  const visibleHistory = useMemo(() => scanHistory.slice(0, 4), [scanHistory]);
+  const openHistory = React.useCallback(() => {
+    navigation.navigate('ScannerHistory');
+  }, [navigation]);
+
+  const openHistoricalUrl = React.useCallback(() => {
+    if (!historicalScan?.canOpenUrl) return;
+    const trimmed = historicalScan.url.trim();
+    const externalUrl = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+    void Linking.openURL(externalUrl).catch(() => {
+      // Opening source URLs is optional and should not block scanner usage.
+    });
+  }, [historicalScan]);
+
+  const handleBack = React.useCallback(() => {
+    if (historicalScan) {
+      onReturnToActiveScan();
+      return;
+    }
+    navigation.navigate('Dashboard');
+  }, [historicalScan, navigation, onReturnToActiveScan]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
@@ -172,9 +192,11 @@ export const ScannerScreen = () => {
                   onScanPress={onScanPress}
                   isLoading={isLoading}
                   sourceHint={sourceHint}
-                  onBack={() => navigation.navigate('Dashboard')}
+                  historicalScan={historicalScan}
+                  onBack={handleBack}
+                  onOpenHistoricalUrl={openHistoricalUrl}
+                  onOpenHistory={openHistory}
                 />
-                <ScannerHistorySection entries={visibleHistory} onSelect={onHistoryPress} />
                 <ScannerFeedbackCard
                   scanSummary={scanSummary}
                   errorState={errorState}
@@ -182,6 +204,7 @@ export const ScannerScreen = () => {
                   canUseScreenshotFallback={canUseScreenshotFallback}
                   hasAnalysis={hasAnalysis}
                   isLoading={isLoading}
+                  showTechnicalHints={SHOULD_EXPOSE_TECHNICAL_SURFACES}
                   onUpgrade={() => navigation.navigate('PremiumPurchase')}
                   onOpenScreenshotFallback={() =>
                     navigation.navigate('JobScreenshotUpload', {

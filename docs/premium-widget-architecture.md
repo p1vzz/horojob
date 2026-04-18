@@ -4,14 +4,15 @@
 **Owner:** Mobile + Backend
 
 ## Goal
-Expose a compact `Morning Career Briefing` on the OS home screen, backed by existing daily transit and AI synergy calculations.
+Expose a compact `Morning Career Briefing` on the OS home screen, backed by the same daily career plan used by the in-app Career Vibe card.
 
 ## High-Level Components
 1. Backend endpoint returns widget-ready briefing payload.
 2. Mobile API client (`src/services/astrologyApi.ts`) fetches and validates payload.
 3. App-side sync layer normalizes data and writes it into shared widget storage.
 4. Android native widget providers read shared payload and render selected variant.
-5. iOS widget extension will reuse the same payload schema later.
+5. Android widget root taps launch the in-app `CareerVibePlan` route through `horojob://career-vibe-plan`.
+6. iOS widget extension will reuse the same payload schema later.
 
 ## Android Variant Set (Implemented)
 - `SMALL 2x2`
@@ -32,11 +33,15 @@ All Android variants support system Light/Dark theme via resource qualifiers.
 - Reuse existing computed sources:
   - `daily-transit` response
   - `aiSynergy` object
+- Use `career-vibe-plan` as the in-app tool contract:
+  - deterministic plan for all authenticated users
+  - optional LLM-polished plan for premium users when backend config allows it
 - Keep widget payload compact and deterministic:
   - date key
   - headline
   - short summary
   - primary scores (`energy`, `focus`, `luck`, `aiSynergy.score`)
+  - widget-safe plan snapshot (`headline`, `summary`, `primaryAction`, `peakWindow`, `riskGuardrail`)
   - generated/stale timestamps
 
 ## Sync and Refresh Model
@@ -47,12 +52,14 @@ All Android variants support system Light/Dark theme via resource qualifiers.
   - daily boundary change (local user timezone)
 - Minimum freshness target: once per local day.
 - If network fails: keep last payload and mark stale.
+- Android native rendering uses plan action copy when available and switches to refresh copy when `staleAfter` has passed.
 
 ## Storage and Contract Versioning
 - Shared storage key: `widget.morningBriefing.v1`.
 - Setup state key: `widget.morningBriefing.setupState`.
 - Include payload `schemaVersion` to support future field changes.
 - Never store auth tokens in widget-accessible storage.
+- `morning-briefing-v2` adds `plan` without changing the shared storage key because the native module persists individual fields and keeps legacy fallbacks.
 
 ## Premium Gating
 - Backend enforces premium access for widget payload endpoint.
@@ -66,5 +73,6 @@ All Android variants support system Light/Dark theme via resource qualifiers.
 
 ## Rollout Sequence
 1. Android multi-variant release (provider set + pin flow + shared storage sync).
-2. iOS widget extension with same payload schema.
-3. Add background refresh improvements only after baseline reliability is confirmed.
+2. Post-purchase Android setup handoff from Premium activation to Settings style picker.
+3. iOS widget extension with same payload schema.
+4. Add background refresh improvements only after baseline reliability is confirmed.

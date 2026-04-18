@@ -288,13 +288,13 @@ export function createNotificationsApi(deps: NotificationsApiDeps) {
   const upsertInterviewStrategySettings = async (input: {
     enabled: boolean;
     timezoneIana: string;
-    slotDurationMinutes: 30 | 45 | 60;
-    allowedWeekdays: number[];
-    workdayStartMinute: number;
-    workdayEndMinute: number;
-    quietHoursStartMinute: number;
-    quietHoursEndMinute: number;
-    slotsPerWeek: number;
+    slotDurationMinutes?: 30 | 45 | 60;
+    allowedWeekdays?: number[];
+    workdayStartMinute?: number;
+    workdayEndMinute?: number;
+    quietHoursStartMinute?: number;
+    quietHoursEndMinute?: number;
+    slotsPerWeek?: number;
   }) => {
     const response = await deps.authorizedFetch('/api/notifications/interview-strategy-settings', {
       method: 'PUT',

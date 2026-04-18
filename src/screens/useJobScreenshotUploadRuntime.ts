@@ -11,6 +11,7 @@ import {
   mergeScreenshotItems,
   selectionLimitForAdditionalScreenshots,
   toScreenshotAnalyzeErrorMessage,
+  validateScreenshotPayloadSize,
   type JobScreenshotItem,
   type ScreenshotAnalyzeApiErrorLike,
 } from './jobScreenshotUploadCore';
@@ -84,8 +85,14 @@ export function useJobScreenshotUploadRuntime(args: UseJobScreenshotUploadRuntim
       return;
     }
 
-    setItems((current) => mergeScreenshotItems(current, nextItems));
-  }, [items.length, launchImageLibraryAsync, now, random, requestMediaLibraryPermissionsAsync]);
+    const mergedItems = mergeScreenshotItems(items, nextItems);
+    setItems(mergedItems);
+
+    const sizeError = validateScreenshotPayloadSize(mergedItems);
+    if (sizeError) {
+      setErrorText(sizeError);
+    }
+  }, [items, launchImageLibraryAsync, now, random, requestMediaLibraryPermissionsAsync]);
 
   const removeScreenshot = React.useCallback((id: string) => {
     setItems((current) => current.filter((entry) => entry.id !== id));
@@ -94,6 +101,12 @@ export function useJobScreenshotUploadRuntime(args: UseJobScreenshotUploadRuntim
   const onAnalyzePress = React.useCallback(async () => {
     if (items.length === 0) {
       setErrorText(SCREENSHOT_UPLOAD_TEXTS.emptyAnalyze);
+      return;
+    }
+
+    const sizeError = validateScreenshotPayloadSize(items);
+    if (sizeError) {
+      setErrorText(sizeError);
       return;
     }
 

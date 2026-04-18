@@ -1,6 +1,6 @@
 # Scanner Flow UX Addendum
 **Status:** Active  
-**Last synced:** 2026-03-29
+**Last synced:** 2026-04-17
 
 ## Goal
 
@@ -17,6 +17,8 @@ Capture scanner micro-behaviors that are easy to miss in high-level feature docs
   - Glassdoor
 - Hint tone can be `neutral`, `positive`, or `warning`.
 - Unsupported sources are shown before API call with explicit message.
+- LinkedIn jobs collection/search links are treated as valid only when they include a numeric `currentJobId`.
+- Tapping `Scan` dismisses the keyboard before the request starts.
 
 ## Cache Layers In Scanner Runtime
 
@@ -30,7 +32,8 @@ Capture scanner micro-behaviors that are easy to miss in high-level feature docs
 3. Scan history (`src/utils/jobScanHistoryStorage.ts`)
    - Persisted in AsyncStorage, per-user.
    - Capacity: 8 entries.
-   - Dashboard list in scanner UI shows first 4 entries.
+   - `ScannerHistoryScreen` shows the full persisted list.
+   - Tapping an entry opens `Scanner` in history-result mode with the saved analysis payload.
 
 ## Runtime Orchestration Split
 
@@ -40,7 +43,7 @@ Capture scanner micro-behaviors that are easy to miss in high-level feature docs
   - imported screenshot payload hydration
   - initial URL auto-start
   - scan submission
-  - history reopen
+  - selected history result hydration
 - `src/screens/scannerRuntimeCore.ts` owns pure branching for:
   - imported meta fallback
   - challenge-page cache guards
@@ -48,9 +51,10 @@ Capture scanner micro-behaviors that are easy to miss in high-level feature docs
   - fresh result meta mapping
 - `src/screens/scanner/*` now owns screen-local presentation splits:
   - search panel
-  - history list
+  - history list rows
   - feedback/error card
   - analysis section
+- `src/screens/ScannerHistoryScreen.tsx` owns scan history page loading and navigation back to `Scanner`.
 - `src/screens/JobScreenshotUploadScreen.tsx` is the render layer for screenshot fallback UI.
 - `src/screens/useJobScreenshotUploadRuntime.ts` owns screenshot runtime orchestration for:
   - media permission checks
@@ -73,11 +77,11 @@ Capture scanner micro-behaviors that are easy to miss in high-level feature docs
 
 - `isLikelyChallengeAnalysis(...)` detects likely anti-bot/security pages.
 - If detected in last-scan restore, cached entry is cleared and not rendered as usable result.
-- If detected in tapped history entry, scanner shows blocked error state and recommends re-run or screenshot fallback.
+- If detected in tapped history entry, scanner history-result mode shows blocked error state and recommends re-run or screenshot fallback.
 
 ## Screenshot Fallback Rules
 
-- Fallback CTA ("Upload screenshots instead") is shown only when:
+- Fallback CTA ("Scan from screenshots") is shown only when:
   - there is an error state,
   - error code is in `SCREENSHOT_FALLBACK_ERROR_CODES`,
   - scan is not loading.
@@ -90,18 +94,25 @@ Capture scanner micro-behaviors that are easy to miss in high-level feature docs
 
 ## Screenshot Upload Flow Constraints
 
-- Upload screen accepts 1 to 4 screenshots (`MAX_SCREENSHOTS = 4`).
+- Upload screen accepts 1 to 6 screenshots (`MAX_SCREENSHOTS = 6`).
+- Upload screen explains the minimum visible fields before selection:
+  - role title
+  - company name
+  - job description or responsibilities
+- Optional helpful fields shown to the user: location, seniority, employment type.
+- Client validates per-image and total payload size before submitting.
 - Per-image base64 payload is sent to `POST /api/jobs/analyze-screenshots`.
 - On success, user is navigated back to `Scanner` with imported analysis payload and meta.
 - Picker selection is deduped by image `uri` on-device before submit.
 - Error mapping has dedicated texts for:
   - `screenshot_not_vacancy`
-  - `screenshot_incomplete_info`
+  - `screenshot_incomplete_info` with core missing fields only
   - `usage_limit_reached`
 
 ## Related Files
 
 - `src/screens/ScannerScreen.tsx`
+- `src/screens/ScannerHistoryScreen.tsx`
 - `src/screens/useScannerRuntime.ts`
 - `src/screens/scannerRuntimeCore.ts`
 - `src/screens/scanner/ScannerSearchPanel.tsx`

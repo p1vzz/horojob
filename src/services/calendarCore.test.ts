@@ -12,6 +12,7 @@ function createPlan(): InterviewStrategyPlan {
     timezoneIana: 'UTC',
     score: 80,
     explanation: 'good',
+    calendarNote: 'Use this window for clear answers.',
     breakdown: {
       dailyCareerScore: 80,
       aiSynergyScore: 75,
@@ -29,6 +30,7 @@ function createPlan(): InterviewStrategyPlan {
     timezoneIana: 'UTC',
     score: 75,
     explanation: 'ok',
+    calendarNote: 'Use this window for calm follow-ups.',
     breakdown: {
       dailyCareerScore: 75,
       aiSynergyScore: 70,
@@ -46,6 +48,7 @@ function createPlan(): InterviewStrategyPlan {
     timezoneIana: 'UTC',
     score: 70,
     explanation: 'update needed',
+    calendarNote: 'Use this window for concise interview stories.',
     breakdown: {
       dailyCareerScore: 70,
       aiSynergyScore: 65,
@@ -223,6 +226,7 @@ test('calendar core syncs strategy events with skip/update/create and pruning', 
 
   assert.deepEqual(updateCalls, ['evt-update']);
   assert.equal(createCalls.length, 1);
+  assert.match(createCalls[0], /^Why:Use this window for calm follow-ups\./);
   assert.equal(result.created, 1);
   assert.equal(result.updated, 1);
   assert.equal(result.skipped, 1);

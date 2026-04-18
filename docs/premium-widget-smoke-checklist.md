@@ -13,15 +13,19 @@
 ## Core Functional Checks
 - [ ] Premium user sees widget setup CTA after entitlement activation.
 - [ ] Free user does not receive active widget setup flow.
-- [ ] Payload fetch returns data for premium user.
-- [ ] Payload fetch is blocked for free user (`premium_required` contract).
+- [ ] `career-vibe-plan` fetch returns deterministic data for free and premium users.
+- [ ] `morning-briefing` widget payload fetch returns data for premium user.
+- [ ] `morning-briefing` widget payload fetch is blocked for free user (`premium_required` contract).
 
 ## Android Checks
 - [ ] Style picker in app shows all 8 variants with preview cards.
+- [ ] Post-purchase `Add Widget` action opens Settings and launches the style picker for premium users.
 - [ ] Pin widget request opens system confirmation dialog.
 - [ ] Accept flow places widget on Home Screen.
 - [ ] Reject flow keeps setup status as not enabled.
 - [ ] Widget updates after manual in-app refresh.
+- [ ] Widget renders the plan primary action and backend peak window from `morning-briefing-v2`.
+- [ ] Tapping any widget variant opens the full Career Vibe plan screen.
 - [ ] Widget still shows last payload after app restart.
 - [ ] Home Screen widget list contains all small/medium/strip variants.
 - [ ] Light and Dark system themes both render readable widget UI.

@@ -1,4 +1,5 @@
 import type { AuthSession, AuthUser } from '../utils/authSessionStorage';
+import type { TimeoutRequestInit } from './fetchWithTimeout';
 
 type SessionApiPayload = {
   user: AuthUser;
@@ -23,7 +24,7 @@ export class ApiError extends Error {
 
 export type AuthSessionCoreDeps = {
   apiBaseUrl: string;
-  fetchFn: (input: string, init?: RequestInit) => Promise<Response>;
+  fetchFn: (input: string, init?: TimeoutRequestInit) => Promise<Response>;
   loadAuthSession: () => Promise<AuthSession | null>;
   saveAuthSession: (session: AuthSession) => Promise<void>;
   clearAuthSession: () => Promise<void>;
@@ -207,7 +208,7 @@ export function createAuthSessionManager(deps: AuthSessionCoreDeps) {
     }
   };
 
-  const authorizedFetch = async (path: string, init: RequestInit = {}) => {
+  const authorizedFetch = async (path: string, init: TimeoutRequestInit = {}) => {
     const session = await ensureAuthSession();
     const headers = new Headers(init.headers ?? {});
     headers.set('Authorization', `Bearer ${session.accessToken}`);

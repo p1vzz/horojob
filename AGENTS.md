@@ -61,11 +61,12 @@ This project is not a monorepo.
   - `npm run typecheck`
   - `npm run test`
   - `npm run test:rntl`
+  - `npm run verify:quiet`
   - `npm run coverage`
   - `npm run coverage:core`
   - `npm run coverage:rntl`
   - `npm run verify`
-- This repo currently has no dedicated lint script.
+- Lint is available via `npm run lint`.
 
 ---
 
@@ -190,6 +191,17 @@ Avoid:
 1. Launch app (`npm run start`) and verify touched flow.
 2. For API features, verify request/response path against `../horojob-server/src/routes`.
 3. Run targeted smoke steps from `docs/job-position-check-smoke-checklist.md` when scanner flow is affected.
+
+---
+
+## Context and token hygiene
+
+- Prefer `npm run verify:quiet` for successful full validation. It stores full output in `.cache/quiet-run/` and prints only pass/fail plus a failure tail.
+- In `../horojob-server`, prefer `npm run verify:quiet` and `npm run smoke:routes:quiet` for final checks when the backend is touched.
+- Run targeted tests/checks first, then one quiet full verify at the end.
+- In a dirty worktree, use path-limited commands such as `git status --short -- <paths>` and `git diff --check -- <paths>` for files touched by the task.
+- Read large docs, logs, and screens through `rg`, `Select-Object -First/-Skip`, or `Get-Content -Tail`; do not load `docs/skills-usage-log.md` or large screen files in full unless the task requires it.
+- Append to `docs/skills-usage-log.md` with `npm run skills:log -- ...`; inspect only the tail when confirming the entry.
 
 ---
 

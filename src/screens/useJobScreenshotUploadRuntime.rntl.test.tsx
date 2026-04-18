@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { Pressable, Text, View } from 'react-native';
 import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
 import type { AppNavigationProp, AppRouteProp } from '../types/navigation';
+import { MAX_SCREENSHOT_IMAGE_BYTES } from './jobScreenshotUploadCore';
 import { useJobScreenshotUploadRuntime } from './useJobScreenshotUploadRuntime';
 
 jest.mock('../services/authSession', () => ({
@@ -182,6 +183,17 @@ test('screenshot runtime reports unreadable picker assets and does not add items
 test('screenshot runtime picks screenshots and navigates back to scanner on successful analyze', async () => {
   const navigation = createNavigationMock();
   const analyzeJobScreenshots = jest.fn(async () => createAnalyzeResult());
+  const launchImageLibraryAsync = jest.fn(async () => ({
+    canceled: false,
+    assets: [
+      {
+        uri: 'file:///shot-1.png',
+        base64: 'YWJj',
+        mimeType: 'image/png',
+        fileSize: 3000,
+      },
+    ],
+  }));
 
   render(
     <RuntimeHarness
@@ -191,17 +203,7 @@ test('screenshot runtime picks screenshots and navigates back to scanner on succ
         requestMediaLibraryPermissionsAsync: jest.fn(async () => ({
           ...createPermissionResult(true),
         })) as unknown as RuntimeDeps['requestMediaLibraryPermissionsAsync'],
-        launchImageLibraryAsync: jest.fn(async () => ({
-          canceled: false,
-          assets: [
-            {
-              uri: 'file:///shot-1.png',
-              base64: 'YWJj',
-              mimeType: 'image/png',
-              fileSize: 3000,
-            },
-          ],
-        })) as unknown as RuntimeDeps['launchImageLibraryAsync'],
+        launchImageLibraryAsync: launchImageLibraryAsync as unknown as RuntimeDeps['launchImageLibraryAsync'],
         analyzeJobScreenshots: analyzeJobScreenshots as RuntimeDeps['analyzeJobScreenshots'],
         now: () => 123,
         random: () => 0.5,
@@ -211,6 +213,11 @@ test('screenshot runtime picks screenshots and navigates back to scanner on succ
 
   fireEvent.press(screen.getByText('Pick screenshots'));
   await waitFor(() => expect(screen.getByText('items:1')).toBeTruthy());
+  expect(launchImageLibraryAsync).toHaveBeenCalledWith(
+    expect.objectContaining({
+      selectionLimit: 6,
+    })
+  );
 
   fireEvent.press(screen.getByText('Analyze screenshots'));
 
@@ -274,4 +281,43 @@ test('screenshot runtime maps API analyze failure into UI error text', async () 
       screen.getByText('error:Not enough vacancy details are visible in screenshots. Missing: title, company.')
     ).toBeTruthy()
   );
+});
+
+test('screenshot runtime blocks oversized screenshots before analyze request', async () => {
+  const navigation = createNavigationMock();
+  const analyzeJobScreenshots = jest.fn();
+
+  render(
+    <RuntimeHarness
+      navigation={navigation}
+      route={createRouteMock()}
+      deps={{
+        requestMediaLibraryPermissionsAsync: jest.fn(async () => ({
+          ...createPermissionResult(true),
+        })) as unknown as RuntimeDeps['requestMediaLibraryPermissionsAsync'],
+        launchImageLibraryAsync: jest.fn(async () => ({
+          canceled: false,
+          assets: [
+            {
+              uri: 'file:///large-shot.png',
+              base64: 'YWJj',
+              mimeType: 'image/png',
+              fileSize: MAX_SCREENSHOT_IMAGE_BYTES + 1,
+            },
+          ],
+        })) as unknown as RuntimeDeps['launchImageLibraryAsync'],
+        analyzeJobScreenshots: analyzeJobScreenshots as RuntimeDeps['analyzeJobScreenshots'],
+      }}
+    />
+  );
+
+  fireEvent.press(screen.getByText('Pick screenshots'));
+  await waitFor(() => expect(screen.getByText('items:1')).toBeTruthy());
+
+  fireEvent.press(screen.getByText('Analyze screenshots'));
+
+  await waitFor(() =>
+    expect(screen.getByText('error:One screenshot is too large (1.53 MB). Crop it or choose a smaller image.')).toBeTruthy()
+  );
+  expect(analyzeJobScreenshots).not.toHaveBeenCalled();
 });

@@ -137,6 +137,13 @@ export type MorningBriefingResponse = {
     aiSynergy: number;
   };
   modeLabel: string;
+  plan?: {
+    headline: string;
+    summary: string;
+    primaryAction: string;
+    peakWindow: string;
+    riskGuardrail: string;
+  };
   insights?: {
     vibe: {
       algorithmVersion: string;
@@ -165,6 +172,49 @@ export type MorningBriefingResponse = {
   sources: {
     dailyTransitDateKey: string;
     aiSynergyDateKey: string | null;
+  };
+};
+
+export type CareerVibePlanResponse = {
+  dateKey: string;
+  cached: boolean;
+  schemaVersion: string;
+  tier: 'free' | 'premium';
+  narrativeSource: 'template' | 'llm';
+  model: string;
+  promptVersion: string;
+  generatedAt: string;
+  staleAfter: string;
+  modeLabel: string;
+  metrics: {
+    energy: number;
+    focus: number;
+    luck: number;
+    opportunity: number;
+    aiSynergy: number;
+  };
+  plan: {
+    headline: string;
+    summary: string;
+    primaryAction: string;
+    bestFor: string[];
+    avoid: string[];
+    peakWindow: string;
+    focusStrategy: string;
+    communicationStrategy: string;
+    aiWorkStrategy: string;
+    riskGuardrail: string;
+  };
+  explanation: {
+    drivers: string[];
+    cautions: string[];
+    metricNotes: string[];
+  };
+  sources: {
+    dailyTransitDateKey: string;
+    aiSynergyDateKey: string | null;
+    dailyVibeAlgorithmVersion: string;
+    aiSynergyAlgorithmVersion: string | null;
   };
 };
 
@@ -242,8 +292,9 @@ export type DiscoverRolesResponse = {
     title: string;
     domain: string;
     tags: string[];
-    score: number;
-    scoreLabel: string;
+    score?: number;
+    scoreLabel?: string;
+    scoreStatus?: 'ready' | 'deferred';
   }>;
   meta: {
     catalogSize: number;
@@ -352,6 +403,22 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
     return payload as MorningBriefingResponse;
   };
 
+  const fetchCareerVibePlan = async (options?: { refresh?: boolean }) => {
+    const params = new URLSearchParams({
+      refresh: options?.refresh ? 'true' : 'false',
+    });
+    const response = await deps.authorizedFetch(`/api/astrology/career-vibe-plan?${params.toString()}`);
+    const payload = await deps.parseJsonBody(response);
+    if (!response.ok) {
+      throw new deps.ApiError(
+        response.status,
+        resolveApiErrorMessage(payload, 'Failed to fetch career vibe plan'),
+        payload
+      );
+    }
+    return payload as CareerVibePlanResponse;
+  };
+
   const fetchFullNatalCareerAnalysis = async (options?: { refresh?: boolean }) => {
     const params = new URLSearchParams({
       refresh: options?.refresh ? 'true' : 'false',
@@ -405,6 +472,8 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
     limit?: number;
     searchLimit?: number;
     refresh?: boolean;
+    deferSearchScores?: boolean;
+    scoreSlug?: string;
   }) => {
     const query = (options?.query ?? '').trim();
     const params = new URLSearchParams({
@@ -412,7 +481,12 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
       limit: String(options?.limit ?? 5),
       searchLimit: String(options?.searchLimit ?? 20),
       refresh: options?.refresh ? 'true' : 'false',
+      deferSearchScores: options?.deferSearchScores ? 'true' : 'false',
     });
+    const scoreSlug = (options?.scoreSlug ?? '').trim();
+    if (scoreSlug) {
+      params.set('scoreSlug', scoreSlug);
+    }
 
     const response = await deps.authorizedFetch(`/api/astrology/discover-roles?${params.toString()}`);
     const payload = await deps.parseJsonBody(response);
@@ -429,6 +503,7 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
     fetchCareerInsights,
     fetchDailyTransit,
     fetchMorningBriefing,
+    fetchCareerVibePlan,
     fetchFullNatalCareerAnalysis,
     regenerateFullNatalCareerAnalysis,
     fetchAiSynergyHistory,

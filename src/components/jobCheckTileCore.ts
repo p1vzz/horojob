@@ -1,24 +1,30 @@
-import type { RootStackParamList } from '../types/navigation';
-
 export const JOB_CHECK_TILE_COPY = {
   title: 'Job Posting Check',
-  description: 'Analyze any vacancy against your natal chart for cosmic alignment score.',
-  placeholder: 'Paste vacancy URL...',
+  description: 'Check a role against your natal chart, then review compatibility, AI risk, and key fit signals.',
+  servicesLabel: 'Supported services',
+  actionLabel: 'Check a posting',
+  footnote: 'Public job detail links work best.',
 } as const;
 
-export function normalizeJobCheckUrlInput(value: string) {
-  return value.trim();
-}
-
-export function buildJobCheckScannerParams(
-  value: string,
-  options: { autoStart?: boolean } = {}
-): RootStackParamList['Scanner'] {
-  const trimmed = normalizeJobCheckUrlInput(value);
-  if (!trimmed) return undefined;
-
-  return {
-    initialUrl: trimmed,
-    autoStart: options.autoStart ?? false,
-  };
-}
+export const JOB_CHECK_SUPPORTED_SERVICES = [
+  {
+    label: 'LinkedIn',
+    detail: 'Public jobs',
+  },
+  {
+    label: 'Wellfound',
+    detail: 'Startup roles',
+  },
+  {
+    label: 'ZipRecruiter',
+    detail: 'Job pages',
+  },
+  {
+    label: 'Indeed',
+    detail: 'Job pages',
+  },
+  {
+    label: 'Glassdoor',
+    detail: 'Job listings',
+  },
+] as const;

@@ -5,6 +5,7 @@ import {
   DarkTheme as NavigationDarkTheme,
   NavigationContainer,
   createNavigationContainerRef,
+  type LinkingOptions,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -19,8 +20,10 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ScannerScreen } from './src/screens/ScannerScreen';
+import { ScannerHistoryScreen } from './src/screens/ScannerHistoryScreen';
 import { PremiumPurchaseScreen } from './src/screens/PremiumPurchaseScreen';
 import { NatalChartScreen } from './src/screens/NatalChartScreen';
+import { CareerVibePlanScreen } from './src/screens/CareerVibePlanScreen';
 import { DiscoverRolesScreen } from './src/screens/DiscoverRolesScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { JobScreenshotUploadScreen } from './src/screens/JobScreenshotUploadScreen';
@@ -52,11 +55,20 @@ import {
   shouldForceStartupLoader,
   shouldShowStartupLoaderGate,
 } from './src/appStartupCore';
+import { SHOULD_ALLOW_DEVELOPMENT_OVERRIDES } from './src/config/appEnvironment';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 const STARTUP_LOADER_MIN_DURATION_MS = 3000;
 type DashboardOpenParams = NonNullable<RootStackParamList['Dashboard']>;
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['horojob://'],
+  config: {
+    screens: {
+      CareerVibePlan: 'career-vibe-plan',
+    },
+  },
+};
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -74,8 +86,14 @@ function AppShell() {
   const pendingDashboardOpenRef = useRef<DashboardOpenParams | null>(null);
   const alertFocusKeyRef = useRef(0);
   const { theme, isReady: isThemeReady } = useThemeMode();
-  const forceOnboardingEntry = shouldForceOnboardingEntry(process.env.EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY, __DEV__);
-  const forceStartupLoader = shouldForceStartupLoader(process.env.EXPO_PUBLIC_FORCE_STARTUP_LOADER, __DEV__);
+  const forceOnboardingEntry = shouldForceOnboardingEntry(
+    process.env.EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY,
+    SHOULD_ALLOW_DEVELOPMENT_OVERRIDES,
+  );
+  const forceStartupLoader = shouldForceStartupLoader(
+    process.env.EXPO_PUBLIC_FORCE_STARTUP_LOADER,
+    SHOULD_ALLOW_DEVELOPMENT_OVERRIDES,
+  );
   const initialRouteName = resolveInitialRouteName({
     hasOnboarded,
     forceOnboardingEntry,
@@ -251,6 +269,7 @@ function AppShell() {
         <NavigationContainer
           ref={navigationRef}
           theme={navigationTheme}
+          linking={linking}
           onReady={() => {
             if (pendingDashboardOpenRef.current) {
               navigationRef.navigate('Dashboard', pendingDashboardOpenRef.current);
@@ -279,9 +298,11 @@ function AppShell() {
                 <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                 <Stack.Screen name="Dashboard" component={DashboardScreen} />
                 <Stack.Screen name="Scanner" component={ScannerScreen} />
+                <Stack.Screen name="ScannerHistory" component={ScannerHistoryScreen} />
                 <Stack.Screen name="Profile" component={DashboardScreen} />
                 <Stack.Screen name="PremiumPurchase" component={PremiumPurchaseScreen} />
                 <Stack.Screen name="NatalChart" component={NatalChartScreen} />
+                <Stack.Screen name="CareerVibePlan" component={CareerVibePlanScreen} />
                 <Stack.Screen name="FullNatalCareerAnalysis" component={FullNatalCareerAnalysisScreen} />
                 <Stack.Screen name="DiscoverRoles" component={DiscoverRolesScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />

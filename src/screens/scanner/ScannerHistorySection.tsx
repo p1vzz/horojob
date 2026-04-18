@@ -5,11 +5,12 @@ import type { JobScanHistoryEntry } from '../../utils/jobScanHistoryStorage';
 
 type ScannerHistorySectionProps = {
   entries: JobScanHistoryEntry[];
+  heading?: string;
   onSelect: (entry: JobScanHistoryEntry) => void;
 };
 
 export function ScannerHistorySection(props: ScannerHistorySectionProps) {
-  const { entries, onSelect } = props;
+  const { entries, heading = 'SAVED SCANS', onSelect } = props;
   const { theme } = useThemeMode();
 
   if (entries.length === 0) {
@@ -19,10 +20,10 @@ export function ScannerHistorySection(props: ScannerHistorySectionProps) {
   return (
     <View className="mt-3">
       <Text className="text-[10px] tracking-[1.8px] mb-1.5" style={{ color: 'rgba(212,212,224,0.44)' }}>
-        RECENT CHECKS
+        {heading}
       </Text>
       <View
-        className="rounded-[14px] overflow-hidden"
+        className="rounded-[8px] overflow-hidden"
         style={{
           borderColor: 'rgba(255,255,255,0.08)',
           borderWidth: 1,

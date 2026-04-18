@@ -147,6 +147,31 @@ test('notifications api builds interview strategy refresh query', async () => {
   ]);
 });
 
+test('notifications api can save fixed interview strategy settings with minimal payload', async () => {
+  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const api = createNotificationsApi({
+    authorizedFetch: async (path, init) => {
+      calls.push({ path, init });
+      return new Response(JSON.stringify({ settings: { enabled: true } }), { status: 200 });
+    },
+    parseJsonBody: async () => ({ settings: { enabled: true } }),
+    ApiError: FakeApiError as never,
+  });
+
+  await api.upsertInterviewStrategySettings({
+    enabled: true,
+    timezoneIana: 'Europe/Warsaw',
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].path, '/api/notifications/interview-strategy-settings');
+  assert.equal(calls[0].init?.method, 'PUT');
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+    enabled: true,
+    timezoneIana: 'Europe/Warsaw',
+  });
+});
+
 test('notifications api throws ApiError with payload on failed burnout plan', async () => {
   const api = createNotificationsApi({
     authorizedFetch: async () => new Response(JSON.stringify({ code: 'premium_required' }), { status: 403 }),

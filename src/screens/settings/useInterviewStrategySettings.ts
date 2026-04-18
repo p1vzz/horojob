@@ -16,15 +16,10 @@ import {
   upsertInterviewStrategySettings,
   type InterviewStrategySettings,
 } from '../../services/notificationsApi';
-import {
-  getDefaultInterviewStrategyPreferences,
-  normalizeInterviewStrategyPreferences,
-} from '../../services/interviewStrategy';
 import type {
   InterviewStrategyCalendarPermissionCache,
   InterviewStrategyCalendarSyncMap,
   InterviewStrategyPlan,
-  InterviewStrategyPreferences,
 } from '../../types/interviewStrategy';
 import {
   loadInterviewStrategyCalendarPermissionCacheForUser,
@@ -34,22 +29,7 @@ import {
   saveInterviewStrategyCalendarSyncMapForUser,
   saveInterviewStrategySelectedCalendarIdForUser,
 } from '../../utils/interviewStrategyStorage';
-import { nextOptionFromList, resolveDeviceTimezoneIana } from '../settingsScreenCore';
-
-const workdayStartOptions = [480, 540, 600];
-const workdayEndOptions = [1020, 1080, 1140, 1230];
-
-function toInterviewPreferences(settings: InterviewStrategySettings) {
-  return normalizeInterviewStrategyPreferences({
-    slotDurationMinutes: settings.slotDurationMinutes,
-    allowedWeekdays: settings.allowedWeekdays,
-    workdayStartMinute: settings.workdayStartMinute,
-    workdayEndMinute: settings.workdayEndMinute,
-    quietHoursStartMinute: settings.quietHoursStartMinute,
-    quietHoursEndMinute: settings.quietHoursEndMinute,
-    slotsPerWeek: settings.slotsPerWeek,
-  });
-}
+import { resolveDeviceTimezoneIana } from '../settingsScreenCore';
 
 export function useInterviewStrategySettings(args: {
   navigateToPremium: () => void;
@@ -59,9 +39,6 @@ export function useInterviewStrategySettings(args: {
 
   const [sessionUserId, setSessionUserId] = React.useState<string | null>(null);
   const [interviewSettings, setInterviewSettings] = React.useState<InterviewStrategySettings | null>(null);
-  const [interviewPreferences, setInterviewPreferences] = React.useState<InterviewStrategyPreferences>(
-    getDefaultInterviewStrategyPreferences()
-  );
   const [interviewPlan, setInterviewPlan] = React.useState<InterviewStrategyPlan | null>(null);
   const [interviewCalendarSyncMap, setInterviewCalendarSyncMap] = React.useState<InterviewStrategyCalendarSyncMap>({});
   const [interviewCalendarPermissionCache, setInterviewCalendarPermissionCache] =
@@ -92,7 +69,6 @@ export function useInterviewStrategySettings(args: {
       setSessionUserId(null);
     }
     setInterviewSettings(null);
-    setInterviewPreferences(getDefaultInterviewStrategyPreferences());
     setInterviewPlan(null);
     setInterviewCalendarSyncMap({});
     setInterviewCalendarPermissionCache(null);
@@ -226,7 +202,6 @@ export function useInterviewStrategySettings(args: {
     if (!isMounted()) return;
 
     setInterviewSettings(null);
-    setInterviewPreferences(getDefaultInterviewStrategyPreferences());
     setInterviewPlan(null);
     setInterviewCalendarSyncMap(savedInterviewSyncMap);
     setInterviewCalendarPermissionCache(savedInterviewPermissionCache);
@@ -245,7 +220,6 @@ export function useInterviewStrategySettings(args: {
       if (!isMounted()) return;
 
       setInterviewSettings(interviewPayload.settings);
-      setInterviewPreferences(toInterviewPreferences(interviewPayload.settings));
       setInterviewPlan(interviewPayload.plan);
       setIsInterviewSectionExpanded(Boolean(interviewPayload.settings.enabled || interviewPayload.plan.slots.length > 0));
 
@@ -361,61 +335,6 @@ export function useInterviewStrategySettings(args: {
     })();
   };
 
-  const applyInterviewPreferences = (nextPreferences: InterviewStrategyPreferences) => {
-    setInterviewPreferences(normalizeInterviewStrategyPreferences(nextPreferences));
-  };
-
-  const handleInterviewDurationChange = (durationMinutes: InterviewStrategyPreferences['slotDurationMinutes']) => {
-    applyInterviewPreferences({
-      ...interviewPreferences,
-      slotDurationMinutes: durationMinutes,
-    });
-  };
-
-  const handleInterviewWeekdayToggle = (weekday: number) => {
-    const exists = interviewPreferences.allowedWeekdays.includes(weekday);
-    const nextWeekdays = exists
-      ? interviewPreferences.allowedWeekdays.filter((value) => value !== weekday)
-      : [...interviewPreferences.allowedWeekdays, weekday].sort((left, right) => left - right);
-    if (nextWeekdays.length === 0) {
-      Alert.alert('Select At Least One Day', 'Interview strategy requires at least one allowed weekday.');
-      return;
-    }
-
-    applyInterviewPreferences({
-      ...interviewPreferences,
-      allowedWeekdays: nextWeekdays,
-    });
-  };
-
-  const handleCycleInterviewWorkdayStart = () => {
-    applyInterviewPreferences({
-      ...interviewPreferences,
-      workdayStartMinute: nextOptionFromList(interviewPreferences.workdayStartMinute, workdayStartOptions),
-    });
-  };
-
-  const handleCycleInterviewWorkdayEnd = () => {
-    applyInterviewPreferences({
-      ...interviewPreferences,
-      workdayEndMinute: nextOptionFromList(interviewPreferences.workdayEndMinute, workdayEndOptions),
-    });
-  };
-
-  const handleResetInterviewPreferences = () => {
-    applyInterviewPreferences(getDefaultInterviewStrategyPreferences());
-  };
-
-  const handleWidenInterviewWindow = () => {
-    applyInterviewPreferences({
-      ...interviewPreferences,
-      slotDurationMinutes: 30,
-      allowedWeekdays: [1, 2, 3, 4, 5, 6],
-      workdayStartMinute: 480,
-      workdayEndMinute: 1230,
-    });
-  };
-
   const handleGenerateInterviewStrategy = () => {
     if (plan !== 'premium') {
       trackAnalyticsEvent('interview_strategy_premium_gate_hit', { source: 'settings_generate' });
@@ -425,8 +344,7 @@ export function useInterviewStrategySettings(args: {
     if (isGeneratingInterviewPlan) return;
 
     trackAnalyticsEvent('interview_strategy_generate_tapped', {
-      durationMinutes: interviewPreferences.slotDurationMinutes,
-      weekdaysCount: interviewPreferences.allowedWeekdays.length,
+      plannerMode: 'fixed_natal_sparse',
     });
 
     setIsGeneratingInterviewPlan(true);
@@ -438,20 +356,12 @@ export function useInterviewStrategySettings(args: {
         const savedSettings = await upsertInterviewStrategySettings({
           enabled: true,
           timezoneIana,
-          slotDurationMinutes: interviewPreferences.slotDurationMinutes,
-          allowedWeekdays: interviewPreferences.allowedWeekdays,
-          workdayStartMinute: interviewPreferences.workdayStartMinute,
-          workdayEndMinute: interviewPreferences.workdayEndMinute,
-          quietHoursStartMinute: interviewPreferences.quietHoursStartMinute,
-          quietHoursEndMinute: interviewPreferences.quietHoursEndMinute,
-          slotsPerWeek: interviewPreferences.slotsPerWeek,
         });
 
         const generatedPayload = await fetchInterviewStrategyPlan({ refresh: true });
         const generatedPlan = generatedPayload.plan;
         const generatedSettings = generatedPayload.settings;
         setInterviewSettings(generatedSettings);
-        setInterviewPreferences(toInterviewPreferences(generatedSettings));
         setInterviewPlan(generatedPlan);
         setIsInterviewSectionExpanded(true);
 
@@ -473,14 +383,11 @@ export function useInterviewStrategySettings(args: {
 
         if (generatedPlan.slots.length === 0) {
           trackAnalyticsEvent('interview_strategy_empty_state', {
-            durationMinutes: interviewPreferences.slotDurationMinutes,
-            weekdaysCount: interviewPreferences.allowedWeekdays.length,
-            workdayStartMinute: interviewPreferences.workdayStartMinute,
-            workdayEndMinute: interviewPreferences.workdayEndMinute,
+            plannerMode: 'fixed_natal_sparse',
           });
           Alert.alert(
             'No Recommended Slots',
-            'No interview windows passed threshold in the next 30 days. Try broader weekdays or work hours.'
+            'No natal interview windows passed threshold in the next 30 days. Regenerate after your next transit refresh.'
           );
         }
       } catch {
@@ -529,13 +436,6 @@ export function useInterviewStrategySettings(args: {
     const settingsPayload = {
       enabled: nextEnabled,
       timezoneIana,
-      slotDurationMinutes: interviewPreferences.slotDurationMinutes,
-      allowedWeekdays: interviewPreferences.allowedWeekdays,
-      workdayStartMinute: interviewPreferences.workdayStartMinute,
-      workdayEndMinute: interviewPreferences.workdayEndMinute,
-      quietHoursStartMinute: interviewPreferences.quietHoursStartMinute,
-      quietHoursEndMinute: interviewPreferences.quietHoursEndMinute,
-      slotsPerWeek: interviewPreferences.slotsPerWeek,
     };
 
     setIsSavingInterviewSettings(true);
@@ -544,7 +444,6 @@ export function useInterviewStrategySettings(args: {
         const saved = await upsertInterviewStrategySettings(settingsPayload);
         const savedSettings = saved.settings;
         setInterviewSettings(savedSettings);
-        setInterviewPreferences(toInterviewPreferences(savedSettings));
 
         if (!nextEnabled) {
           setInterviewPlan(null);
@@ -608,21 +507,14 @@ export function useInterviewStrategySettings(args: {
   return {
     bootstrapInterviewState,
     handleAddInterviewStrategyToCalendar,
-    handleCycleInterviewWorkdayEnd,
-    handleCycleInterviewWorkdayStart,
     handleGenerateInterviewStrategy,
-    handleInterviewDurationChange,
     handleInterviewFeatureRowPress,
     handleInterviewStrategyToggle,
-    handleInterviewWeekdayToggle,
     handleOpenInterviewCalendarPicker,
-    handleResetInterviewPreferences,
     handleSelectInterviewCalendar,
-    handleWidenInterviewWindow,
     interviewCalendarOptions,
     interviewCalendarPermissionCache,
     interviewPlan,
-    interviewPreferences,
     interviewSelectedCalendarId,
     interviewSettings,
     interviewSyncSummary,

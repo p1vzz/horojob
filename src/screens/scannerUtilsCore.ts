@@ -22,16 +22,23 @@ export const ERROR_TEXTS: Record<string, string> = {
   unsupported_protocol: 'Only https links are supported.',
   invalid_url: 'Invalid link format. Please paste a full vacancy URL.',
   usage_limit_reached: 'You reached your plan limit for vacancy scans.',
-  blocked: 'The source temporarily restricted access to this page. Please try again later.',
-  login_wall: 'This job page requires sign-in, so data is unavailable in the current mode.',
-  not_found: 'The job posting was not found on the source page.',
-  provider_failed: 'Could not parse vacancy content. Please try another URL.',
+  blocked:
+    'This job board is temporarily blocking automated access. Upload screenshots of the vacancy and we can scan the visible details.',
+  login_wall:
+    'This vacancy requires sign-in or is not public. Open it in your app or browser, take screenshots, and upload them here.',
+  not_found:
+    'This job posting may be closed or unavailable. If you can still see it in your browser, upload screenshots instead.',
+  provider_failed:
+    'We could not read enough vacancy details from this link. Upload screenshots of the title, company, and job description.',
   screenshot_not_vacancy: 'Uploaded screenshots do not look like a vacancy page.',
   screenshot_incomplete_info: 'Not enough vacancy details are visible in screenshots.',
   screenshot_parse_failed: 'Screenshot parsing failed. Please try again.',
   cooldown: 'This URL is in cooldown. Please retry later.',
   unknown: 'Unable to process this vacancy right now. Please try again.',
 };
+
+export const SCREENSHOT_FALLBACK_GUIDANCE =
+  'Screenshots should include the job title, company name, and description.';
 
 export const SCREENSHOT_FALLBACK_ERROR_CODES = new Set([
   'blocked',
@@ -75,15 +82,17 @@ export function sourceHintFromUrl(raw: string): SourceHintState {
   const path = parsed.pathname.toLowerCase();
 
   if (host.includes('linkedin.com')) {
-    if (/\/jobs\/view\/(?:[^/]+-)?\d+/i.test(path)) {
+    const hasCurrentJobId = /^\d+$/.test(parsed.searchParams.get('currentJobId')?.trim() ?? '');
+    const hasJobsPath = path === '/jobs' || path.startsWith('/jobs/');
+    if (/\/jobs\/view\/(?:[^/]+-)?\d+/i.test(path) || (hasJobsPath && hasCurrentJobId)) {
       return {
         tone: 'positive',
-        message: 'LinkedIn public job detail URL detected.',
+        message: 'LinkedIn job posting URL detected.',
       };
     }
     return {
       tone: 'warning',
-      message: 'LinkedIn hint: use a public detail URL in /jobs/view/<id> format.',
+      message: 'LinkedIn hint: use /jobs/view/<id> or a jobs link with currentJobId.',
     };
   }
 

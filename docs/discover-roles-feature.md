@@ -5,7 +5,19 @@
 
 - Screen: `DiscoverRoles`
 - API: `GET /api/astrology/discover-roles`
-- Data source: curated O*NET role catalog + manual product/tech role extensions
+- Data source: curated O*NET role catalog + manual general role extensions
+
+## Mobile Readiness
+
+- `DashboardScreen` preloads the natal chart with `syncNatalChartCache()` while the dashboard readiness gate is visible.
+- This moves first-time natal chart generation before the user opens `Career Matchmaker`, so `DiscoverRoles` can normally read the required chart from backend storage.
+- `DiscoverRolesScreen` still handles direct entry defensively: if `/discover-roles` returns `Natal chart not found`, the screen runs the same natal chart sync once and retries the recommendation request.
+- If sync cannot prepare a chart, the screen shows user-facing copy instead of the raw backend instruction to generate a natal chart manually.
+- Search uses deferred scoring:
+  - the first search request passes `deferSearchScores=true`, so results render without match percentages
+  - tapping `Check` sends the same query with `scoreSlug=<role-slug>`
+  - backend returns a deterministic score for that role, and the row shows a small loader while it is calculated
+- When search is focused, the recommendations section is hidden, the input is lifted above the keyboard, and the dropdown opens upward like the onboarding city search.
 
 ## Backend Storage
 
@@ -55,7 +67,7 @@ Indexes:
 - unique: `(userId, profileHash, algorithmVersion)`
 - helper: `(userId, updatedAt desc)`
 
-## Recommendation Algorithm (v1)
+## Recommendation Algorithm (v2)
 
 1. Build user trait vector from natal chart:
    - ASC/MC sign bonuses
@@ -71,3 +83,4 @@ Notes:
 
 - Dropdown data is computed in runtime from `discover_role_catalog`; no separate dropdown table is used.
 - Recommendations are cached in `discover_role_recommendations` and can be refreshed with `refresh=true`.
+- Search role scores are deterministic and are intentionally not cached client-side.

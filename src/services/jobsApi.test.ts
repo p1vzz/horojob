@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createJobsApi } from './jobsApiCore';
+import {
+  JOBS_ANALYZE_TIMEOUT_MS,
+  JOBS_METRICS_TIMEOUT_MS,
+  JOBS_PREFLIGHT_TIMEOUT_MS,
+  JOBS_SCREENSHOT_ANALYZE_TIMEOUT_MS,
+  createJobsApi,
+} from './jobsApiCore';
+
+type JobsRequestInit = RequestInit & {
+  timeoutMs?: number;
+};
 
 class FakeApiError extends Error {
   status: number;
@@ -14,7 +24,7 @@ class FakeApiError extends Error {
 }
 
 test('jobs api preflight sends expected payload', async () => {
-  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const calls: Array<{ path: string; init?: JobsRequestInit }> = [];
   const api = createJobsApi({
     authorizedFetch: async (path, init) => {
       calls.push({ path, init });
@@ -29,12 +39,13 @@ test('jobs api preflight sends expected payload', async () => {
   assert.equal(calls.length, 1);
   assert.equal(calls[0].path, '/api/jobs/preflight');
   assert.equal(calls[0].init?.method, 'POST');
+  assert.equal(calls[0].init?.timeoutMs, JOBS_PREFLIGHT_TIMEOUT_MS);
   const body = JSON.parse(String(calls[0].init?.body));
   assert.equal(body.url, 'https://www.linkedin.com/jobs/view/1234567890/');
 });
 
 test('jobs api screenshot analyze maps screenshots and regenerate', async () => {
-  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const calls: Array<{ path: string; init?: JobsRequestInit }> = [];
   const api = createJobsApi({
     authorizedFetch: async (path, init) => {
       calls.push({ path, init });
@@ -48,6 +59,7 @@ test('jobs api screenshot analyze maps screenshots and regenerate', async () => 
   assert.equal(payload.status, 'done');
   assert.equal(calls.length, 1);
   assert.equal(calls[0].path, '/api/jobs/analyze-screenshots');
+  assert.equal(calls[0].init?.timeoutMs, JOBS_SCREENSHOT_ANALYZE_TIMEOUT_MS);
   const body = JSON.parse(String(calls[0].init?.body));
   assert.deepEqual(body, {
     screenshots: [{ dataUrl: 'data:image/png;base64,aaa' }, { dataUrl: 'data:image/png;base64,bbb' }],
@@ -56,10 +68,10 @@ test('jobs api screenshot analyze maps screenshots and regenerate', async () => 
 });
 
 test('jobs api metrics and alerts use windowHours query', async () => {
-  const paths: string[] = [];
+  const calls: Array<{ path: string; init?: JobsRequestInit }> = [];
   const api = createJobsApi({
-    authorizedFetch: async (path) => {
-      paths.push(path);
+    authorizedFetch: async (path, init) => {
+      calls.push({ path, init });
       return new Response(JSON.stringify({ sources: [] }), { status: 200 });
     },
     parseJsonBody: async () => ({ sources: [] }),
@@ -71,12 +83,24 @@ test('jobs api metrics and alerts use windowHours query', async () => {
   await api.fetchJobAlerts();
   await api.fetchJobAlerts(12);
 
-  assert.deepEqual(paths, [
+  assert.deepEqual(
+    calls.map((call) => call.path),
+    [
     '/api/jobs/metrics?windowHours=24',
     '/api/jobs/metrics?windowHours=48',
     '/api/jobs/alerts?windowHours=24',
     '/api/jobs/alerts?windowHours=12',
-  ]);
+    ]
+  );
+  assert.deepEqual(
+    calls.map((call) => call.init?.timeoutMs),
+    [
+      JOBS_METRICS_TIMEOUT_MS,
+      JOBS_METRICS_TIMEOUT_MS,
+      JOBS_METRICS_TIMEOUT_MS,
+      JOBS_METRICS_TIMEOUT_MS,
+    ]
+  );
 });
 
 test('jobs api throws ApiError on analyze failure', async () => {
@@ -96,6 +120,23 @@ test('jobs api throws ApiError on analyze failure', async () => {
       return true;
     },
   );
+});
+
+test('jobs api analyze uses extended timeout for long-running scraper work', async () => {
+  const calls: Array<{ path: string; init?: JobsRequestInit }> = [];
+  const api = createJobsApi({
+    authorizedFetch: async (path, init) => {
+      calls.push({ path, init });
+      return new Response(JSON.stringify({ status: 'done' }), { status: 200 });
+    },
+    parseJsonBody: async () => ({ status: 'done' }),
+    ApiError: FakeApiError as never,
+  });
+
+  await api.analyzeJobUrl('https://www.linkedin.com/jobs/view/1234567890/', true);
+
+  assert.equal(calls[0].path, '/api/jobs/analyze');
+  assert.equal(calls[0].init?.timeoutMs, JOBS_ANALYZE_TIMEOUT_MS);
 });
 
 test('jobs api normalizes sparse preflight payloads into safe scanner defaults', async () => {

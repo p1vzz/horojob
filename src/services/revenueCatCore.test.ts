@@ -29,6 +29,7 @@ test('revenue cat service configure path calls configure when sdk is not configu
 
   const service = createRevenueCatService({
     platformOs: 'android',
+    appEnvironment: 'staging',
     getEnv: (name) => {
       if (name === 'EXPO_PUBLIC_RC_ANDROID_API_KEY') return 'android-key';
       if (name === 'EXPO_PUBLIC_RC_LOG_LEVEL') return 'warn';
@@ -58,7 +59,7 @@ test('revenue cat service configure path calls configure when sdk is not configu
   const ok = await service.configureRevenueCatForUser('user-1');
   assert.equal(ok, true);
   assert.deepEqual(configuredInput, { apiKey: 'android-key', appUserID: 'user-1' });
-  assert.deepEqual(attributesInput, { backend_user_id: 'user-1' });
+  assert.deepEqual(attributesInput, { backend_user_id: 'user-1', app_env: 'staging' });
   assert.deepEqual(calls, ['log:3', 'configure', 'attributes']);
 });
 

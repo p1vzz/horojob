@@ -15,6 +15,10 @@ import {
 test('scanner core returns source hints for empty, valid and invalid URLs', () => {
   assert.equal(sourceHintFromUrl('').tone, 'neutral');
   assert.equal(sourceHintFromUrl('linkedin.com/jobs/view/123456789').tone, 'positive');
+  assert.equal(
+    sourceHintFromUrl('https://www.linkedin.com/jobs/collections/recommended/?currentJobId=4401382836').tone,
+    'positive'
+  );
   assert.equal(sourceHintFromUrl('https://example.com/jobs/123').tone, 'warning');
   assert.equal(sourceHintFromUrl('::bad-url').tone, 'warning');
 });
@@ -22,6 +26,13 @@ test('scanner core returns source hints for empty, valid and invalid URLs', () =
 test('scanner core maps phase labels', () => {
   assert.equal(toPhaseTitle('preflight'), 'Preparing Analysis');
   assert.equal(toPhaseSubtitle('scoring'), 'Matching vacancy against your natal chart...');
+});
+
+test('scanner core maps source access failures to screenshot-first guidance', () => {
+  assert.match(ERROR_TEXTS.blocked, /temporarily blocking automated access/i);
+  assert.match(ERROR_TEXTS.login_wall, /requires sign-in or is not public/i);
+  assert.match(ERROR_TEXTS.not_found, /upload screenshots instead/i);
+  assert.match(ERROR_TEXTS.provider_failed, /title, company, and job description/i);
 });
 
 test('scanner core formats retry and screenshot confidence', () => {

@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Animated, Easing, Dimensions, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { ChevronLeft, Crown, Sparkles, Sun, TrendingUp, Orbit, Bell, CalendarDays, Infinity, Moon, Shield, Lock } from 'lucide-react-native';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
+import { ChevronLeft, Crown, Sparkles, Sun, TrendingUp, Orbit, Bell, CalendarDays, Moon, Shield, Lock } from 'lucide-react-native';
+import Svg, { Defs, RadialGradient, Stop, Rect, Path, Circle, G, Text as SvgText } from 'react-native-svg';
 import { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases';
 import { ensureAuthSession, updateCurrentSessionUser } from '../services/authSession';
 import { syncRevenueCatSubscription } from '../services/billingApi';
@@ -19,7 +19,9 @@ import { useThemeMode } from '../theme/ThemeModeProvider';
 import type { AppNavigationProp } from '../types/navigation';
 import {
   mapPackageToPlan,
+  normalizePreviewSegments,
   sortPackages,
+  type NormalizedPremiumPreviewSegment,
   type PremiumPackageTypes,
   type PremiumPlan,
 } from './premiumPurchaseScreenCore';
@@ -48,9 +50,9 @@ const FEATURES = [
     badgeColor: '#4BD1A0',
   },
   {
-    title: 'Full Natal Chart Analysis',
-    description: 'Unlock the complete career natal chart with all planetary positions and house placements.',
-    badge: 'Deep Insights',
+    title: 'Full Career Blueprint',
+    description: 'Unlock a structured career report with archetypes, role fit, blind spots, and a 90-day plan.',
+    badge: 'Deep Report',
     Icon: Orbit,
     iconColor: '#8861FF',
     iconBg: 'rgba(136,97,255,0.14)',
@@ -78,10 +80,10 @@ const FEATURES = [
     badgeColor: '#E6D96B',
   },
   {
-    title: 'Unlimited Scans & Reports',
-    description: 'Scan unlimited job postings and get detailed compatibility reports for each.',
-    badge: 'No Limits',
-    Icon: Infinity,
+    title: '10 Daily Job Checks',
+    description: 'Run up to 10 successful job checks per day with compatibility, AI risk, and factor breakdown.',
+    badge: '10/day',
+    Icon: Shield,
     iconColor: '#65B8FF',
     iconBg: 'rgba(101,184,255,0.14)',
     badgeBg: 'rgba(101,184,255,0.16)',
@@ -97,6 +99,42 @@ const FEATURES = [
     badgeBg: 'rgba(245,247,255,0.16)',
     badgeColor: '#F5F7FF',
   },
+];
+
+const AI_INSIGHT_SEGMENTS = normalizePreviewSegments([
+  { label: 'Cognitive Flow', value: 31, color: '#79D99C' },
+  { label: 'Automation', value: 30, color: '#35BEE8' },
+  { label: 'Decisions', value: 23, color: '#5C46D4' },
+  { label: 'AI Collab', value: 16, color: '#E6D96B' },
+]);
+
+const DEEP_REPORT_ROWS = [
+  {
+    title: 'Archetype evidence',
+    detail: '3-4 scored career archetypes tied to chart signals.',
+    accent: '#79D99C',
+  },
+  {
+    title: 'Role-fit matrix',
+    detail: 'Five practical domains with fit scores and example roles.',
+    accent: '#35BEE8',
+  },
+  {
+    title: 'Blind spots',
+    detail: 'Three risks with mitigation, not vague warning copy.',
+    accent: '#E6D96B',
+  },
+  {
+    title: 'Phase plan',
+    detail: '0-6, 6-18, and 18-36 month actions with KPIs.',
+    accent: '#5C46D4',
+  },
+];
+
+const AI_INSIGHT_POINTS = [
+  'Daily AI synergy from cognitive flow and automation readiness',
+  'Premium career insights with five strategy notes and actions',
+  "Drivers, cautions, and action priorities for today's work",
 ];
 
 const { width, height } = Dimensions.get('window');
@@ -124,6 +162,247 @@ const PACKAGE_ORDER: PACKAGE_TYPE[] = [
   PACKAGE_TYPES.CUSTOM,
   PACKAGE_TYPES.UNKNOWN,
 ];
+
+function polarPoint(center: number, radius: number, angle: number) {
+  const radians = ((angle - 90) * Math.PI) / 180;
+  return {
+    x: center + radius * Math.cos(radians),
+    y: center + radius * Math.sin(radians),
+  };
+}
+
+function describeDonutSlice(center: number, outerRadius: number, innerRadius: number, startAngle: number, endAngle: number) {
+  const outerStart = polarPoint(center, outerRadius, startAngle);
+  const outerEnd = polarPoint(center, outerRadius, endAngle);
+  const innerStart = polarPoint(center, innerRadius, startAngle);
+  const innerEnd = polarPoint(center, innerRadius, endAngle);
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerEnd.x} ${innerEnd.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
+    'Z',
+  ].join(' ');
+}
+
+function PremiumRadialChart({ segments }: { segments: NormalizedPremiumPreviewSegment[] }) {
+  const center = 78;
+  const baseOuterRadius = 38;
+  const innerRadius = 17;
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  let cursor = 0;
+
+  return (
+    <View className="items-center">
+      <Svg width={156} height={156} viewBox="0 0 156 156">
+        <G>
+          {segments.map((segment) => {
+            const sweep = total > 0 ? (segment.value / total) * 360 : 0;
+            const rawStart = cursor;
+            const rawEnd = cursor + sweep;
+            const start = rawStart + 1.4;
+            const end = rawEnd - 1.4;
+            const mid = start + (end - start) / 2;
+            const outerRadius = baseOuterRadius + segment.percentage * 0.72;
+            cursor = rawEnd;
+            const labelPoint = polarPoint(center, outerRadius + 13, mid);
+
+            return (
+              <G key={segment.label}>
+                <Path
+                  d={describeDonutSlice(center, outerRadius, innerRadius, start, end)}
+                  fill={segment.color}
+                  opacity={0.9}
+                />
+                <SvgText
+                  x={labelPoint.x}
+                  y={labelPoint.y}
+                  fill="rgba(240,240,248,0.86)"
+                  fontSize="9"
+                  fontWeight="700"
+                  textAnchor="middle"
+                  alignmentBaseline="middle"
+                >
+                  {segment.percentage}%
+                </SvgText>
+              </G>
+            );
+          })}
+          <Circle cx={center} cy={center} r={innerRadius + 1} fill="#0C0C18" />
+        </G>
+      </Svg>
+      <View className="flex-row flex-wrap justify-center mt-0.5 px-1">
+        {segments.map((segment) => (
+          <View
+            key={segment.label}
+            className="flex-row items-center justify-center mb-1"
+            style={{ width: '50%' }}
+          >
+            <View className="w-1.5 h-1.5 rounded-full mr-1" style={{ backgroundColor: segment.color }} />
+            <Text className="text-[9px]" style={{ color: 'rgba(212,212,224,0.55)' }}>
+              {segment.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function PremiumPointList({ points }: { points: string[] }) {
+  return (
+    <View className="mt-4">
+      {points.map((point) => (
+        <View key={point} className="flex-row items-start mb-2">
+          <View style={{ width: 12, alignItems: 'center', paddingTop: 6, marginRight: 6 }}>
+            <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#E6D96B' }} />
+          </View>
+          <Text className="text-[11px] leading-[16px] flex-1" style={{ color: 'rgba(226,226,238,0.72)' }}>
+            {point}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function PremiumReportPanel() {
+  return (
+    <View
+      className="rounded-[8px] p-4"
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+      }}
+    >
+      <View className="flex-row items-center justify-between mb-3">
+        <View className="flex-1 pr-3">
+          <Text className="text-[10px] tracking-[2px] font-semibold uppercase" style={{ color: 'rgba(212,212,224,0.42)' }}>
+            Deep Reports
+          </Text>
+          <Text className="text-[16px] font-semibold mt-1 leading-[22px]" style={{ color: 'rgba(240,240,248,0.96)' }}>
+            Full Career Blueprint
+          </Text>
+        </View>
+        <Sparkles size={16} color="#E6D96B" />
+      </View>
+
+      <Text className="text-[12px] leading-[18px] mb-4" style={{ color: 'rgba(212,212,224,0.62)' }}>
+        A structured premium report turns your natal chart into career archetypes, role-fit evidence, blind spots, phase planning, and next-step strategy.
+      </Text>
+
+      <View className="flex-row mb-3">
+        {[
+          { value: '5', label: 'role-fit domains' },
+          { value: '3', label: 'career phases' },
+          { value: '90', label: 'day action plan' },
+        ].map((stat, index) => (
+          <View
+            key={stat.label}
+            className="flex-1 rounded-[8px] px-2 py-2"
+            style={{
+              marginRight: index === 2 ? 0 : 8,
+              backgroundColor: 'rgba(230,217,107,0.08)',
+              borderColor: 'rgba(230,217,107,0.16)',
+              borderWidth: 1,
+            }}
+          >
+            <Text className="text-[18px] font-bold" style={{ color: '#E6D96B' }}>
+              {stat.value}
+            </Text>
+            <Text className="text-[9px] leading-[13px]" style={{ color: 'rgba(212,212,224,0.58)' }}>
+              {stat.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View>
+        {DEEP_REPORT_ROWS.map((row, index) => (
+          <View
+            key={row.title}
+            className="flex-row items-start py-2"
+            style={{
+              borderTopColor: index === 0 ? 'transparent' : 'rgba(255,255,255,0.06)',
+              borderTopWidth: index === 0 ? 0 : 1,
+            }}
+          >
+            <View
+              className="w-1.5 rounded-full mr-3 mt-1"
+              style={{ height: 28, backgroundColor: row.accent }}
+            />
+            <View className="flex-1">
+              <Text className="text-[12px] font-semibold" style={{ color: 'rgba(236,236,246,0.92)' }}>
+                {row.title}
+              </Text>
+              <Text className="text-[10px] leading-[15px] mt-0.5" style={{ color: 'rgba(212,212,224,0.58)' }}>
+                {row.detail}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function PremiumAiInsightPanel({
+  stats,
+  points,
+}: {
+  stats: Array<{ value: string; label: string }>;
+  points: string[];
+}) {
+  return (
+    <View
+      className="rounded-[8px] p-4"
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+      }}
+    >
+      <View className="flex-row items-center justify-between mb-3">
+        <View className="flex-1 pr-3">
+          <Text className="text-[10px] tracking-[2px] font-semibold uppercase" style={{ color: 'rgba(212,212,224,0.42)' }}>
+            AI Insights
+          </Text>
+          <Text className="text-[16px] font-semibold mt-1 leading-[22px]" style={{ color: 'rgba(240,240,248,0.96)' }}>
+            AI Work Strategy
+          </Text>
+        </View>
+        <Sparkles size={16} color="#E6D96B" />
+      </View>
+
+      <Text className="text-[12px] leading-[18px] mb-4" style={{ color: 'rgba(212,212,224,0.62)' }}>
+        Daily AI synergy blends cognitive flow, automation readiness, decision quality, and collaboration signals into practical work guidance.
+      </Text>
+
+      <View className="flex-row items-center">
+        <View style={{ width: 156, marginRight: 8 }}>
+          <PremiumRadialChart segments={AI_INSIGHT_SEGMENTS} />
+        </View>
+        <View className="flex-1">
+          {stats.map((stat) => (
+            <View key={stat.label} className="mb-2">
+              <Text className="text-[18px] font-bold" style={{ color: '#E6D96B' }}>
+                {stat.value}
+              </Text>
+              <Text className="text-[10px] leading-[14px]" style={{ color: 'rgba(212,212,224,0.56)' }}>
+                {stat.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <PremiumPointList points={points} />
+    </View>
+  );
+}
 
 export const PremiumPurchaseScreen = () => {
   const { theme } = useThemeMode();
@@ -293,8 +572,25 @@ export const PremiumPurchaseScreen = () => {
           Alert.alert('Purchase Pending', 'Purchase completed, but premium access is still syncing. Please retry in a moment.');
           return;
         }
-        Alert.alert('Premium Activated', 'Your premium subscription is active now.');
-        navigation.goBack();
+        Alert.alert(
+          'Premium Activated',
+          'Your premium subscription is active now. Add the Morning Career Briefing widget to keep today\'s plan on your home screen.',
+          [
+            {
+              text: 'Later',
+              style: 'cancel',
+              onPress: () => navigation.goBack(),
+            },
+            {
+              text: 'Add Widget',
+              onPress: () =>
+                navigation.navigate('Settings', {
+                  openWidgetSetup: true,
+                  widgetSetupKey: Date.now(),
+                }),
+            },
+          ],
+        );
       } catch (error) {
         if ((error as { userCancelled?: boolean })?.userCancelled) {
           return;
@@ -476,7 +772,7 @@ export const PremiumPurchaseScreen = () => {
                   className="text-[13px] mt-2 text-center leading-[20px]"
                   style={{ color: 'rgba(212,212,224,0.62)' }}
                 >
-                  Access all premium features and take control of your cosmic career journey.
+                  Get 10 daily job checks, deeper career reports, AI work guidance, and premium planning tools.
                 </Text>
               </View>
             </Animated.View>
@@ -537,6 +833,24 @@ export const PremiumPurchaseScreen = () => {
                   </View>
                 </Animated.View>
               ))}
+            </View>
+
+            <View className="mt-6 gap-3">
+              <Text
+                className="text-[11px] tracking-[2.4px] font-semibold px-1"
+                style={{ color: 'rgba(212,212,224,0.38)' }}
+              >
+                DEEP REPORTS & AI INSIGHTS
+              </Text>
+              <PremiumReportPanel />
+              <PremiumAiInsightPanel
+                stats={[
+                  { value: '4', label: 'signal components' },
+                  { value: '5', label: 'premium insights' },
+                  { value: '3x', label: 'actions per insight' },
+                ]}
+                points={AI_INSIGHT_POINTS}
+              />
             </View>
 
             {plansError ? (

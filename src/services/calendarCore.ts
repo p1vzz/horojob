@@ -109,13 +109,15 @@ function parseSlotIdFromNotes(notes: string | null | undefined) {
 }
 
 function buildInterviewEventNotes(slot: InterviewStrategySlot, plan: InterviewStrategyPlan) {
+  const note = (slot.calendarNote ?? slot.explanation).replace(/\s+/g, ' ').trim();
   return [
+    note.length > 0 ? `Why:${note}` : null,
     `${SLOT_MARKER_PREFIX}${slot.id}`,
     `${STRATEGY_MARKER_PREFIX}${plan.strategyId}`,
     `Algorithm:${plan.algorithmVersion}`,
     `Score:${slot.score}`,
     `GeneratedAt:${plan.generatedAt}`,
-  ].join('\n');
+  ].filter((line): line is string => Boolean(line)).join('\n');
 }
 
 function toTs(dateLike: string | Date | null | undefined) {

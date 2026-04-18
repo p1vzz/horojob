@@ -58,7 +58,7 @@ export const ScannerRing = ({ size = 220 }: ScannerRingProps) => {
           width: size,
           height: size,
           transform: [{ rotate: spin }],
-          opacity: 0.15,
+          opacity: 0.35,
         }}
       >
         {positions.map((pos, i) => (
@@ -69,7 +69,7 @@ export const ScannerRing = ({ size = 220 }: ScannerRingProps) => {
               left: size / 2 + pos.x - 9,
               top: size / 2 + pos.y - 9,
               fontSize: 16,
-              color: 'rgba(201,168,76,0.7)',
+              color: 'rgba(226,191,91,0.9)',
             }}
           >
             {pos.s}
@@ -80,7 +80,7 @@ export const ScannerRing = ({ size = 220 }: ScannerRingProps) => {
             cx={size / 2}
             cy={size / 2}
             r={size / 2 - 12}
-            stroke="rgba(201,168,76,0.35)"
+            stroke="rgba(226,191,91,0.55)"
             strokeWidth="0.6"
             fill="none"
           />

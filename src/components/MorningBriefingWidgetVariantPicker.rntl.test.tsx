@@ -37,7 +37,7 @@ test('widget variant picker calls select/confirm/close handlers', () => {
     />
   );
 
-  fireEvent.press(screen.getByText('Score + cosmic hints'));
+  fireEvent.press(screen.getByText('Score + timing cues'));
   expect(onSelectVariant).toHaveBeenCalledWith('small_score');
 
   fireEvent.press(screen.getByText('Use Selected Style'));

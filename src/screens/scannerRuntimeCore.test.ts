@@ -5,8 +5,10 @@ import type { ScannerImportedMeta } from '../types/navigation';
 import type { JobScanHistoryEntry } from '../utils/jobScanHistoryStorage';
 import type { JobScanCache } from '../utils/jobScanStorage';
 import {
+  buildHistoryScanDisplay,
   buildImportedScannerMeta,
   buildScanMetaFromResult,
+  isOpenableJobUrl,
   normalizeScannerInitialUrl,
   resolveHistorySelection,
   resolveLastScanRestore,
@@ -157,6 +159,32 @@ test('scanner runtime core normalizes initial URLs and analysis meta from fresh 
   );
 });
 
+test('scanner runtime core builds history display metadata', () => {
+  assert.deepEqual(buildHistoryScanDisplay(createHistoryEntry()), {
+    title: 'Product Manager',
+    url: 'https://linkedin.com/jobs/view/123',
+    canOpenUrl: true,
+  });
+  assert.deepEqual(
+    buildHistoryScanDisplay(
+      createHistoryEntry({
+        url: 'Screenshot Upload',
+        analysis: createAnalysis({
+          job: undefined,
+          jobSummary: 'Imported screenshot role',
+        }),
+      })
+    ),
+    {
+      title: 'Imported screenshot role',
+      url: 'Screenshot Upload',
+      canOpenUrl: false,
+    }
+  );
+  assert.equal(isOpenableJobUrl('linkedin.com/jobs/view/123'), true);
+  assert.equal(isOpenableJobUrl('http://linkedin.com/jobs/view/123'), false);
+});
+
 test('scanner runtime core blocks challenge-like history selections', () => {
   const selection = resolveHistorySelection(
     createHistoryEntry({
@@ -170,7 +198,7 @@ test('scanner runtime core blocks challenge-like history selections', () => {
   assert.equal(selection.kind, 'blocked');
   assert.equal(selection.url, 'https://linkedin.com/jobs/view/123');
   assert.equal(selection.errorState.code, 'blocked');
-  assert.match(selection.errorState.message, /screenshot fallback/i);
+  assert.match(selection.errorState.message, /upload screenshots/i);
 });
 
 test('scanner runtime core discards challenge-like session and last-scan caches', () => {

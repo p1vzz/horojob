@@ -23,10 +23,6 @@ jest.mock('../../components/CompatibilityBreakdown', () => ({
   CompatibilityBreakdown: () => null,
 }));
 
-jest.mock('../../components/InterviewStrategy', () => ({
-  InterviewStrategy: () => null,
-}));
-
 jest.mock('../../components/PremiumScansCard', () => ({
   PremiumScansCard: () => null,
 }));

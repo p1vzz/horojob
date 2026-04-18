@@ -30,6 +30,7 @@ export type RevenueCatPurchasesDeps<TLogLevel, TOffering, TPackage, TCustomerInf
 export type RevenueCatCoreDeps<TLogLevel, TOffering, TPackage, TCustomerInfo> = {
   platformOs: RevenueCatPlatformOs;
   getEnv: (name: string) => string | undefined;
+  appEnvironment?: string;
   logLevels: RevenueCatLogLevels<TLogLevel>;
   purchases: RevenueCatPurchasesDeps<TLogLevel, TOffering, TPackage, TCustomerInfo>;
 };
@@ -101,6 +102,7 @@ export function createRevenueCatService<TLogLevel, TOffering, TPackage, TCustome
 
     await deps.purchases.setAttributes({
       backend_user_id: userId,
+      app_env: deps.appEnvironment ?? 'unknown',
     });
 
     return true;

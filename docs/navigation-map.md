@@ -1,6 +1,6 @@
 # Navigation Map
 **Status:** Active  
-**Last synced:** 2026-04-12
+**Last synced:** 2026-04-14
 
 ## Root Stack
 
@@ -11,13 +11,15 @@ Routes:
 1. `Onboarding` -> `OnboardingScreen`
 2. `Dashboard` -> `DashboardScreen`
 3. `Scanner` -> `ScannerScreen`
-4. `Profile` -> `DashboardScreen` (alias route)
-5. `PremiumPurchase` -> `PremiumPurchaseScreen`
-6. `NatalChart` -> `NatalChartScreen`
-7. `FullNatalCareerAnalysis` -> `FullNatalCareerAnalysisScreen`
-8. `DiscoverRoles` -> `DiscoverRolesScreen`
-9. `Settings` -> `SettingsScreen`
-10. `JobScreenshotUpload` -> `JobScreenshotUploadScreen`
+4. `ScannerHistory` -> `ScannerHistoryScreen`
+5. `Profile` -> `DashboardScreen` (alias route)
+6. `PremiumPurchase` -> `PremiumPurchaseScreen`
+7. `NatalChart` -> `NatalChartScreen`
+8. `CareerVibePlan` -> `CareerVibePlanScreen`
+9. `FullNatalCareerAnalysis` -> `FullNatalCareerAnalysisScreen`
+10. `DiscoverRoles` -> `DiscoverRolesScreen`
+11. `Settings` -> `SettingsScreen`
+12. `JobScreenshotUpload` -> `JobScreenshotUploadScreen`
 
 ## Initial Route Rules
 
@@ -26,7 +28,7 @@ Routes:
   - non-onboarded user -> `Onboarding`
 - Optional development override:
   - `EXPO_PUBLIC_FORCE_ONBOARDING_ENTRY=true` forces initial route to `Onboarding`
-  - override is ignored outside development builds
+  - override is ignored unless `EXPO_PUBLIC_APP_ENV=development`
 
 ## Cross-Screen Navigation Triggers
 
@@ -37,8 +39,14 @@ Routes:
 - Premium flows:
   - gated actions route to `PremiumPurchase`
   - post-purchase/restore sync refreshes session tier and premium surfaces
+- Career Vibe:
+  - dashboard `DailyAstroStatus` opens `CareerVibePlan`
+  - Android Morning Career Briefing widget deep links to `CareerVibePlan` via `horojob://career-vibe-plan`
+  - `CareerVibePlan` fetches `/api/astrology/career-vibe-plan` and supports manual refresh
 - Scanner flows:
   - URL scanner on `Scanner`
+  - saved scan list on `ScannerHistory`
+  - tapping a saved scan opens `Scanner` in history-result mode
   - screenshot-based scan on `JobScreenshotUpload`
 
 ## Settings-Centric Feature Branches

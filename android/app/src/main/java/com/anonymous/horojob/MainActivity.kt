@@ -1,5 +1,6 @@
 package com.anonymous.horojob
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.graphics.Color
@@ -26,6 +27,11 @@ class MainActivity : ReactActivity() {
   override fun onResume() {
     super.onResume()
     applyNavigationBarStyle()
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
   }
 
   override fun onWindowFocusChanged(hasFocus: Boolean) {

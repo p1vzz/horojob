@@ -1,5 +1,5 @@
 # Career Vibe and Morning Widget Algorithm Spec
-**Version:** 1.1  
+**Version:** 1.2
 **Status:** Active (`v2` is primary)  
 **Owner:** Backend + Mobile
 
@@ -16,10 +16,12 @@ Implementation sources:
 - Backend:
   - `../horojob-server/src/services/dailyTransit.ts`
   - `../horojob-server/src/services/aiSynergy.ts`
+  - `../horojob-server/src/services/careerVibePlan.ts`
   - `../horojob-server/src/services/morningBriefing.ts`
   - `../horojob-server/src/routes/astrology.ts`
 - Mobile:
   - `src/components/DailyAstroStatus.tsx`
+  - `src/screens/CareerVibePlanScreen.tsx`
   - `src/components/AiSynergyTile.tsx`
   - `src/services/astrologyApi.ts`
   - `src/services/morningBriefingSync.ts`
@@ -32,9 +34,33 @@ If this doc conflicts with code, code wins and this doc must be updated.
 
 ## 3. End-to-End Data Flow
 ### 3.1 Dashboard `Career Vibe` card
-1. Mobile calls `GET /api/astrology/daily-transit`.
-2. Backend returns `transit` object with `title`, `modeLabel`, `summary`, and `metrics.energy/focus/luck`.
-3. `DailyAstroStatus` renders these values directly.
+1. Mobile calls `GET /api/astrology/career-vibe-plan?refresh=false`.
+2. Backend returns a tool-like daily plan with metrics, best-use categories, avoid items, peak window, strategies, and explainability notes.
+3. Free users receive deterministic template copy; premium users can receive LLM-polished narrative copy when the backend LLM flag and API key are enabled.
+4. `DailyAstroStatus` renders the plan headline, primary action, summary, `bestFor`, `avoid`, and metrics. It labels `luck` as user-facing `Opportunity`.
+5. The `Open full plan` action navigates to `CareerVibePlanScreen`.
+6. If live fetch fails and a saved plan exists, the card shows the saved plan with a `Saved` label and inline stale-sync copy.
+7. If no saved plan exists, the card shows a clearly labeled sample plan instead of silently presenting placeholder data as live guidance.
+
+### 3.1.1 Career Vibe detail tool
+1. `CareerVibePlanScreen` calls `GET /api/astrology/career-vibe-plan?refresh=false` on entry.
+2. Manual refresh calls the same endpoint with `refresh=true` only on non-production technical surfaces.
+3. The screen renders the full plan contract:
+  - `primaryAction`
+  - `peakWindow`
+  - `focusStrategy`
+  - `communicationStrategy`
+  - `aiWorkStrategy`
+  - `riskGuardrail`
+  - `bestFor`
+  - `avoid`
+  - `explanation.drivers`
+  - `explanation.cautions`
+  - `explanation.metricNotes`
+4. It saves successful payloads in per-user local storage.
+5. It keeps the previous successful plan visible if a manual refresh fails and shows the refresh error inline.
+6. `401` and `404` responses clear the local plan cache so a signed-out or profile-missing user does not keep seeing stale personalized guidance.
+7. Production UI hides raw cache/source/model/prompt/schema labels; non-production UI keeps them visible under `EXPO_PUBLIC_APP_ENV`.
 
 ### 3.2 Dashboard `AI Synergy` tile
 1. Same `daily-transit` response may include `aiSynergy`.
@@ -47,6 +73,7 @@ If this doc conflicts with code, code wins and this doc must be updated.
 3. Mobile writes payload into native widget storage via `syncMorningBriefing`.
 4. Android widget provider reads stored snapshot and computes derived display fields (`vibeDelta`, `trend`, `peakWindow`, etc.).
 5. Variant layout renders different subsets of snapshot + derived fields.
+6. Tapping any Android widget variant opens the full in-app `CareerVibePlan` route through `horojob://career-vibe-plan`.
 
 ## 4. Current Daily Transit Vibe Algorithm (`daily-vibe-v2`)
 All metric outputs are integer percentages in `[10..99]`.
@@ -277,12 +304,42 @@ fallbackAi =
 - additive `insights` object includes:
   - `insights.vibe` (`algorithmVersion`, `drivers`, `cautions`, `tags`)
   - `insights.aiSynergy` (`algorithmVersion`, `band`, `confidence`, `confidenceBreakdown`, `tags`, `drivers`, `cautions`, `actionsPriority`, `narrativeVariantId`, `styleProfile`)
+- additive `plan` snapshot includes widget-safe fields:
+  - `headline`
+  - `summary`
+  - `primaryAction`
+  - `peakWindow`
+  - `riskGuardrail`
+
+`morning-briefing-v2` keeps the original headline, summary, mode label, and metrics fields intact while adding `plan`. The Android widget uses `plan.primaryAction` and `plan.peakWindow` when present; older cached payloads without `plan` still fall back to the legacy derived presentation.
+
+## 6.1 Career Vibe Plan Payload (`/career-vibe-plan`)
+Authenticated users only. Premium is not required for the endpoint itself.
+
+Query params:
+- `refresh=true|false` bypasses the daily cache when true.
+
+Payload construction:
+- `metrics.energy/focus/luck` come from `daily-transit`.
+- `metrics.opportunity` mirrors `luck` for user-facing career timing copy.
+- `metrics.aiSynergy` uses `transit.aiSynergy.score` when available, otherwise the same weighted fallback used by morning briefing.
+- `plan` contains `headline`, `summary`, `primaryAction`, `bestFor`, `avoid`, `peakWindow`, `focusStrategy`, `communicationStrategy`, `aiWorkStrategy`, and `riskGuardrail`.
+- `explanation` contains `drivers`, `cautions`, and `metricNotes`.
+- `sources` records daily vibe and AI synergy date/algorithm versions.
+
+LLM behavior:
+- Deterministic scoring and deterministic plan fields are always built first.
+- LLM is attempted only for premium users when `OPENAI_CAREER_VIBE_PLAN_ENABLED=true` and `OPENAI_API_KEY` is set.
+- The LLM may rewrite plan text only; it cannot change metrics, dates, or peak window.
+- Invalid or failed LLM output falls back to deterministic template copy.
 
 ## 7. Android Widget Derived Presentation Model
 Snapshot fields persisted from morning payload:
 - `headline`, `summary`, `modeLabel`
 - `energy`, `focus`, `luck`, `ai`
 - `dateKey`
+- `generatedAt`, `staleAfter`
+- optional plan fields: `planHeadline`, `primaryAction`, `peakWindowOverride`, `riskGuardrail`
 
 Derived fields:
 ```text
@@ -313,20 +370,22 @@ peakWindow = to12Hour(startHour24) + "-" + to12Hour(endHour24) + ("PM" if endHou
 ```
 
 Variant data usage:
-- `small_vibe`: `vibeDelta`, `trendLine`
+- `small_vibe`: `vibeDelta`, `primaryAction` when available, otherwise `trendLine`
 - `small_score`: `ai`, `moonPhase`, `mercuryLabel`
 - `small_energy_arc`: `energy`, `energyDelta`
 - `small_energy_value`: `energy`
 - `small_ring_score`: `ai`
-- `medium_vibe`: `vibeDelta`, `trendLine`, truncated summary, formatted date
-- `strip_peak`: `vibeDelta`, short summary, `peakWindow`
+- `medium_vibe`: `planHeadline`, `vibeDelta`, `trendLine`, `primaryAction`, formatted date
+- `strip_peak`: `vibeDelta`, `primaryAction`, `peakWindow`
 - `strip_minimal`: `vibeDelta`, `peakWindow`
+
+When `staleAfter` is in the past, action-heavy fields switch to muted/stale refresh copy while preserving the last numeric snapshot.
 
 ## 8. In-App Style Picker Preview Logic (Not 1:1 with Native Widget)
 The settings preview component uses local approximation logic. Known differences from native widget renderer:
 - Uses 5 moon phases in preview vs 6 in native widget.
 - `small_energy_arc` "from yesterday" text in preview is synthetic and differs from native `energyDelta`.
-- `small_score` preview may hardcode `Mercury Rx`; native computes Rx/Dir from seed.
+- `small_score` preview uses neutral "Timing cue" copy; native still computes the compact timing label from seed.
 - Medium date label preview may show raw `dateKey`, native formats verbose date.
 
 This is expected for quick visual preview, but not exact parity.
@@ -336,12 +395,14 @@ Base relation graph:
 ```text
 transit chart -> daily vibe (energy/focus/luck + dominant)
 daily vibe + natal/transit features -> aiSynergy score
+daily vibe + aiSynergy -> career-vibe-plan tool output
 daily vibe + aiSynergy -> morning briefing payload
 morning payload -> widget snapshot -> derived display values (delta/trend/window)
 ```
 
 Practical interpretation:
 - `energy`, `focus`, `luck` are the common source shared between dashboard and widgets.
+- Dashboard labels timing quality as `Opportunity`; backend keeps `luck` for compatibility.
 - `aiSynergy` depends on those metrics plus extra chart-derived features.
 - Widget `vibeDelta` is not a direct backend score; it is a display aggregate from `energy + focus + ai`.
 
@@ -356,6 +417,7 @@ Practical interpretation:
 - `dailyTransit.transit.algorithmVersion = daily-vibe-v2`
 - `aiSynergy.algorithmVersion = ai-synergy-v2`
 - `morningBriefing.schemaVersion = morning-briefing-v2`
+- `careerVibePlan.schemaVersion = career-vibe-plan-v1`
 
 ### 11.2 Implemented deterministic upgrades
 - Aspect strength now uses `orb`-weighted intensity (not count-only buckets).
@@ -390,6 +452,17 @@ Practical interpretation:
 - LLM may only rewrite narrative text.
 - LLM output is schema-validated.
 - Any LLM failure falls back to deterministic narrative payload.
+
+### 11.5 Implemented P1 tool surface
+- Dashboard card remains compact and action-oriented.
+- Detail screen exposes the complete plan, strategies, explainability, and manual refresh.
+- The detail screen uses the same `career-vibe-plan-v1` contract; no separate mobile-only interpretation layer is introduced.
+
+### 11.6 Implemented P2 local resilience
+- Successful `career-vibe-plan` responses are persisted per user in `career-vibe-plan:v1:<userId>`.
+- Dashboard and detail screen both use the same cache sync service.
+- Transient network/API failures fall back to the saved plan when available.
+- Auth/profile errors clear the cache to avoid showing stale user-bound guidance.
 
 ## 12. Next Improvements (v3 Candidates)
 - Calibrate orb weights with empirical quality metrics by aspect family.

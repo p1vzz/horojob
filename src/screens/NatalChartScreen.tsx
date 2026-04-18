@@ -11,6 +11,7 @@ import { ApiError, ensureAuthSession } from '../services/authSession';
 import { fetchCareerInsights, fetchNatalChart, type CareerInsightsResponse } from '../services/astrologyApi';
 import type { AppNavigationProp } from '../types/navigation';
 import { useThemeMode } from '../theme/ThemeModeProvider';
+import { NatalPremiumInsightsCard } from '../components/NatalPremiumInsightsCard';
 
 type ChartPlanet = {
   name: string;
@@ -1324,6 +1325,7 @@ export const NatalChartScreen = () => {
                   </Animated.View>
                 ))}
               </View>
+              <NatalPremiumInsightsCard onPress={() => navigation.navigate('PremiumPurchase')} />
             </Animated.View>
           </View>
         </ScrollView>

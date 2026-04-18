@@ -1,6 +1,9 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, InteractionManager, Keyboard } from 'react-native';
 import { saveOnboardingForUser } from '../utils/onboardingStorage';
+import { clearJobScanHistoryForUser } from '../utils/jobScanHistoryStorage';
+import { clearLastJobScanForUser } from '../utils/jobScanStorage';
+import { clearSessionJobScansForUser } from '../utils/jobScanSessionCache';
 import { upsertBirthProfile } from '../services/astrologyApi';
 import { ensureAuthSession } from '../services/authSession';
 import { searchCities, type CitySearchItem } from '../services/citiesApi';
@@ -257,7 +260,12 @@ export function useOnboardingForm(navigation: OnboardingNavigation) {
       await upsertBirthProfile(payload);
       try {
         const session = await ensureAuthSession();
-        await saveOnboardingForUser(session.user.id, payload);
+        clearSessionJobScansForUser(session.user.id);
+        await Promise.allSettled([
+          saveOnboardingForUser(session.user.id, payload),
+          clearLastJobScanForUser(session.user.id),
+          clearJobScanHistoryForUser(session.user.id),
+        ]);
       } catch {
         // Local cache failure should not block successful onboarding.
       }

@@ -5,7 +5,7 @@
 
 ## What It Is
 
-`AI Synergy Score` is a daily metric for how effectively a user can collaborate with AI right now, based on:
+`AI Synergy Score` is a daily metric for how effectively a user can collaborate with AI today, based on:
 
 - natal chart baseline
 - daily transit chart

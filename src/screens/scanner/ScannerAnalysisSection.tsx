@@ -6,7 +6,6 @@ import { ScannerRing } from '../../components/ScannerRing';
 import { AiRiskMeter } from '../../components/AiRiskMeter';
 import { JobProfileCard } from '../../components/JobProfileCard';
 import { CompatibilityBreakdown } from '../../components/CompatibilityBreakdown';
-import { InterviewStrategy } from '../../components/InterviewStrategy';
 import { PremiumScansCard } from '../../components/PremiumScansCard';
 import { useBrightnessAdaptation } from '../../contexts/BrightnessAdaptationContext';
 import { adaptColorOpacity } from '../../utils/brightnessAdaptation';
@@ -111,7 +110,6 @@ export function ScannerAnalysisSection(props: ScannerAnalysisSectionProps) {
         descriptors={analysis.descriptors}
       />
       <CompatibilityBreakdown items={analysis.breakdown} />
-      <InterviewStrategy />
       <PremiumScansCard />
     </>
   );

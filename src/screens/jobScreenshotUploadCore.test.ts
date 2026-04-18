@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  MAX_SCREENSHOT_IMAGE_BYTES,
+  MAX_SCREENSHOT_TOTAL_BYTES,
   SCREENSHOT_UPLOAD_TEXTS,
   buildScannerImportFromScreenshotAnalysis,
   buildScreenshotItems,
@@ -8,6 +10,7 @@ import {
   selectionLimitForAdditionalScreenshots,
   toScreenshotAnalyzeErrorMessage,
   toScreenshotMbText,
+  validateScreenshotPayloadSize,
   type ScreenshotAnalyzeApiErrorLike,
 } from './jobScreenshotUploadCore';
 import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
@@ -68,8 +71,8 @@ function createAnalyzeResult(): JobAnalyzeSuccessResponse {
 
 test('screenshot core formats megabytes and selection limit safely', () => {
   assert.equal(toScreenshotMbText(1_048_576), '1.00 MB');
-  assert.equal(selectionLimitForAdditionalScreenshots(0), 4);
-  assert.equal(selectionLimitForAdditionalScreenshots(3), 1);
+  assert.equal(selectionLimitForAdditionalScreenshots(0), 6);
+  assert.equal(selectionLimitForAdditionalScreenshots(5), 1);
   assert.equal(selectionLimitForAdditionalScreenshots(8), 1);
 });
 
@@ -112,12 +115,57 @@ test('screenshot core merges screenshot items by uri and respects the max limit'
       { id: '4', uri: 'file:///3.png', dataUrl: 'd', bytes: 100 },
       { id: '5', uri: 'file:///4.png', dataUrl: 'e', bytes: 100 },
       { id: '6', uri: 'file:///5.png', dataUrl: 'f', bytes: 100 },
+      { id: '7', uri: 'file:///6.png', dataUrl: 'g', bytes: 100 },
     ]
   );
 
   assert.deepEqual(
     merged.map((item) => item.uri),
-    ['file:///1.png', 'file:///2.png', 'file:///3.png', 'file:///4.png']
+    ['file:///1.png', 'file:///2.png', 'file:///3.png', 'file:///4.png', 'file:///5.png', 'file:///6.png']
+  );
+});
+
+test('screenshot core validates payload size before network upload', () => {
+  assert.equal(
+    validateScreenshotPayloadSize([
+      {
+        id: 'large',
+        uri: 'file:///large.png',
+        dataUrl: 'data:image/png;base64,aaa',
+        bytes: MAX_SCREENSHOT_IMAGE_BYTES + 1,
+      },
+    ]),
+    'One screenshot is too large (1.53 MB). Crop it or choose a smaller image.'
+  );
+
+  assert.equal(
+    validateScreenshotPayloadSize([
+      {
+        id: '1',
+        uri: 'file:///1.png',
+        dataUrl: 'data:image/png;base64,aaa',
+        bytes: MAX_SCREENSHOT_TOTAL_BYTES / 4 + 1,
+      },
+      {
+        id: '2',
+        uri: 'file:///2.png',
+        dataUrl: 'data:image/png;base64,bbb',
+        bytes: MAX_SCREENSHOT_TOTAL_BYTES / 4 + 1,
+      },
+      {
+        id: '3',
+        uri: 'file:///3.png',
+        dataUrl: 'data:image/png;base64,ccc',
+        bytes: MAX_SCREENSHOT_TOTAL_BYTES / 4 + 1,
+      },
+      {
+        id: '4',
+        uri: 'file:///4.png',
+        dataUrl: 'data:image/png;base64,ddd',
+        bytes: MAX_SCREENSHOT_TOTAL_BYTES / 4 + 1,
+      },
+    ]),
+    'Selected screenshots are too large (5.72 MB). Remove one or choose smaller images.'
   );
 });
 

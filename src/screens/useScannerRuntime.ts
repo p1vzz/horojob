@@ -7,7 +7,6 @@ import {
 } from '../services/jobsApi';
 import type { AppNavigationProp, AppRouteProp, ScannerImportedMeta } from '../types/navigation';
 import {
-  loadJobScanHistoryForUser,
   saveJobScanHistoryEntryForUser,
   type JobScanHistoryEntry,
 } from '../utils/jobScanHistoryStorage';
@@ -29,12 +28,14 @@ import {
 } from './scannerUtils';
 import {
   buildImportedScannerMeta,
+  buildHistoryScanDisplay,
   buildScanMetaFromResult,
   normalizeScannerInitialUrl,
   resolveHistorySelection,
   resolveLastScanRestore,
   resolvePreflightGate,
   resolveSessionCacheHit,
+  type ScannerHistoryDisplay,
 } from './scannerRuntimeCore';
 
 type UseScannerRuntimeArgs = {
@@ -42,37 +43,64 @@ type UseScannerRuntimeArgs = {
   route: AppRouteProp<'Scanner'>;
 };
 
+type ActiveScannerSnapshot = {
+  url: string;
+  analysis: JobAnalyzeSuccessResponse | null;
+  scanMeta: ScannerImportedMeta | null;
+  errorState: ScannerErrorState | null;
+};
+
 export function useScannerRuntime(args: UseScannerRuntimeArgs) {
   const { navigation, route } = args;
   const [url, setUrl] = React.useState('');
   const [analysis, setAnalysis] = React.useState<JobAnalyzeSuccessResponse | null>(null);
-  const [scanHistory, setScanHistory] = React.useState<JobScanHistoryEntry[]>([]);
   const [phase, setPhase] = React.useState<ScannerPhase>('idle');
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorState, setErrorState] = React.useState<ScannerErrorState | null>(null);
   const [scanMeta, setScanMeta] = React.useState<ScannerImportedMeta | null>(null);
+  const [historyEntry, setHistoryEntry] = React.useState<JobScanHistoryEntry | null>(null);
   const initialImportedAnalysisRef = React.useRef(route.params?.importedAnalysis);
   const initialUrlRef = React.useRef(normalizeScannerInitialUrl(route.params?.initialUrl));
+  const initialHistoryEntryRef = React.useRef(route.params?.historyEntry);
   const inFlightRef = React.useRef(false);
+  const activeScanSnapshotRef = React.useRef<ActiveScannerSnapshot | null>(null);
+  const activeStateRef = React.useRef<ActiveScannerSnapshot>({
+    url: '',
+    analysis: null,
+    scanMeta: null,
+    errorState: null,
+  });
+  const historyEntryRef = React.useRef<JobScanHistoryEntry | null>(null);
+
+  React.useEffect(() => {
+    activeStateRef.current = {
+      url,
+      analysis,
+      scanMeta,
+      errorState,
+    };
+  }, [analysis, errorState, scanMeta, url]);
+
+  React.useEffect(() => {
+    historyEntryRef.current = historyEntry;
+  }, [historyEntry]);
 
   React.useEffect(() => {
     let mounted = true;
     const skipRestore =
-      Boolean(initialImportedAnalysisRef.current) || initialUrlRef.current.length > 0;
+      Boolean(initialImportedAnalysisRef.current) ||
+      Boolean(initialHistoryEntryRef.current) ||
+      initialUrlRef.current.length > 0;
 
     void (async () => {
       try {
         const session = await ensureAuthSession();
-        const [cached, history] = await Promise.all([
-          loadLastJobScanForUser(session.user.id),
-          loadJobScanHistoryForUser(session.user.id),
-        ]);
+        const cached = await loadLastJobScanForUser(session.user.id);
         if (!mounted) {
           return;
         }
 
-        setScanHistory(history);
-        if (skipRestore) {
+        if (skipRestore || historyEntryRef.current) {
           return;
         }
 
@@ -117,6 +145,8 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
     if (importedUrl) {
       setUrl(importedUrl);
     }
+    activeScanSnapshotRef.current = null;
+    setHistoryEntry(null);
     setAnalysis(importedAnalysis);
     setScanMeta(importedMeta);
     setErrorState(null);
@@ -133,15 +163,11 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
         });
 
         try {
-          const history = await saveJobScanHistoryEntryForUser(session.user.id, {
+          await saveJobScanHistoryEntryForUser(session.user.id, {
             url: storageUrl,
             analysis: importedAnalysis,
             meta: importedMeta,
           });
-          if (!mounted) {
-            return;
-          }
-          setScanHistory(history);
         } catch {
           // non-blocking history sync
         }
@@ -161,6 +187,45 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
     };
   }, [navigation, route.params?.importedAnalysis, route.params?.importedMeta, route.params?.importedUrl]);
 
+  React.useEffect(() => {
+    const selectedHistoryEntry = route.params?.historyEntry;
+    if (!selectedHistoryEntry) {
+      return;
+    }
+
+    if (!historyEntryRef.current) {
+      activeScanSnapshotRef.current = activeStateRef.current;
+    }
+
+    const selection = resolveHistorySelection(selectedHistoryEntry);
+    setHistoryEntry(selectedHistoryEntry);
+    setUrl(selection.url);
+
+    if (selection.kind === 'blocked') {
+      setAnalysis(null);
+      setScanMeta(null);
+      setErrorState(selection.errorState);
+      navigation.setParams({ historyEntry: undefined });
+      return;
+    }
+
+    setAnalysis(selection.analysis);
+    setScanMeta(selection.meta);
+    setErrorState(null);
+    void ensureAuthSession()
+      .then((session) => {
+        saveSessionJobScanForUser(session.user.id, selection.url, {
+          analysis: selection.analysis,
+          meta: selection.meta,
+        });
+      })
+      .catch(() => {
+        // non-blocking session cache warmup
+      });
+
+    navigation.setParams({ historyEntry: undefined });
+  }, [navigation, route.params?.historyEntry]);
+
   const runScan = React.useCallback(async (rawUrl: string) => {
     const trimmedUrl = normalizeScannerInitialUrl(rawUrl);
     if (!trimmedUrl) {
@@ -178,6 +243,8 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
     }
 
     inFlightRef.current = true;
+    activeScanSnapshotRef.current = null;
+    setHistoryEntry(null);
     setUrl(trimmedUrl);
     setErrorState(null);
 
@@ -214,12 +281,11 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
       });
 
       try {
-        const history = await saveJobScanHistoryEntryForUser(session.user.id, {
+        await saveJobScanHistoryEntryForUser(session.user.id, {
           url: trimmedUrl,
           analysis: result,
           meta: nextMeta,
         });
-        setScanHistory(history);
       } catch {
         // non-blocking history save
       }
@@ -249,6 +315,8 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
     }
 
     setUrl(initialUrl);
+    activeScanSnapshotRef.current = null;
+    setHistoryEntry(null);
     if (route.params?.autoStart) {
       void runScan(initialUrl);
     }
@@ -259,42 +327,42 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
     });
   }, [navigation, route.params?.autoStart, route.params?.initialUrl, runScan]);
 
-  const onHistoryPress = React.useCallback((entry: JobScanHistoryEntry) => {
-    const selection = resolveHistorySelection(entry);
-    setUrl(selection.url);
-
-    if (selection.kind === 'blocked') {
-      setErrorState(selection.errorState);
-      return;
-    }
-
-    setAnalysis(selection.analysis);
-    setScanMeta(selection.meta);
-    setErrorState(null);
-    void ensureAuthSession()
-      .then((session) => {
-        saveSessionJobScanForUser(session.user.id, selection.url, {
-          analysis: selection.analysis,
-          meta: selection.meta,
-        });
-      })
-      .catch(() => {
-        // non-blocking session cache warmup
-      });
-  }, []);
-
   const onScanPress = React.useCallback(async () => {
     await runScan(url);
   }, [runScan, url]);
 
+  const onReturnToActiveScan = React.useCallback(() => {
+    const snapshot = activeScanSnapshotRef.current;
+    setHistoryEntry(null);
+    activeScanSnapshotRef.current = null;
+
+    if (!snapshot) {
+      setUrl('');
+      setAnalysis(null);
+      setScanMeta(null);
+      setErrorState(null);
+      return;
+    }
+
+    setUrl(snapshot.url);
+    setAnalysis(snapshot.analysis);
+    setScanMeta(snapshot.scanMeta);
+    setErrorState(snapshot.errorState);
+  }, []);
+
+  const historicalScan: ScannerHistoryDisplay | null = React.useMemo(
+    () => buildHistoryScanDisplay(historyEntry),
+    [historyEntry]
+  );
+
   return {
     analysis,
     errorState,
+    historicalScan,
     isLoading,
-    onHistoryPress,
+    onReturnToActiveScan,
     onScanPress,
     phase,
-    scanHistory,
     scanMeta,
     setUrl,
     url,

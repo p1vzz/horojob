@@ -1,5 +1,5 @@
 # Job Position Check - E2E Smoke Checklist (P0-4)
-**Version:** 1.0  
+**Version:** 1.1
 **Status:** Active  
 **Owner:** Backend + Mobile QA
 
@@ -37,9 +37,11 @@ Use these URLs as the default smoke dataset.
 
 ### LinkedIn (public job detail required)
 - `https://www.linkedin.com/jobs/view/<PUBLIC_JOB_ID>/`
+- `https://www.linkedin.com/jobs/collections/recommended/?currentJobId=<PUBLIC_JOB_ID>`
 - Notes:
   - Must be a concrete public job detail page.
-  - Search/list URLs are out of scope and should fail with `unsupported_path`.
+  - Jobs collection/search URLs are accepted only when they include numeric `currentJobId`.
+  - Search/list URLs without a concrete job id should fail with `unsupported_path`.
 
 ### Wellfound
 - `https://wellfound.com/jobs/3886025-software-engineer-poland`
@@ -156,24 +158,28 @@ Mark all items complete in one smoke pass.
 On `ScannerScreen`:
 - success result renders cards and scores,
 - `usage_limit_reached` shows premium CTA,
-- `blocked/login_wall/not_found` show mapped message + retry timestamp when provided.
+- `blocked/login_wall/not_found/provider_failed` show mapped screenshot-first message + retry timestamp when provided.
+- top-right `History` opens `ScannerHistoryScreen`,
+- tapping a saved scan opens the full saved result on `ScannerScreen`,
+- historical results show vacancy title instead of URL input and display the source URL below.
 
 ## 9. Screenshot Fallback UI Smoke (Mobile)
 Use one deterministic blocked or login-wall vacancy URL so the scanner offers screenshot fallback CTA.
 
 1. Open `ScannerScreen` with a URL that resolves to `blocked`, `login_wall`, `not_found`, or `provider_failed`.
-2. Assert scanner feedback card shows `Upload screenshots instead`.
+2. Assert scanner feedback card shows `Scan from screenshots` and the minimum screenshot guidance.
 3. Tap CTA and confirm `JobScreenshotUploadScreen` opens.
 4. On screenshot upload screen:
    - verify title and summary copy render,
-   - verify total counter starts at `0/4`,
+   - verify total counter starts at `0/6`,
+   - verify minimum requirements copy mentions role title, company name, and job description/responsibilities,
    - verify `Analyze Screenshots` is disabled until at least one screenshot is present.
 5. Permission-denied branch:
    - deny gallery permission,
    - verify error text `Media permission is required to upload screenshots.`.
 6. Successful upload branch:
    - allow gallery access,
-   - choose 1 to 4 vacancy screenshots,
+   - choose 1 to 6 vacancy screenshots,
    - verify gallery thumbnails render,
    - verify duplicate asset selection does not create duplicate cards,
    - verify total counter updates.
@@ -198,3 +204,19 @@ Use one deterministic blocked or login-wall vacancy URL so the scanner offers sc
 - [ ] `screenshot_not_vacancy` error copy is correct
 - [ ] `screenshot_incomplete_info` error copy is correct
 - [ ] `usage_limit_reached` error copy is correct
+
+## 10. Production Gate Smoke
+
+Mobile production build/config:
+- [ ] `EXPO_PUBLIC_APP_ENV=production` is present in the production EAS profile.
+- [ ] `SettingsScreen` does not render `DEV PARSER QUALITY`.
+- [ ] scanner does not show source/provider/cache summary labels such as `LINKEDIN via browser fallback - cached result`.
+- [ ] screenshot fallback and premium upsell actions remain visible when their user-facing error states apply.
+
+Backend production env:
+- [ ] `NODE_ENV=production`.
+- [ ] `DEV_FORCE_PREMIUM_FOR_ALL_USERS` is unset or `false`.
+- [ ] `JOB_USAGE_LIMITS_ENABLED` is unset or `true`.
+- [ ] `JOB_METRICS_ENDPOINTS_ENABLED` is unset or `false`.
+- [ ] `GET /api/jobs/metrics` returns `404` in production.
+- [ ] `GET /api/jobs/alerts` returns `404` in production.

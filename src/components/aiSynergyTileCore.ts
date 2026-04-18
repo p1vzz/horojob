@@ -19,12 +19,12 @@ export function createFallbackAiSynergy(generatedAt = new Date().toISOString()):
     band: 'strong',
     confidence: 72,
     headline: 'Strong AI collaboration day',
-    summary: "Your chart and today's transit support focused AI-assisted execution.",
-    description: 'Your Mercury-Uranus pattern favors prompt precision. Keep AI on repeatable tasks and retain final human judgment.',
+    summary: 'Today supports focused AI-assisted execution.',
+    description: 'Use AI for structured drafting, summarizing, and repetitive decisions. Keep final judgment on high-impact work.',
     recommendations: [
-      'Batch repetitive work into structured AI prompts.',
-      'Validate high-impact outputs before shipping.',
-      'Use AI for first draft, then human refinement.',
+      'Turn one repetitive workflow into a structured prompt.',
+      'Use AI for first drafts, then review the final output yourself.',
+      'Keep vague strategy calls human-led today.',
     ],
     components: {
       cognitiveFlow: 90,
@@ -50,6 +50,13 @@ export const FALLBACK_AI_SYNERGY = createFallbackAiSynergy();
 
 export function selectAiSynergyView(value: DailyTransitResponse['aiSynergy'] | null | undefined) {
   return value ?? FALLBACK_AI_SYNERGY;
+}
+
+export function formatAiSynergyConfidenceLabel(confidence: number) {
+  const value = Math.max(0, Math.min(100, Math.round(confidence)));
+  if (value >= 75) return 'High signal clarity';
+  if (value >= 55) return 'Moderate signal clarity';
+  return 'Limited signal clarity';
 }
 
 export function resolveAiSynergyPalette(score: number): AiSynergyPalette {

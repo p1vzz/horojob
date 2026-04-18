@@ -17,6 +17,7 @@
     "precoverage": "node -e \"require('fs').rmSync('coverage',{ recursive: true, force: true })\"",
     "coverage": "npm run coverage:core && npm run coverage:rntl",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run test:rntl",
+    "verify:quiet": "node scripts/run-quiet.mjs npm run verify",
     "skills:log": "node scripts/append-skills-log.mjs"
   },
   "dependencies": {

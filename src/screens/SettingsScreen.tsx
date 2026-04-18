@@ -6,18 +6,15 @@ import { ChevronLeft } from 'lucide-react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { JobParserQualityCard } from '../components/JobParserQualityCard';
 import { MorningBriefingWidgetVariantPicker } from '../components/MorningBriefingWidgetVariantPicker';
-import type { AppNavigationProp } from '../types/navigation';
+import type { AppNavigationProp, AppScreenProps } from '../types/navigation';
 import { useThemeMode } from '../theme/ThemeModeProvider';
+import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
 import {
   SettingsBirthDetailsSection,
   SettingsInterviewStrategyPanel,
   SettingsPremiumFeaturesSection,
   SettingsSubscriptionSection,
 } from './settings/SettingsSections';
-import {
-  SETTINGS_INTERVIEW_DURATION_OPTIONS,
-  SETTINGS_INTERVIEW_WEEKDAY_OPTIONS,
-} from './settings/settingsInterviewOptions';
 import { buildSettingsPremiumFeaturesViewModel } from './settings/settingsPremiumFeaturesViewModel';
 import { useInterviewStrategySettings } from './settings/useInterviewStrategySettings';
 import { useMorningBriefingSettings } from './settings/useMorningBriefingSettings';
@@ -26,9 +23,10 @@ import { useSettingsBootstrap } from './settings/useSettingsBootstrap';
 
 const { width, height } = Dimensions.get('window');
 
-export const SettingsScreen = () => {
+export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
   const navigation = useNavigation<AppNavigationProp<'Settings'>>();
   const { theme } = useThemeMode();
+  const handledWidgetSetupKeyRef = React.useRef<number | null>(null);
   const openPremiumPurchase = () => navigation.navigate('PremiumPurchase');
   const clearPremiumDependentState = () => {
     resetNotificationState();
@@ -72,21 +70,14 @@ export const SettingsScreen = () => {
   const {
     bootstrapInterviewState,
     handleAddInterviewStrategyToCalendar,
-    handleCycleInterviewWorkdayEnd,
-    handleCycleInterviewWorkdayStart,
     handleGenerateInterviewStrategy,
-    handleInterviewDurationChange,
     handleInterviewFeatureRowPress,
     handleInterviewStrategyToggle,
-    handleInterviewWeekdayToggle,
     handleOpenInterviewCalendarPicker,
-    handleResetInterviewPreferences,
     handleSelectInterviewCalendar,
-    handleWidenInterviewWindow,
     interviewCalendarOptions,
     interviewCalendarPermissionCache,
     interviewPlan,
-    interviewPreferences,
     interviewSelectedCalendarId,
     interviewSettings,
     interviewSyncSummary,
@@ -110,6 +101,15 @@ export const SettingsScreen = () => {
     resetInterviewState,
     resetMorningBriefingState,
   });
+
+  React.useEffect(() => {
+    if (!route.params?.openWidgetSetup) return;
+    if (plan !== 'premium') return;
+    const key = route.params.widgetSetupKey ?? 1;
+    if (handledWidgetSetupKeyRef.current === key) return;
+    handledWidgetSetupKeyRef.current = key;
+    openWidgetStylePicker();
+  }, [openWidgetStylePicker, plan, route.params?.openWidgetSetup, route.params?.widgetSetupKey]);
 
   const { premiumFeatureStates, premiumFeaturesFooterText, widgetVariantLabel } = buildSettingsPremiumFeaturesViewModel({
     plan,
@@ -212,10 +212,8 @@ export const SettingsScreen = () => {
             >
               {plan === 'premium' && isInterviewSectionExpanded ? (
                 <SettingsInterviewStrategyPanel
-                  durationOptions={SETTINGS_INTERVIEW_DURATION_OPTIONS}
                   interviewCalendarOptions={interviewCalendarOptions}
                   interviewPlan={interviewPlan}
-                  interviewPreferences={interviewPreferences}
                   interviewSelectedCalendarId={interviewSelectedCalendarId}
                   interviewSettings={interviewSettings}
                   interviewSyncSummary={interviewSyncSummary}
@@ -225,22 +223,15 @@ export const SettingsScreen = () => {
                   isSavingInterviewSettings={isSavingInterviewSettings}
                   isSyncingInterviewCalendar={isSyncingInterviewCalendar}
                   onAddToCalendar={handleAddInterviewStrategyToCalendar}
-                  onCycleWorkdayEnd={handleCycleInterviewWorkdayEnd}
-                  onCycleWorkdayStart={handleCycleInterviewWorkdayStart}
-                  onDurationChange={handleInterviewDurationChange}
                   onGenerate={handleGenerateInterviewStrategy}
                   onOpenCalendarPicker={handleOpenInterviewCalendarPicker}
-                  onResetPreferences={handleResetInterviewPreferences}
                   onSelectInterviewCalendar={handleSelectInterviewCalendar}
-                  onWeekdayToggle={handleInterviewWeekdayToggle}
-                  onWidenWindow={handleWidenInterviewWindow}
                   selectedInterviewCalendarOption={selectedInterviewCalendarOption}
-                  weekdayOptions={SETTINGS_INTERVIEW_WEEKDAY_OPTIONS}
                 />
               ) : null}
             </SettingsPremiumFeaturesSection>
 
-            {__DEV__ ? <JobParserQualityCard /> : null}
+            {SHOULD_EXPOSE_TECHNICAL_SURFACES ? <JobParserQualityCard /> : null}
 
             <View className="items-center mt-12">
               <Text className="text-[12px]" style={{ color: 'rgba(212,212,224,0.22)' }}>

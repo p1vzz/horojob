@@ -16,6 +16,10 @@ export type InterviewStrategyScoreBreakdown = {
   weekdayWeight: number;
   hourWeight: number;
   conflictPenalty: number;
+  natalCommunicationScore?: number;
+  transitNatalScore?: number;
+  careerHouseScore?: number;
+  rangeQualityScore?: number;
 };
 
 export type InterviewStrategySlot = {
@@ -26,6 +30,7 @@ export type InterviewStrategySlot = {
   timezoneIana: string;
   score: number;
   explanation: string;
+  calendarNote?: string;
   breakdown: InterviewStrategyScoreBreakdown;
 };
 

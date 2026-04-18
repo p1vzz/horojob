@@ -64,6 +64,26 @@ test('astrology api morning briefing query defaults to refresh=false', async () 
   ]);
 });
 
+test('astrology api career vibe plan query defaults to refresh=false', async () => {
+  const paths: string[] = [];
+  const api = createAstrologyApi({
+    authorizedFetch: async (path) => {
+      paths.push(path);
+      return new Response(JSON.stringify({}), { status: 200 });
+    },
+    parseJsonBody: async () => ({}),
+    ApiError: FakeApiError as never,
+  });
+
+  await api.fetchCareerVibePlan();
+  await api.fetchCareerVibePlan({ refresh: true });
+
+  assert.deepEqual(paths, [
+    '/api/astrology/career-vibe-plan?refresh=false',
+    '/api/astrology/career-vibe-plan?refresh=true',
+  ]);
+});
+
 test('astrology api natal chart sends POST body and surfaces backend error message', async () => {
   const calls: Array<{ path: string; init?: RequestInit }> = [];
   const successApi = createAstrologyApi({
@@ -130,4 +150,29 @@ test('astrology api discover roles trims query and applies defaults', async () =
   assert.equal(url.searchParams.get('limit'), '5');
   assert.equal(url.searchParams.get('searchLimit'), '20');
   assert.equal(url.searchParams.get('refresh'), 'false');
+  assert.equal(url.searchParams.get('deferSearchScores'), 'false');
+  assert.equal(url.searchParams.get('scoreSlug'), null);
+});
+
+test('astrology api discover roles can defer search scores and request one score slug', async () => {
+  const paths: string[] = [];
+  const api = createAstrologyApi({
+    authorizedFetch: async (path) => {
+      paths.push(path);
+      return new Response(JSON.stringify({}), { status: 200 });
+    },
+    parseJsonBody: async () => ({}),
+    ApiError: FakeApiError as never,
+  });
+
+  await api.fetchDiscoverRoles({
+    query: 'teacher',
+    deferSearchScores: true,
+    scoreSlug: 'elementary-school-teacher',
+  });
+
+  assert.equal(paths.length, 1);
+  const url = new URL(`https://example.com${paths[0]}`);
+  assert.equal(url.searchParams.get('deferSearchScores'), 'true');
+  assert.equal(url.searchParams.get('scoreSlug'), 'elementary-school-teacher');
 });

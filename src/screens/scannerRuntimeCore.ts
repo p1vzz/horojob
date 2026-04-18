@@ -49,8 +49,38 @@ export type ScannerPreflightGate =
       phase: Extract<ScannerPhase, 'fetching' | 'scoring'>;
     };
 
+export type ScannerHistoryDisplay = {
+  title: string;
+  url: string;
+  canOpenUrl: boolean;
+};
+
 export function normalizeScannerInitialUrl(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+export function isOpenableJobUrl(value: string) {
+  const normalized = normalizeScannerInitialUrl(value);
+  if (!normalized) return false;
+
+  const candidate = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(normalized) ? normalized : `https://${normalized}`;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export function buildHistoryScanDisplay(entry: JobScanHistoryEntry | null | undefined): ScannerHistoryDisplay | null {
+  if (!entry) return null;
+
+  const title = entry.analysis.job?.title?.trim() || entry.analysis.jobSummary?.trim() || 'Saved job scan';
+  return {
+    title,
+    url: entry.url,
+    canOpenUrl: isOpenableJobUrl(entry.url),
+  };
 }
 
 export function buildImportedScannerMeta(
@@ -86,7 +116,7 @@ export function resolveHistorySelection(entry: JobScanHistoryEntry): ScannerHist
       url: entry.url,
       errorState: {
         code: 'blocked',
-        message: 'Cached security challenge page detected. Re-run the scan or use screenshot fallback.',
+        message: 'That saved result looks like a sign-in or challenge page. Run the scan again or upload screenshots.',
         retryAt: null,
         usageContext: null,
       },

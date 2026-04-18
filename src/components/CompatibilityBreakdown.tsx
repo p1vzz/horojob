@@ -58,61 +58,68 @@ export const CompatibilityBreakdown = ({ items }: CompatibilityBreakdownProps) =
         Compatibility Breakdown
       </Text>
       <View
-        className="rounded-[16px] p-4"
+        className="rounded-[8px] px-3 py-2"
         style={{
           backgroundColor: 'rgba(255,255,255,0.04)',
           borderColor: 'rgba(255,255,255,0.08)',
           borderWidth: 1,
         }}
       >
-        <View className="flex-row justify-between">
         {resolvedItems.map((item, index) => {
-            const color = colorPalette[index % colorPalette.length];
-            const height = anim.current[index]?.interpolate({
+          const color = colorPalette[index % colorPalette.length];
+          const width =
+            anim.current[index]?.interpolate({
               inputRange: [0, 1],
-              outputRange: [0, item.score],
-            }) ?? item.score;
-            const Icon = iconByKey[item.key] ?? TrendingUp;
+              outputRange: ['0%', `${item.score}%`],
+            }) ?? `${item.score}%`;
+          const Icon = iconByKey[item.key] ?? TrendingUp;
 
-            return (
-              <View key={item.key} className="flex-1 items-center">
-                <Text className="text-[12px] font-semibold mb-2" style={{ color }}>
-                  {item.score}%
-                </Text>
+          return (
+            <View
+              key={item.key}
+              className="py-2.5"
+              style={{
+                borderBottomColor: 'rgba(255,255,255,0.06)',
+                borderBottomWidth: index === resolvedItems.length - 1 ? 0 : 1,
+              }}
+            >
+              <View className="flex-row items-start">
                 <View
-                  className="w-full rounded-[12px] overflow-hidden"
-                  style={{ height: 100, backgroundColor: 'rgba(255,255,255,0.04)' }}
+                  className="w-8 h-8 rounded-[8px] items-center justify-center mr-3"
+                  style={{ backgroundColor: `${color}1F` }}
                 >
-                  <Animated.View
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height,
-                      backgroundColor: `${color}55`,
-                      borderTopLeftRadius: 12,
-                      borderTopRightRadius: 12,
-                    }}
-                  />
+                  <Icon size={15} color={color} />
                 </View>
-                <Icon size={14} color={color} style={{ marginTop: 8 }} />
-                <Text className="text-[11px] mt-2 text-center" style={{ color: 'rgba(212,212,224,0.9)' }}>
-                  {item.label}
-                </Text>
-                {item.note ? (
-                  <Text
-                    numberOfLines={2}
-                    className="text-[9px] mt-1 text-center"
-                    style={{ color: 'rgba(212,212,224,0.55)' }}
-                  >
-                    {item.note}
+                <View className="flex-1 mr-3">
+                  <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.94)' }}>
+                    {item.label}
                   </Text>
-                ) : null}
+                  {item.note ? (
+                    <Text className="text-[10px] mt-1 leading-[15px]" style={{ color: 'rgba(212,212,224,0.58)' }}>
+                      {item.note}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text className="text-[13px] font-semibold" style={{ color }}>
+                  {`${item.score}%`}
+                </Text>
               </View>
-            );
-          })}
-        </View>
+              <View
+                className="h-1.5 rounded-full overflow-hidden mt-2.5"
+                style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+              >
+                <Animated.View
+                  style={{
+                    width,
+                    height: '100%',
+                    backgroundColor: `${color}B8`,
+                    borderRadius: 999,
+                  }}
+                />
+              </View>
+            </View>
+          );
+        })}
         {resolvedItems.length === 0 ? (
           <Text className="text-[12px]" style={{ color: 'rgba(212,212,224,0.5)' }}>
             Run a scan to see factor-level compatibility details.

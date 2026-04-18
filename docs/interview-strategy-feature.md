@@ -40,21 +40,23 @@ Premium-only `Interview Strategy` that:
 - Mobile keeps local `slotId -> calendarEventId` map for idempotent calendar operations.
 
 ## 4. Server Scoring (`interview-strategy-v1`)
-Score `0..100` for each slot:
+The server now requires the active birth profile and natal chart before planning.
 
-```text
-score =
-  0.40 * dailyCareerScore
-  + 0.25 * aiSynergyScore
-  + 0.20 * weekdayWeight
-  + 0.15 * hourWeight
-```
+Score `0..100` blends:
+- transit-to-natal communication aspects
+- natal communication bias
+- career-house emphasis
+- daily career momentum
+- AI synergy
+- small weekday/time quality weights
 
 Rules:
-- Deterministic date/user jitter around transit baseline.
-- Filter by user settings (weekdays, work window, quiet hours).
-- Drop slots below threshold (`INTERVIEW_STRATEGY_MIN_SCORE`, default `55`).
-- Keep top `N` per week (`slotsPerWeek`).
+- Generate one candidate range per eligible day.
+- Range duration is backend-selected from 1 to 3 hours.
+- Select up to 4-5 strongest windows per 30-day horizon, with spacing to avoid calendar spam.
+- Do not backfill weak days below `INTERVIEW_STRATEGY_MIN_SCORE` (`68` by default).
+- Legacy weekday/duration/workday request fields remain accepted for rollout compatibility, but mobile no longer exposes manual range settings.
+- Each slot includes `explanation` and short `calendarNote`; calendar sync writes the note into event details.
 
 ## 5. Autofill Lifecycle
 1. Premium user enables Interview Strategy in Settings.
@@ -68,13 +70,7 @@ Rules:
 ### 6.1 Settings payload
 - `enabled`
 - `timezoneIana`
-- `slotDurationMinutes` (`30|45|60`)
-- `allowedWeekdays` (`0..6`)
-- `workdayStartMinute`
-- `workdayEndMinute`
-- `quietHoursStartMinute`
-- `quietHoursEndMinute`
-- `slotsPerWeek`
+- legacy optional fields still accepted by backend: `slotDurationMinutes`, `allowedWeekdays`, `workdayStartMinute`, `workdayEndMinute`, `quietHoursStartMinute`, `quietHoursEndMinute`, `slotsPerWeek`
 
 ### 6.2 Returned settings metadata
 - `autoFillConfirmedAt`

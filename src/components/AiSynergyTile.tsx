@@ -1,11 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, Animated, type LayoutChangeEvent } from 'react-native';
 import { Cpu, Activity } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line, Path, G } from 'react-native-svg';
 import { useAppTheme } from '../theme/ThemeModeProvider';
 import { useAiSynergy } from '../hooks/queries/useAiSynergy';
 import {
+  formatAiSynergyConfidenceLabel,
   resolveAiSynergyPalette,
   selectAiSynergyView,
 } from './aiSynergyTileCore';
@@ -14,13 +15,14 @@ import { AI_SYNERGY_HELIX_POINTS } from './aiSynergyTileVisuals';
 export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) => {
   const theme = useAppTheme();
   const scanAnim = useRef(new Animated.Value(0)).current;
+  const [cardHeight, setCardHeight] = useState(124);
   const { data: aiSynergy, isLoading } = useAiSynergy();
   const hasSignaledReadyRef = useRef(false);
 
   const synergy = selectAiSynergyView(aiSynergy);
 
   useEffect(() => {
-    Animated.loop(
+    const scanLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(scanAnim, {
           toValue: 1,
@@ -33,7 +35,10 @@ export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) 
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+
+    scanLoop.start();
+    return () => scanLoop.stop();
   }, [scanAnim]);
 
   useEffect(() => {
@@ -43,17 +48,26 @@ export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) 
     }
   }, [isLoading, onReady]);
 
+  const handleCardLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    if (nextHeight > 0) {
+      setCardHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
+    }
+  }, []);
+
   const scanTranslate = scanAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [14, 110],
+    outputRange: [8, Math.max(110, cardHeight - 8)],
   });
 
   const { scoreColor, scoreSubColor } = resolveAiSynergyPalette(synergy.score);
+  const confidenceLabel = formatAiSynergyConfidenceLabel(synergy.confidence);
 
   return (
     <View className="px-5 py-2">
       <View
         className="p-5 rounded-[24px] overflow-hidden relative"
+        onLayout={handleCardLayout}
         style={{
           backgroundColor: 'rgba(56,204,136,0.04)',
           borderColor: 'rgba(56,204,136,0.1)',
@@ -112,7 +126,7 @@ export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) 
         <View className="flex-row items-center mb-3">
           <Cpu size={15} color="#00FFCC" />
           <Text className="text-[13px] font-semibold ml-2" style={{ color: theme.colors.foreground }}>
-            AI Synergy Score
+            Today&apos;s AI Synergy
           </Text>
         </View>
 
@@ -130,13 +144,13 @@ export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) 
         </Text>
 
         <Text className="text-[11px] mb-3 pr-8" style={{ color: 'rgba(212,212,224,0.58)' }}>
-          Next: {synergy.recommendations[0]}
+          Best move: {synergy.recommendations[0]}
         </Text>
 
-        <View className="flex-row items-center mb-4">
+        <View className="flex-row items-center">
           <Activity size={11} color="#00FFCC" style={{ opacity: 0.9, marginRight: 6 }} />
           <Text className="text-[10px] tracking-[1.5px] uppercase font-semibold" style={{ color: 'rgba(212,212,224,0.45)' }}>
-            {isLoading ? 'Computing real-time synergy' : `Confidence ${synergy.confidence}%`}
+            {isLoading ? "Syncing today's AI signal" : confidenceLabel}
           </Text>
         </View>
       </View>

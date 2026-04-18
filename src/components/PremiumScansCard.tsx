@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { Infinity, Crown, ArrowRight } from 'lucide-react-native';
+import { ArrowRight, Gauge } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../types/navigation';
 
@@ -26,14 +26,14 @@ export const PremiumScansCard = () => {
               className="w-8 h-8 rounded-[10px] items-center justify-center mr-3"
               style={{ backgroundColor: 'rgba(201,168,76,0.12)' }}
             >
-              <Infinity size={16} color="#C9A84C" />
+              <Gauge size={16} color="#C9A84C" />
             </View>
             <View className="flex-1">
               <Text className="text-[13px] font-semibold" style={{ color: 'rgba(212,212,224,0.95)' }}>
-                Unlimited Scans & Deep Reports
+                10 Daily Job Checks
               </Text>
               <Text className="text-[11px]" style={{ color: 'rgba(212,212,224,0.55)' }}>
-                Scan unlimited job postings with full natal chart analysis.
+                Premium gives you 10 successful checks per day.
               </Text>
             </View>
             <View
@@ -46,19 +46,10 @@ export const PremiumScansCard = () => {
             </View>
           </View>
 
-          <View className="flex-row items-center justify-between mt-3">
-            <View className="flex-row items-center">
-              <Crown size={12} color="rgba(201,168,76,0.7)" />
-              <Text className="text-[10px] ml-1" style={{ color: 'rgba(212,212,224,0.5)' }}>
-                Deep reports
-              </Text>
-            </View>
-            <View className="flex-row items-center">
-              <Crown size={12} color="rgba(201,168,76,0.7)" />
-              <Text className="text-[10px] ml-1" style={{ color: 'rgba(212,212,224,0.5)' }}>
-                AI insights
-              </Text>
-            </View>
+          <View className="flex-row items-center mt-2">
+            <Text className="text-[10px] flex-1" style={{ color: 'rgba(212,212,224,0.48)' }}>
+              More scans for comparing roles and saved history.
+            </Text>
             <ArrowRight size={14} color="rgba(212,212,224,0.35)" />
           </View>
         </View>

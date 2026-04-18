@@ -1,6 +1,7 @@
 import React from 'react';
 import { expect, jest, test } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { SCREENSHOT_FALLBACK_GUIDANCE } from '../scannerUtilsCore';
 import { ScannerFeedbackCard } from './ScannerFeedbackCard';
 
 jest.mock('../../theme/ThemeModeProvider', () => {
@@ -41,6 +42,7 @@ test('scanner feedback card opens premium upsell from usage limit state', () => 
       canUseScreenshotFallback={false}
       hasAnalysis={false}
       isLoading={false}
+      showTechnicalHints={false}
       onUpgrade={onUpgrade}
       onOpenScreenshotFallback={() => {}}
     />
@@ -67,12 +69,32 @@ test('scanner feedback card opens screenshot fallback CTA for supported errors',
       canUseScreenshotFallback
       hasAnalysis={false}
       isLoading={false}
+      showTechnicalHints
       onUpgrade={() => {}}
       onOpenScreenshotFallback={onOpenScreenshotFallback}
     />
   );
 
   expect(screen.getByText('LINKEDIN - fresh scan')).toBeTruthy();
-  fireEvent.press(screen.getByText('Upload screenshots instead'));
+  expect(screen.getByText(SCREENSHOT_FALLBACK_GUIDANCE)).toBeTruthy();
+  fireEvent.press(screen.getByText('Scan from screenshots'));
   expect(onOpenScreenshotFallback).toHaveBeenCalledTimes(1);
+});
+
+test('scanner feedback card hides technical scan summary in production surfaces', () => {
+  render(
+    <ScannerFeedbackCard
+      scanSummary="LINKEDIN via browser fallback - cached result"
+      errorState={null}
+      retryAtText={null}
+      canUseScreenshotFallback={false}
+      hasAnalysis
+      isLoading={false}
+      showTechnicalHints={false}
+      onUpgrade={() => {}}
+      onOpenScreenshotFallback={() => {}}
+    />
+  );
+
+  expect(screen.queryByText('LINKEDIN via browser fallback - cached result')).toBeNull();
 });

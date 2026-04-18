@@ -15,12 +15,11 @@ import type { MorningBriefingResponse } from '../../services/astrologyApi';
 import type { WritableCalendarOption } from '../../services/calendar';
 import type { SubscriptionPlan } from '../../services/morningBriefingSync';
 import type { InterviewStrategySettings } from '../../services/notificationsApi';
-import type { InterviewStrategyPlan, InterviewStrategyPreferences } from '../../types/interviewStrategy';
-import type { SettingsPremiumFeatureId, SettingsPremiumFeatureState, SettingsWeekdayOption } from './settingsTypes';
+import type { InterviewStrategyPlan } from '../../types/interviewStrategy';
+import type { SettingsPremiumFeatureId, SettingsPremiumFeatureState } from './settingsTypes';
 import {
   formatInterviewCalendarOptionLabel,
   formatInterviewSlotWindow,
-  formatMinuteLabel,
 } from '../settingsScreenCore';
 
 type SettingsIcon = React.ComponentType<{ size?: number; color?: string }>;
@@ -413,10 +412,8 @@ export function SettingsPremiumFeaturesSection(props: {
 }
 
 export function SettingsInterviewStrategyPanel(props: {
-  durationOptions: Array<InterviewStrategyPreferences['slotDurationMinutes']>;
   interviewCalendarOptions: WritableCalendarOption[];
   interviewPlan: InterviewStrategyPlan | null;
-  interviewPreferences: InterviewStrategyPreferences;
   interviewSelectedCalendarId: string | null;
   interviewSettings: InterviewStrategySettings | null;
   interviewSyncSummary: string | null;
@@ -426,23 +423,14 @@ export function SettingsInterviewStrategyPanel(props: {
   isSavingInterviewSettings: boolean;
   isSyncingInterviewCalendar: boolean;
   onAddToCalendar: () => void;
-  onCycleWorkdayEnd: () => void;
-  onCycleWorkdayStart: () => void;
-  onDurationChange: (duration: InterviewStrategyPreferences['slotDurationMinutes']) => void;
   onGenerate: () => void;
   onOpenCalendarPicker: () => void;
-  onResetPreferences: () => void;
   onSelectInterviewCalendar: (calendarId: string | null) => void;
-  onWeekdayToggle: (weekday: number) => void;
-  onWidenWindow: () => void;
   selectedInterviewCalendarOption: WritableCalendarOption | null;
-  weekdayOptions: SettingsWeekdayOption[];
 }) {
   const {
-    durationOptions,
     interviewCalendarOptions,
     interviewPlan,
-    interviewPreferences,
     interviewSelectedCalendarId,
     interviewSettings,
     interviewSyncSummary,
@@ -452,17 +440,10 @@ export function SettingsInterviewStrategyPanel(props: {
     isSavingInterviewSettings,
     isSyncingInterviewCalendar,
     onAddToCalendar,
-    onCycleWorkdayEnd,
-    onCycleWorkdayStart,
-    onDurationChange,
     onGenerate,
     onOpenCalendarPicker,
-    onResetPreferences,
     onSelectInterviewCalendar,
-    onWeekdayToggle,
-    onWidenWindow,
     selectedInterviewCalendarOption,
-    weekdayOptions,
   } = props;
 
   const isCalendarPickerDisabled =
@@ -483,10 +464,10 @@ export function SettingsInterviewStrategyPanel(props: {
             INTERVIEW STRATEGY
           </Text>
           <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.94)' }}>
-            Best interview windows for next 30 days
+            Sparse natal interview windows for next 30 days
           </Text>
           <Text className="text-[11px] mt-1" style={{ color: 'rgba(212,212,224,0.56)' }}>
-            Duration {interviewPreferences.slotDurationMinutes}m | Workday {formatMinuteLabel(interviewPreferences.workdayStartMinute)}-{formatMinuteLabel(interviewPreferences.workdayEndMinute)}
+            4-5 strongest monthly ranges, one focused block per selected day
           </Text>
           {interviewSettings?.autoFillConfirmedAt ? (
             <Text className="text-[10px] mt-1" style={{ color: 'rgba(212,212,224,0.5)' }}>
@@ -511,101 +492,6 @@ export function SettingsInterviewStrategyPanel(props: {
         >
           <Text className="text-[11px] font-semibold" style={{ color: 'rgba(221,214,255,0.98)' }}>
             {isGeneratingInterviewPlan ? 'Generating...' : 'Generate'}
-          </Text>
-        </Pressable>
-      </View>
-
-      <View className="mt-3">
-        <Text className="text-[10px] tracking-[1.1px] font-semibold" style={{ color: 'rgba(212,212,224,0.56)' }}>
-          SLOT DURATION
-        </Text>
-        <View className="flex-row mt-2">
-          {durationOptions.map((duration) => {
-            const active = interviewPreferences.slotDurationMinutes === duration;
-            return (
-              <Pressable
-                key={duration}
-                onPress={() => onDurationChange(duration)}
-                className="px-2.5 py-1.5 rounded-[10px] mr-2"
-                style={{
-                  backgroundColor: active ? 'rgba(160,140,255,0.26)' : 'rgba(255,255,255,0.05)',
-                  borderColor: active ? 'rgba(160,140,255,0.6)' : 'rgba(255,255,255,0.12)',
-                  borderWidth: 1,
-                }}
-              >
-                <Text
-                  className="text-[11px] font-semibold"
-                  style={{ color: active ? 'rgba(221,214,255,0.98)' : 'rgba(212,212,224,0.6)' }}
-                >
-                  {duration}m
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View className="mt-3">
-        <Text className="text-[10px] tracking-[1.1px] font-semibold" style={{ color: 'rgba(212,212,224,0.56)' }}>
-          PREFERRED WEEKDAYS
-        </Text>
-        <View className="flex-row flex-wrap mt-2">
-          {weekdayOptions.map((day) => {
-            const active = interviewPreferences.allowedWeekdays.includes(day.value);
-            return (
-              <Pressable
-                key={day.label}
-                onPress={() => onWeekdayToggle(day.value)}
-                className="px-2.5 py-1.5 rounded-[10px] mr-2 mb-2"
-                style={{
-                  backgroundColor: active ? 'rgba(160,140,255,0.22)' : 'rgba(255,255,255,0.05)',
-                  borderColor: active ? 'rgba(160,140,255,0.54)' : 'rgba(255,255,255,0.1)',
-                  borderWidth: 1,
-                }}
-              >
-                <Text
-                  className="text-[11px] font-semibold"
-                  style={{ color: active ? 'rgba(221,214,255,0.98)' : 'rgba(212,212,224,0.58)' }}
-                >
-                  {day.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View className="mt-1 flex-row items-center">
-        <Pressable
-          onPress={onCycleWorkdayStart}
-          className="flex-1 px-3 py-2.5 rounded-[10px] mr-2"
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.04)',
-            borderColor: 'rgba(255,255,255,0.1)',
-            borderWidth: 1,
-          }}
-        >
-          <Text className="text-[10px] tracking-[1.1px] font-semibold mb-0.5" style={{ color: 'rgba(212,212,224,0.5)' }}>
-            START
-          </Text>
-          <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.92)' }}>
-            {formatMinuteLabel(interviewPreferences.workdayStartMinute)}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onCycleWorkdayEnd}
-          className="flex-1 px-3 py-2.5 rounded-[10px]"
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.04)',
-            borderColor: 'rgba(255,255,255,0.1)',
-            borderWidth: 1,
-          }}
-        >
-          <Text className="text-[10px] tracking-[1.1px] font-semibold mb-0.5" style={{ color: 'rgba(212,212,224,0.5)' }}>
-            END
-          </Text>
-          <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.92)' }}>
-            {formatMinuteLabel(interviewPreferences.workdayEndMinute)}
           </Text>
         </Pressable>
       </View>
@@ -765,36 +651,8 @@ export function SettingsInterviewStrategyPanel(props: {
               No slots passed threshold
             </Text>
             <Text className="text-[10px] mt-1" style={{ color: 'rgba(212,212,224,0.55)' }}>
-              Broaden weekdays or widen your work window, then regenerate.
+              Regenerate after the next transit refresh or once your natal chart has been rebuilt.
             </Text>
-            <View className="flex-row mt-2">
-              <Pressable
-                onPress={onWidenWindow}
-                className="px-2.5 py-1.5 rounded-[9px] mr-2"
-                style={{
-                  backgroundColor: 'rgba(160,140,255,0.2)',
-                  borderColor: 'rgba(160,140,255,0.52)',
-                  borderWidth: 1,
-                }}
-              >
-                <Text className="text-[10px] font-semibold" style={{ color: 'rgba(221,214,255,0.98)' }}>
-                  Widen Window
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={onResetPreferences}
-                className="px-2.5 py-1.5 rounded-[9px]"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderColor: 'rgba(255,255,255,0.14)',
-                  borderWidth: 1,
-                }}
-              >
-                <Text className="text-[10px] font-semibold" style={{ color: 'rgba(212,212,224,0.66)' }}>
-                  Reset Defaults
-                </Text>
-              </Pressable>
-            </View>
           </View>
         )
       ) : (

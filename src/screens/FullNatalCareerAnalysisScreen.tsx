@@ -9,6 +9,7 @@ import { ApiError } from '../services/authSession';
 import { fetchFullNatalCareerAnalysis, type FullNatalCareerAnalysisResponse } from '../services/astrologyApi';
 import { FullScreenCosmicLoader } from '../components/loaders/FullScreenCosmicLoader';
 import { useThemeMode } from '../theme/ThemeModeProvider';
+import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
 
 type ScreenState = 'loading' | 'ready' | 'premium_required' | 'error';
 type PhaseKey = '0_6_months' | '6_18_months' | '18_36_months';
@@ -167,7 +168,9 @@ export const FullNatalCareerAnalysisScreen = () => {
   const footerMeta = useMemo(() => {
     if (!response) return null;
     const source = response.narrativeSource === 'llm' ? 'LLM' : 'Template';
-    return `${formatGeneratedAt(response.generatedAt)} | ${response.model} | ${response.promptVersion} | ${source}`;
+    const generatedAt = formatGeneratedAt(response.generatedAt);
+    if (!SHOULD_EXPOSE_TECHNICAL_SURFACES) return `Updated ${generatedAt}`;
+    return `${generatedAt} | ${response.model} | ${response.promptVersion} | ${source}`;
   }, [response]);
 
   return (
@@ -591,7 +594,7 @@ export const FullNatalCareerAnalysisScreen = () => {
                   {response?.cached ? (
                     <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}>
                       <Text className="text-[10px]" style={{ color: 'rgba(212,212,224,0.56)' }}>
-                        Cached
+                        {SHOULD_EXPOSE_TECHNICAL_SURFACES ? 'Cached' : 'Saved'}
                       </Text>
                     </View>
                   ) : null}

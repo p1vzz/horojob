@@ -34,6 +34,42 @@ export type PremiumPlan<TPackage> = {
   package: TPackage;
 };
 
+export type PremiumPreviewSegment = {
+  label: string;
+  value: number;
+  color: string;
+};
+
+export type NormalizedPremiumPreviewSegment = PremiumPreviewSegment & {
+  percentage: number;
+};
+
+function normalizeSegmentValue(value: number) {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+export function normalizePreviewSegments(
+  segments: PremiumPreviewSegment[]
+): NormalizedPremiumPreviewSegment[] {
+  const cleaned = segments.map((segment) => ({
+    ...segment,
+    value: normalizeSegmentValue(segment.value),
+  }));
+  const total = cleaned.reduce((sum, segment) => sum + segment.value, 0);
+
+  if (total <= 0) {
+    return cleaned.map((segment) => ({
+      ...segment,
+      percentage: 0,
+    }));
+  }
+
+  return cleaned.map((segment) => ({
+    ...segment,
+    percentage: Math.round((segment.value / total) * 100),
+  }));
+}
+
 export function packagePriority<TToken extends PremiumPackageToken>(
   packageType: TToken,
   packageOrder: readonly TToken[]

@@ -16,6 +16,7 @@ import { useDashboardInsights } from '../hooks/useDashboardInsights';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
 import { adaptOpacity } from '../utils/brightnessAdaptation';
+import { syncNatalChartCache } from '../services/natalChartSync';
 import { DASHBOARD_BACKGROUND_GRADIENTS } from './dashboardScreenVisuals';
 import {
   buildDashboardAlertPushAnalyticsProperties,
@@ -27,7 +28,7 @@ import { trackAnalyticsEvent } from '../services/analytics';
 import type { AppScreenProps, DashboardAlertFocus } from '../types/navigation';
 
 const { width, height } = Dimensions.get('window');
-type DashboardReadySection = 'insights' | 'dailyAstro' | 'aiSynergy' | 'interview' | 'deepDive';
+type DashboardReadySection = 'insights' | 'natalChart' | 'dailyAstro' | 'aiSynergy' | 'interview' | 'deepDive';
 type AlertCardOffsets = Record<DashboardAlertFocus, number | null>;
 type DashboardScreenProps = AppScreenProps<'Dashboard'> | AppScreenProps<'Profile'>;
 
@@ -66,6 +67,7 @@ export const DashboardScreen = ({ route }: DashboardScreenProps) => {
   const [activeAlertFocusKey, setActiveAlertFocusKey] = React.useState<number | null>(null);
   const [readySections, setReadySections] = React.useState<Record<DashboardReadySection, boolean>>({
     insights: false,
+    natalChart: false,
     dailyAstro: false,
     aiSynergy: false,
     interview: false,
@@ -90,6 +92,24 @@ export const DashboardScreen = ({ route }: DashboardScreenProps) => {
       markSectionReady('insights');
     }
   }, [isInitialReady, markSectionReady]);
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    const warmNatalChart = async () => {
+      await syncNatalChartCache().catch(() => {
+        // Dashboard must not get stuck if chart preloading is temporarily unavailable.
+      });
+      if (mounted) {
+        markSectionReady('natalChart');
+      }
+    };
+
+    void warmNatalChart();
+    return () => {
+      mounted = false;
+    };
+  }, [markSectionReady]);
 
   React.useEffect(() => {
     if (!routeAlertFocus) return;
