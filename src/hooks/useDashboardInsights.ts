@@ -23,11 +23,11 @@ import {
 } from './useDashboardInsightsCore';
 
 export function useDashboardInsights(options: {
-  showBurnoutFallbackOnError?: boolean;
-  showLunarFallbackOnError?: boolean;
+  showBurnoutUnavailableOnError?: boolean;
+  showLunarUnavailableOnError?: boolean;
 } = {}) {
-  const showBurnoutFallbackOnError = options.showBurnoutFallbackOnError ?? false;
-  const showLunarFallbackOnError = options.showLunarFallbackOnError ?? false;
+  const showBurnoutUnavailableOnError = options.showBurnoutUnavailableOnError ?? false;
+  const showLunarUnavailableOnError = options.showLunarUnavailableOnError ?? false;
   const [state, setState] = React.useState(() => createDefaultDashboardInsightsState());
   const [isInitialReady, setIsInitialReady] = React.useState(false);
   const [burnoutVisible, setBurnoutVisible] = React.useState(false);
@@ -69,18 +69,18 @@ export function useDashboardInsights(options: {
       }));
     } catch {
       if (burnoutRequestIdRef.current !== requestId) return;
-      setBurnoutVisible(showBurnoutFallbackOnError);
+      setBurnoutVisible(showBurnoutUnavailableOnError);
       setState((current) => ({
         ...current,
         burnout: {
           snapshot: FROZEN_BURNOUT_SNAPSHOT,
-          source: 'fallback',
+          source: 'unavailable',
           isHydrating: false,
           lastSyncedAt: current.burnout.lastSyncedAt,
         },
       }));
     }
-  }, [showBurnoutFallbackOnError]);
+  }, [showBurnoutUnavailableOnError]);
 
   const hydrateLunar = React.useCallback(async (requestId: number) => {
     setState((current) => ({
@@ -115,18 +115,18 @@ export function useDashboardInsights(options: {
       }));
     } catch {
       if (lunarRequestIdRef.current !== requestId) return;
-      setLunarVisible(showLunarFallbackOnError);
+      setLunarVisible(showLunarUnavailableOnError);
       setState((current) => ({
         ...current,
         lunar: {
           snapshot: FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT,
-          source: 'fallback',
+          source: 'unavailable',
           isHydrating: false,
           lastSyncedAt: current.lunar.lastSyncedAt,
         },
       }));
     }
-  }, [showLunarFallbackOnError]);
+  }, [showLunarUnavailableOnError]);
 
   const refreshBurnout = React.useCallback(async () => {
     const requestId = ++burnoutRequestIdRef.current;
@@ -168,8 +168,8 @@ export function useDashboardInsights(options: {
         } catch {
           burnoutRequestIdRef.current += 1;
           lunarRequestIdRef.current += 1;
-          setBurnoutVisible(showBurnoutFallbackOnError);
-          setLunarVisible(showLunarFallbackOnError);
+          setBurnoutVisible(showBurnoutUnavailableOnError);
+          setLunarVisible(showLunarUnavailableOnError);
           if (!initialResolutionDoneRef.current) {
             initialResolutionDoneRef.current = true;
             setIsInitialReady(true);

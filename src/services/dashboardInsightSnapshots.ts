@@ -11,7 +11,7 @@ export type DashboardInsightMetric = {
   color: string;
 };
 
-export type DashboardInsightSourceMode = 'live' | 'preview' | 'fallback';
+export type DashboardInsightSourceMode = 'live' | 'preview' | 'unavailable';
 
 export type BurnoutInsightSnapshot = {
   algorithmVersion: string;

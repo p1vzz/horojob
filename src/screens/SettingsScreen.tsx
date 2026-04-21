@@ -70,21 +70,25 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
   const {
     bootstrapInterviewState,
     handleAddInterviewStrategyToCalendar,
-    handleGenerateInterviewStrategy,
     handleInterviewFeatureRowPress,
     handleInterviewStrategyToggle,
     handleOpenInterviewCalendarPicker,
+    handleRemoveInterviewStrategyFromCalendar,
+    handleRetryInterviewStrategy,
     handleSelectInterviewCalendar,
+    hasInterviewCalendarEvents,
     interviewCalendarOptions,
     interviewCalendarPermissionCache,
     interviewPlan,
     interviewSelectedCalendarId,
     interviewSettings,
+    interviewErrorText,
     interviewSyncSummary,
     isGeneratingInterviewPlan,
     isInterviewCalendarListVisible,
     isInterviewSectionExpanded,
     isLoadingInterviewCalendars,
+    isRemovingInterviewCalendarEvents,
     isSavingInterviewSettings,
     isSyncingInterviewCalendar,
     resetInterviewState,
@@ -135,6 +139,7 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
     interviewSelectedCalendarId,
     interviewSettings,
     isGeneratingInterviewPlan,
+    isRemovingInterviewCalendarEvents,
     isSavingInterviewSettings,
     isSyncingInterviewCalendar,
     selectedInterviewCalendarOption,
@@ -216,14 +221,18 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
                   interviewPlan={interviewPlan}
                   interviewSelectedCalendarId={interviewSelectedCalendarId}
                   interviewSettings={interviewSettings}
+                  interviewErrorText={interviewErrorText}
+                  hasInterviewCalendarEvents={hasInterviewCalendarEvents}
                   interviewSyncSummary={interviewSyncSummary}
                   isGeneratingInterviewPlan={isGeneratingInterviewPlan}
                   isInterviewCalendarListVisible={isInterviewCalendarListVisible}
                   isLoadingInterviewCalendars={isLoadingInterviewCalendars}
+                  isRemovingInterviewCalendarEvents={isRemovingInterviewCalendarEvents}
                   isSavingInterviewSettings={isSavingInterviewSettings}
                   isSyncingInterviewCalendar={isSyncingInterviewCalendar}
                   onAddToCalendar={handleAddInterviewStrategyToCalendar}
-                  onGenerate={handleGenerateInterviewStrategy}
+                  onRemoveFromCalendar={handleRemoveInterviewStrategyFromCalendar}
+                  onRetry={handleRetryInterviewStrategy}
                   onOpenCalendarPicker={handleOpenInterviewCalendarPicker}
                   onSelectInterviewCalendar={handleSelectInterviewCalendar}
                   selectedInterviewCalendarOption={selectedInterviewCalendarOption}

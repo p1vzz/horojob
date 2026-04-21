@@ -28,6 +28,15 @@ export type ScoredSignalTag = {
   reason: string;
 };
 
+export type LlmNarrativeStatus = 'ready' | 'pending' | 'unavailable' | 'failed';
+export type LlmNarrativeFailureCode =
+  | 'llm_unavailable'
+  | 'llm_unconfigured'
+  | 'llm_timeout'
+  | 'llm_rate_limited'
+  | 'llm_invalid_response'
+  | 'llm_upstream_error';
+
 export type DailyTransitResponse = {
   dateKey: string;
   cached: boolean;
@@ -75,7 +84,9 @@ export type DailyTransitResponse = {
   aiSynergy?: {
     algorithmVersion: string;
     dateKey: string;
-    narrativeSource: 'template' | 'llm';
+    narrativeSource: 'llm' | null;
+    narrativeStatus: LlmNarrativeStatus;
+    narrativeFailureCode?: LlmNarrativeFailureCode | null;
     llmModel: string | null;
     llmPromptVersion: string | null;
     narrativeVariantId?: string;
@@ -89,9 +100,9 @@ export type DailyTransitResponse = {
       coherence: number;
       stability: number;
     };
-    headline: string;
-    summary: string;
-    description: string;
+    headline: string | null;
+    summary: string | null;
+    description: string | null;
     recommendations: string[];
     tags?: ScoredSignalTag[];
     drivers?: string[];
@@ -151,7 +162,7 @@ export type MorningBriefingResponse = {
       cautions: string[];
       tags: ScoredSignalTag[];
     };
-    aiSynergy: {
+    aiSynergy?: {
       algorithmVersion: string;
       band: 'peak' | 'strong' | 'stable' | 'volatile';
       confidence: number;
@@ -180,7 +191,9 @@ export type CareerVibePlanResponse = {
   cached: boolean;
   schemaVersion: string;
   tier: 'free' | 'premium';
-  narrativeSource: 'template' | 'llm';
+  narrativeSource: 'llm' | null;
+  narrativeStatus: LlmNarrativeStatus;
+  narrativeFailureCode?: LlmNarrativeFailureCode | null;
   model: string;
   promptVersion: string;
   generatedAt: string;
@@ -204,7 +217,7 @@ export type CareerVibePlanResponse = {
     communicationStrategy: string;
     aiWorkStrategy: string;
     riskGuardrail: string;
-  };
+  } | null;
   explanation: {
     drivers: string[];
     cautions: string[];
@@ -222,8 +235,13 @@ export type FullNatalCareerAnalysisResponse = {
   cached: boolean;
   model: string;
   promptVersion: string;
-  narrativeSource: 'template' | 'llm';
+  narrativeSource: 'llm';
   generatedAt: string;
+  profileUpdatedAt?: string;
+  profileChangeNotice?: {
+    profileUpdatedAt: string;
+    expiresAt: string;
+  } | null;
   analysis: {
     schemaVersion: string;
     headline: string;
@@ -260,6 +278,25 @@ export type FullNatalCareerAnalysisResponse = {
     decisionRules: string[];
     next90DaysPlan: string[];
   };
+};
+
+export type OperationProgressStatus = 'idle' | 'running' | 'completed' | 'failed';
+export type OperationProgressStageState = 'pending' | 'active' | 'complete' | 'failed';
+
+export type OperationProgressResponse = {
+  operation: string;
+  status: OperationProgressStatus;
+  title: string;
+  subtitle: string;
+  activeStageKey: string | null;
+  stages: Array<{
+    key: string;
+    title: string;
+    detail: string;
+    state: OperationProgressStageState;
+  }>;
+  updatedAt: string | null;
+  expiresAt: string | null;
 };
 
 export type AiSynergyHistoryResponse = {
@@ -303,10 +340,17 @@ export type DiscoverRolesResponse = {
 };
 
 export type AstrologyApiDeps = {
-  authorizedFetch: (path: string, init?: RequestInit) => Promise<Response>;
+  authorizedFetch: (path: string, init?: AstrologyRequestInit) => Promise<Response>;
   parseJsonBody: (response: Response) => Promise<unknown>;
   ApiError: new (status: number, message: string, payload: unknown) => Error;
 };
+
+type AstrologyRequestInit = RequestInit & {
+  timeoutMs?: number;
+};
+
+export const NATAL_CHART_FETCH_TIMEOUT_MS = 60_000;
+export const FULL_NATAL_ANALYSIS_FETCH_TIMEOUT_MS = 120_000;
 
 function resolveApiErrorMessage(payload: unknown, fallback: string) {
   if (payload && typeof payload === 'object') {
@@ -316,6 +360,12 @@ function resolveApiErrorMessage(payload: unknown, fallback: string) {
     }
   }
   return fallback;
+}
+
+function resolveApiErrorCode(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return null;
+  const code = (payload as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
 }
 
 export function createAstrologyApi(deps: AstrologyApiDeps) {
@@ -343,8 +393,9 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
   };
 
   const fetchNatalChart = async (input?: OnboardingData) => {
-    const request: RequestInit = {
+    const request: AstrologyRequestInit = {
       method: 'POST',
+      timeoutMs: NATAL_CHART_FETCH_TIMEOUT_MS,
     };
 
     if (input) {
@@ -419,11 +470,10 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
     return payload as CareerVibePlanResponse;
   };
 
-  const fetchFullNatalCareerAnalysis = async (options?: { refresh?: boolean }) => {
-    const params = new URLSearchParams({
-      refresh: options?.refresh ? 'true' : 'false',
+  const fetchFullNatalCareerAnalysis = async () => {
+    const response = await deps.authorizedFetch('/api/astrology/full-natal-analysis', {
+      timeoutMs: FULL_NATAL_ANALYSIS_FETCH_TIMEOUT_MS,
     });
-    const response = await deps.authorizedFetch(`/api/astrology/full-natal-analysis?${params.toString()}`);
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
       throw new deps.ApiError(
@@ -435,15 +485,34 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
     return payload as FullNatalCareerAnalysisResponse;
   };
 
-  const regenerateFullNatalCareerAnalysis = async () => {
-    const response = await deps.authorizedFetch('/api/astrology/full-natal-analysis/regenerate', {
-      method: 'POST',
-    });
+  const fetchFullNatalCareerAnalysisProgress = async () => {
+    const response = await deps.authorizedFetch('/api/astrology/full-natal-analysis/progress');
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
       throw new deps.ApiError(
         response.status,
-        resolveApiErrorMessage(payload, 'Failed to regenerate full natal analysis'),
+        resolveApiErrorMessage(payload, 'Failed to fetch full natal analysis progress'),
+        payload
+      );
+    }
+    return payload as OperationProgressResponse;
+  };
+
+  const fetchCachedFullNatalCareerAnalysis = async () => {
+    const params = new URLSearchParams({
+      cacheOnly: 'true',
+    });
+    const response = await deps.authorizedFetch(`/api/astrology/full-natal-analysis?${params.toString()}`, {
+      timeoutMs: FULL_NATAL_ANALYSIS_FETCH_TIMEOUT_MS,
+    });
+    const payload = await deps.parseJsonBody(response);
+    if (response.status === 404 && resolveApiErrorCode(payload) === 'full_natal_analysis_not_ready') {
+      return null;
+    }
+    if (!response.ok) {
+      throw new deps.ApiError(
+        response.status,
+        resolveApiErrorMessage(payload, 'Failed to fetch full natal analysis'),
         payload
       );
     }
@@ -505,7 +574,8 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
     fetchMorningBriefing,
     fetchCareerVibePlan,
     fetchFullNatalCareerAnalysis,
-    regenerateFullNatalCareerAnalysis,
+    fetchFullNatalCareerAnalysisProgress,
+    fetchCachedFullNatalCareerAnalysis,
     fetchAiSynergyHistory,
     fetchDiscoverRoles,
   };

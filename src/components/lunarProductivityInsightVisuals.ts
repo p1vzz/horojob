@@ -98,7 +98,7 @@ export const LIGHT_LUNAR_PRODUCTIVITY_PALETTE = {
   retryText: '#677084',
 } as const;
 
-export function resolveLunarProductivityInsightSourcePalette(mode: 'live' | 'preview' | 'fallback', isLight: boolean) {
+export function resolveLunarProductivityInsightSourcePalette(mode: 'live' | 'preview' | 'unavailable', isLight: boolean) {
   if (mode === 'live') {
     return isLight
       ? {
@@ -113,7 +113,7 @@ export function resolveLunarProductivityInsightSourcePalette(mode: 'live' | 'pre
         };
   }
 
-  if (mode === 'fallback') {
+  if (mode === 'unavailable') {
     return isLight
       ? {
           backgroundColor: 'rgba(177,136,56,0.12)',

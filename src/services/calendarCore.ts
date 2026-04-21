@@ -1,7 +1,8 @@
 import type { InterviewStrategyCalendarSyncMap, InterviewStrategyPlan, InterviewStrategySlot } from '../types/interviewStrategy';
 
 const SLOT_MARKER_PREFIX = 'HOROJOB_INTERVIEW_SLOT:';
-const STRATEGY_MARKER_PREFIX = 'HOROJOB_INTERVIEW_STRATEGY:';
+const INTERVIEW_EVENT_TITLE = 'Interview Timing Reminder';
+const HOROJOB_CALENDAR_TITLE = 'Horojob';
 
 export type CalendarPermissionState = {
   status: 'granted' | 'denied' | 'undetermined';
@@ -29,6 +30,21 @@ export type SyncInterviewStrategyCalendarEventsResult = {
   map: InterviewStrategyCalendarSyncMap;
 };
 
+export type RemoveInterviewStrategyCalendarEventsInput = {
+  plan?: InterviewStrategyPlan | null;
+  existingMap: InterviewStrategyCalendarSyncMap;
+  now?: Date;
+};
+
+export type RemoveInterviewStrategyCalendarEventsResult = {
+  deleted: number;
+  failed: number;
+  notFound: number;
+  skipped: number;
+  scanned: number;
+  map: InterviewStrategyCalendarSyncMap;
+};
+
 export type WritableCalendarOption = {
   id: string;
   title: string;
@@ -42,13 +58,19 @@ export type CalendarLike = {
   allowsModifications?: boolean;
   source?: {
     name?: string | null;
+    type?: string | null;
+    isLocalAccount?: boolean | null;
   } | null;
   isPrimary?: boolean;
+  ownerAccount?: string | null;
+  isVisible?: boolean;
+  isSynced?: boolean;
 };
 
 export type CalendarEventLike = {
   id: string;
   calendarId?: string;
+  title?: string | null;
   notes?: string | null;
   startDate?: string | Date | null;
   endDate?: string | Date | null;
@@ -60,6 +82,7 @@ type InterviewEventPayload = {
   startDate: Date;
   endDate: Date;
   timeZone: string;
+  availability: 'free';
   alarms: Array<{ relativeOffset: number }>;
 };
 
@@ -69,10 +92,12 @@ export type CalendarCoreDeps = {
   getCalendarPermissions: () => Promise<{ status: string; canAskAgain?: boolean }>;
   requestCalendarPermissions: () => Promise<{ status: string; canAskAgain?: boolean }>;
   getDefaultCalendar?: () => Promise<CalendarLike | null>;
+  createHorojobCalendar?: () => Promise<string>;
   getEvents: (calendarIds: string[], startAt: Date, endAt: Date) => Promise<CalendarEventLike[]>;
   getEvent: (eventId: string) => Promise<CalendarEventLike | null>;
   updateEvent: (eventId: string, payload: InterviewEventPayload) => Promise<unknown>;
   createEvent: (calendarId: string, payload: InterviewEventPayload) => Promise<string>;
+  deleteEvent: (eventId: string) => Promise<unknown>;
 };
 
 function normalizePermissionResult(permission: { status: string; canAskAgain?: boolean }): CalendarPermissionState {
@@ -108,16 +133,9 @@ function parseSlotIdFromNotes(notes: string | null | undefined) {
   return null;
 }
 
-function buildInterviewEventNotes(slot: InterviewStrategySlot, plan: InterviewStrategyPlan) {
+function buildInterviewEventNotes(slot: InterviewStrategySlot) {
   const note = (slot.calendarNote ?? slot.explanation).replace(/\s+/g, ' ').trim();
-  return [
-    note.length > 0 ? `Why:${note}` : null,
-    `${SLOT_MARKER_PREFIX}${slot.id}`,
-    `${STRATEGY_MARKER_PREFIX}${plan.strategyId}`,
-    `Algorithm:${plan.algorithmVersion}`,
-    `Score:${slot.score}`,
-    `GeneratedAt:${plan.generatedAt}`,
-  ].filter((line): line is string => Boolean(line)).join('\n');
+  return note;
 }
 
 function toTs(dateLike: string | Date | null | undefined) {
@@ -137,13 +155,19 @@ function startsAndEndsMatch(event: CalendarEventLike, slot: InterviewStrategySlo
   return Math.abs(eventStartTs - slotStartTs) < oneMinuteMs && Math.abs(eventEndTs - slotEndTs) < oneMinuteMs;
 }
 
-function buildInterviewEventPayload(slot: InterviewStrategySlot, plan: InterviewStrategyPlan): InterviewEventPayload {
+function isRecognizedInterviewEvent(event: CalendarEventLike) {
+  if (parseSlotIdFromNotes(event.notes)) return true;
+  return event.title === INTERVIEW_EVENT_TITLE;
+}
+
+function buildInterviewEventPayload(slot: InterviewStrategySlot): InterviewEventPayload {
   return {
-    title: 'Interview Focus Block',
-    notes: buildInterviewEventNotes(slot, plan),
+    title: INTERVIEW_EVENT_TITLE,
+    notes: buildInterviewEventNotes(slot),
     startDate: new Date(slot.startAt),
     endDate: new Date(slot.endAt),
     timeZone: slot.timezoneIana,
+    availability: 'free',
     alarms: [{ relativeOffset: -30 }],
   };
 }
@@ -166,6 +190,86 @@ function filterWritableCalendars(calendars: CalendarLike[]) {
   return calendars.filter((calendar) => calendar.allowsModifications !== false);
 }
 
+function isHorojobCalendar(calendar: CalendarLike) {
+  return calendar.title.trim().toLowerCase() === HOROJOB_CALENDAR_TITLE.toLowerCase();
+}
+
+function isLocalCalendar(calendar: CalendarLike) {
+  return calendar.source?.isLocalAccount === true || calendar.source?.type?.toLowerCase() === 'local';
+}
+
+function isSystemCalendar(calendar: CalendarLike) {
+  const title = calendar.title.trim().toLowerCase();
+  return (
+    title.includes('birthday') ||
+    title.includes('holiday') ||
+    title.includes('tasks') ||
+    title.includes('task') ||
+    title.includes('reminder')
+  );
+}
+
+function toWritableCalendarOption(calendar: CalendarLike): WritableCalendarOption {
+  return {
+    id: calendar.id,
+    title: calendar.title,
+    sourceName:
+      typeof calendar.source?.name === 'string' && calendar.source.name.trim().length > 0
+        ? calendar.source.name.trim()
+        : null,
+    isPrimary: calendar.isPrimary === true,
+  };
+}
+
+function resolveMainCalendar(calendars: CalendarLike[]) {
+  const candidates = calendars.filter((calendar) => !isHorojobCalendar(calendar) && !isSystemCalendar(calendar));
+  if (candidates.length === 0) return null;
+
+  const primary = candidates.find((calendar) => calendar.isPrimary === true);
+  if (primary) return primary;
+
+  const eventCalendar = candidates.find((calendar) => calendar.title.trim().toLowerCase() === 'events');
+  if (eventCalendar) return eventCalendar;
+
+  return candidates[0];
+}
+
+function resolveHorojobCalendar(calendars: CalendarLike[], platformOs: string) {
+  const horojobCalendars = calendars.filter(isHorojobCalendar);
+  if (horojobCalendars.length === 0) return null;
+
+  if (platformOs === 'android') {
+    return horojobCalendars.find(isLocalCalendar) ?? null;
+  }
+
+  return horojobCalendars[0];
+}
+
+async function resolveFocusedCalendars(deps: CalendarCoreDeps) {
+  let calendars = filterWritableCalendars(await deps.getCalendars());
+  let mainCalendar = resolveMainCalendar(calendars);
+  let horojobCalendar = resolveHorojobCalendar(calendars, deps.platformOs);
+
+  if (!horojobCalendar && deps.createHorojobCalendar) {
+    try {
+      const createdId = await deps.createHorojobCalendar();
+      calendars = filterWritableCalendars(await deps.getCalendars());
+      mainCalendar = resolveMainCalendar(calendars);
+      horojobCalendar =
+        calendars.find((calendar) => calendar.id === createdId) ?? resolveHorojobCalendar(calendars, deps.platformOs) ?? {
+          id: createdId,
+          title: HOROJOB_CALENDAR_TITLE,
+          allowsModifications: true,
+          isPrimary: false,
+        };
+    } catch {
+      // Fall back to the main writable calendar if the OS/provider rejects calendar creation.
+    }
+  }
+
+  return { horojobCalendar, mainCalendar, calendars };
+}
+
 async function indexStrategyEventsBySlotId(
   deps: CalendarCoreDeps,
   plan: InterviewStrategyPlan,
@@ -186,29 +290,50 @@ async function indexStrategyEventsBySlotId(
   const index = new Map<string, CalendarEventLike>();
   for (const event of events) {
     const slotId = parseSlotIdFromNotes(event.notes);
-    if (!slotId || index.has(slotId)) continue;
-    index.set(slotId, event);
+    if (slotId) {
+      if (!index.has(slotId)) index.set(slotId, event);
+      continue;
+    }
+
+    if (!isRecognizedInterviewEvent(event)) continue;
+    const matchingSlot = plan.slots.find((slot) => startsAndEndsMatch(event, slot));
+    if (matchingSlot && !index.has(matchingSlot.id)) {
+      index.set(matchingSlot.id, event);
+    }
   }
   return index;
 }
 
+function resolveStrategyEventScanRange(plan: InterviewStrategyPlan | null | undefined, now: Date) {
+  const startCandidates =
+    plan?.slots.map((slot) => Date.parse(slot.startAt)).filter((value) => Number.isFinite(value)) ?? [];
+  const endCandidates =
+    plan?.slots.map((slot) => Date.parse(slot.endAt)).filter((value) => Number.isFinite(value)) ?? [];
+
+  if (startCandidates.length > 0 && endCandidates.length > 0) {
+    return {
+      startAt: new Date(Math.min(...startCandidates) - 24 * 60 * 60 * 1000),
+      endAt: new Date(Math.max(...endCandidates) + 24 * 60 * 60 * 1000),
+    };
+  }
+
+  return {
+    startAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    endAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+  };
+}
+
 export function createCalendarService(deps: CalendarCoreDeps) {
   const listWritableCalendarOptions = async (): Promise<WritableCalendarOption[]> => {
-    const calendars = filterWritableCalendars(await deps.getCalendars());
-    const options = calendars.map((calendar) => ({
-      id: calendar.id,
-      title: calendar.title,
-      sourceName:
-        typeof calendar.source?.name === 'string' && calendar.source.name.trim().length > 0
-          ? calendar.source.name.trim()
-          : null,
-      isPrimary: calendar.isPrimary === true,
-    }));
+    const { horojobCalendar, mainCalendar } = await resolveFocusedCalendars(deps);
+    const options: WritableCalendarOption[] = [];
 
-    options.sort((left, right) => {
-      if (left.isPrimary !== right.isPrimary) return left.isPrimary ? -1 : 1;
-      return left.title.localeCompare(right.title);
-    });
+    if (horojobCalendar) {
+      options.push(toWritableCalendarOption(horojobCalendar));
+    }
+    if (mainCalendar && mainCalendar.id !== horojobCalendar?.id) {
+      options.push(toWritableCalendarOption(mainCalendar));
+    }
 
     return options;
   };
@@ -224,27 +349,16 @@ export function createCalendarService(deps: CalendarCoreDeps) {
   };
 
   const resolvePreferredCalendarId = async (preferredCalendarId?: string | null) => {
-    const writableCalendars = filterWritableCalendars(await deps.getCalendars());
-    if (writableCalendars.length === 0) return null;
+    const { horojobCalendar, mainCalendar } = await resolveFocusedCalendars(deps);
+    const focusedCalendars = [horojobCalendar, mainCalendar].filter((calendar): calendar is CalendarLike => Boolean(calendar));
+    if (focusedCalendars.length === 0) return null;
 
     if (preferredCalendarId) {
-      const preferred = writableCalendars.find((calendar) => calendar.id === preferredCalendarId);
+      const preferred = focusedCalendars.find((calendar) => calendar.id === preferredCalendarId);
       if (preferred) return preferred.id;
     }
 
-    if (deps.platformOs === 'ios' && deps.getDefaultCalendar) {
-      try {
-        const defaultCalendar = await deps.getDefaultCalendar();
-        if (defaultCalendar && writableCalendars.some((calendar) => calendar.id === defaultCalendar.id)) {
-          return defaultCalendar.id;
-        }
-      } catch {
-        // Fall back to writable calendar list.
-      }
-    }
-
-    const primary = writableCalendars.find((calendar) => calendar.isPrimary === true);
-    return (primary ?? writableCalendars[0]).id;
+    return (horojobCalendar ?? mainCalendar ?? focusedCalendars[0]).id;
   };
 
   const loadCalendarBusyIntervals = async (input: {
@@ -328,11 +442,15 @@ export function createCalendarService(deps: CalendarCoreDeps) {
         }
       }
 
-      const payload = buildInterviewEventPayload(slot, input.plan);
+      const payload = buildInterviewEventPayload(slot);
 
       if (existingEvent) {
-        const hasMarker = parseSlotIdFromNotes(existingEvent.notes) === slot.id;
-        if (startsAndEndsMatch(existingEvent, slot) && hasMarker) {
+        if (
+          startsAndEndsMatch(existingEvent, slot) &&
+          isRecognizedInterviewEvent(existingEvent) &&
+          existingEvent.title === payload.title &&
+          existingEvent.notes === payload.notes
+        ) {
           skipped += 1;
           nextMap[slot.id] = existingEvent.id;
           continue;
@@ -371,6 +489,90 @@ export function createCalendarService(deps: CalendarCoreDeps) {
     };
   };
 
+  const removeInterviewStrategyCalendarEvents = async (
+    input: RemoveInterviewStrategyCalendarEventsInput
+  ): Promise<RemoveInterviewStrategyCalendarEventsResult> => {
+    let deleted = 0;
+    let failed = 0;
+    let notFound = 0;
+    let skipped = 0;
+    let scanned = 0;
+
+    const remainingMap: InterviewStrategyCalendarSyncMap = { ...input.existingMap };
+    const attemptedEventIds = new Set<string>();
+
+    const deleteMarkedEvent = async (eventId: string) => {
+      if (attemptedEventIds.has(eventId)) return;
+      attemptedEventIds.add(eventId);
+
+      let event: CalendarEventLike | null = null;
+      try {
+        event = await deps.getEvent(eventId);
+      } catch {
+        notFound += 1;
+        for (const [slotId, mappedEventId] of Object.entries(remainingMap)) {
+          if (mappedEventId === eventId) {
+            delete remainingMap[slotId];
+          }
+        }
+        return;
+      }
+
+      if (!event) {
+        notFound += 1;
+        for (const [slotId, mappedEventId] of Object.entries(remainingMap)) {
+          if (mappedEventId === eventId) {
+            delete remainingMap[slotId];
+          }
+        }
+        return;
+      }
+
+      if (!isRecognizedInterviewEvent(event)) {
+        skipped += 1;
+        return;
+      }
+      const slotId = parseSlotIdFromNotes(event.notes);
+
+      try {
+        await deps.deleteEvent(eventId);
+        deleted += 1;
+        for (const [mappedSlotId, mappedEventId] of Object.entries(remainingMap)) {
+          if (mappedEventId === eventId || (slotId && mappedSlotId === slotId)) {
+            delete remainingMap[mappedSlotId];
+          }
+        }
+      } catch {
+        failed += 1;
+      }
+    };
+
+    for (const eventId of new Set(Object.values(input.existingMap))) {
+      await deleteMarkedEvent(eventId);
+    }
+
+    const writableCalendars = filterWritableCalendars(await deps.getCalendars());
+    const calendarIds = writableCalendars.map((calendar) => calendar.id);
+    if (calendarIds.length > 0) {
+      const { startAt, endAt } = resolveStrategyEventScanRange(input.plan, input.now ?? new Date());
+      const events = await deps.getEvents(calendarIds, startAt, endAt);
+      scanned = events.length;
+      for (const event of events) {
+        if (!event.id || !isRecognizedInterviewEvent(event)) continue;
+        await deleteMarkedEvent(event.id);
+      }
+    }
+
+    return {
+      deleted,
+      failed,
+      notFound,
+      skipped,
+      scanned,
+      map: remainingMap,
+    };
+  };
+
   return {
     listWritableCalendarOptions,
     getCalendarPermissionState,
@@ -378,5 +580,6 @@ export function createCalendarService(deps: CalendarCoreDeps) {
     resolvePreferredCalendarId,
     loadCalendarBusyIntervals,
     syncInterviewStrategyCalendarEvents,
+    removeInterviewStrategyCalendarEvents,
   };
 }

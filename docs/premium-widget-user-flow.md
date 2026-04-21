@@ -47,7 +47,7 @@ Keep state in local storage; mirror as analytics events for funnel analysis.
 - If widget is not enabled, show the same briefing content as in-app card.
 - If premium expires, widget shows locked/upgrade state on next refresh.
 - If fresh data fetch fails, widget shows last successful payload with stale timestamp.
-- If Career Vibe plan fetch fails in-app, the dashboard card is explicitly labeled as a sample plan.
+- If Career Vibe plan fetch fails in-app without a saved payload, the dashboard card shows unavailable/preparing copy and does not display sample guidance.
 
 ## Edge Cases
 - Purchase succeeded but entitlement sync is delayed.

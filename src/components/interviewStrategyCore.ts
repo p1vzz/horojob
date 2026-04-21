@@ -13,6 +13,10 @@ export type InterviewStrategyScoreTone = {
   background: string;
 };
 
+type InterviewStrategyScoreToneOptions = {
+  isTopPick?: boolean;
+};
+
 type InterviewStrategyDateFormatters = {
   formatDateLabel?: (value: Date) => string;
   formatTimeLabel?: (value: Date) => string;
@@ -33,14 +37,12 @@ const defaultDateFormatters: Required<Pick<InterviewStrategyDateFormatters, 'for
     }),
 };
 
-export const FALLBACK_INTERVIEW_SLOTS: InterviewSlotRow[] = [
-  { id: 's1', title: 'Tomorrow', timeRange: '10:00 - 11:30 AM', score: 95 },
-  { id: 's2', title: 'Thu, Mar 27', timeRange: '2:00 - 3:30 PM', score: 82 },
-  { id: 's3', title: 'Fri, Mar 28', timeRange: '9:00 - 10:00 AM', score: 78 },
-];
+export const DEFAULT_INTERVIEW_INSIGHT =
+  'Interview Strategy prepares natal-aware timing windows for interviews and follow-ups automatically.';
 
-export const FALLBACK_INTERVIEW_INSIGHT =
-  'Generate your interview strategy to find sparse, natal-aware windows for high-clarity conversations.';
+export const NO_INTERVIEW_WINDOWS_TITLE = 'No standout interview windows yet';
+export const NO_INTERVIEW_WINDOWS_INSIGHT =
+  'Your chart does not show a clean interview timing signal for the upcoming month. Keep applying normally; we will refresh this automatically.';
 
 export function clampInterviewStrategyScore(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -96,9 +98,8 @@ export function buildInterviewStrategyInsight(
 ) {
   const directText = normalizeInterviewInsightText(slot?.explanation);
   if (directText.length >= 68) return directText;
-  if (!slot) return FALLBACK_INTERVIEW_INSIGHT;
+  if (!slot) return DEFAULT_INTERVIEW_INSIGHT;
 
-  const score = clampInterviewStrategyScore(slot.score);
   const dateTitle = formatInterviewStrategySlotTitle(slot.startAt, 0, options);
   const timeRange = formatInterviewStrategyTimeRange(slot.startAt, slot.endAt, options);
   const drivers: string[] = [];
@@ -115,7 +116,7 @@ export function buildInterviewStrategyInsight(
       ? `${drivers.slice(0, 2).join(' and ')}.`
       : 'communication and focus are in a balanced range.';
 
-  return `${dateTitle} (${timeRange}) rates at ${score}% for interviews: ${reason} Use this window for conversations where first impression and clarity matter most.`;
+  return `${dateTitle} (${timeRange}) looks supportive for interviews: ${reason} Use this window for conversations where first impression and clarity matter most.`;
 }
 
 export function toInterviewSlotRows(
@@ -130,24 +131,41 @@ export function toInterviewSlotRows(
   }));
 }
 
-export function resolveInterviewStrategyScoreTone(score: number): InterviewStrategyScoreTone {
-  if (score >= 90) {
+export function resolveInterviewStrategyScoreTone(
+  score: number,
+  options: InterviewStrategyScoreToneOptions = {}
+): InterviewStrategyScoreTone {
+  if (options.isTopPick) {
     return {
       accent: '#38CC88',
-      border: 'rgba(56,204,136,0.38)',
-      background: 'rgba(56,204,136,0.11)',
+      border: 'rgba(56,204,136,0.32)',
+      background: 'rgba(56,204,136,0.08)',
+    };
+  }
+  if (score >= 90) {
+    return {
+      accent: '#C9A84C',
+      border: 'rgba(201,168,76,0.3)',
+      background: 'rgba(201,168,76,0.075)',
     };
   }
   if (score >= 80) {
     return {
-      accent: '#C9A84C',
-      border: 'rgba(201,168,76,0.34)',
-      background: 'rgba(201,168,76,0.1)',
+      accent: '#D9C06B',
+      border: 'rgba(217,192,107,0.24)',
+      background: 'rgba(217,192,107,0.06)',
     };
   }
   return {
-    accent: '#D9C06B',
-    border: 'rgba(217,192,107,0.3)',
-    background: 'rgba(217,192,107,0.09)',
+    accent: '#CFC5A7',
+    border: 'rgba(207,197,167,0.2)',
+    background: 'rgba(255,255,255,0.035)',
   };
+}
+
+export function resolveInterviewStrategyTimingLabel(score: number, options: { isTopPick?: boolean } = {}) {
+  if (options.isTopPick) return 'Best';
+  if (score >= 90) return 'Strong';
+  if (score >= 80) return 'Favorable';
+  return 'Supportive';
 }

@@ -21,13 +21,13 @@ Verify the highest-risk dashboard behavior for burnout and lunar insight cards a
 - `Dashboard` fetches live data only for `premium` users.
 - `free` users do not see dashboard alert cards because live threshold state is not available.
 - `Dashboard` stays behind a full-screen loader until all current async sections needed for the screen are ready.
-- Fallback is per-card:
+- Unavailable state is per-card:
   - if burnout plan fails, lunar card may still render live
   - if lunar plan fails, burnout card may still render live
 - Sync semantics:
   - a premium card being refreshed may show `SYNCING`
   - cards may show `Updated ...` after a successful live sync
-  - push-entry fallback cards show unavailable copy and may show `Try Again`
+  - push-entry unavailable cards show unavailable copy and may show `Try Again`
 - Returning to `Dashboard` should refresh cards on screen focus.
 - Tapping a burnout/lunar push should open `Dashboard`, wait for readiness, then scroll to and briefly highlight the matching card.
 - Burnout card renders only when current-day burnout severity is `warn`, `high`, or `critical`, or as a degraded unavailable card if a burnout push opened the dashboard and live hydration fails.
@@ -75,7 +75,7 @@ Verify the highest-risk dashboard behavior for burnout and lunar insight cards a
   - dev logs include `dashboard_alert_opened_from_push` and `dashboard_alert_push_target_focused` with `alertFocus=lunar`
   - if targeted live hydration fails, the app can show the degraded unavailable card with `Try Again`
 
-### 3. Per-Card Fallback Isolation
+### 3. Per-Card Unavailable Isolation
 
 - Use a premium scenario where one plan is unavailable while the other still succeeds.
 - Acceptable ways to simulate:
@@ -84,7 +84,7 @@ Verify the highest-risk dashboard behavior for burnout and lunar insight cards a
 - Expected:
   - regular dashboard opens keep the affected alert card hidden if threshold cannot be confirmed
   - push-entry opens may show affected unavailable copy instead of frozen score/severity/metrics
-  - push-entry fallback exposes `Try Again`
+  - push-entry unavailable state exposes `Try Again`
   - if push-entry hydration succeeds below threshold, dev logs include `dashboard_alert_push_target_hidden`
   - unaffected card still renders live snapshot
   - unaffected card should not be forced back into `SYNCING` when retrying the failed card manually
@@ -142,7 +142,7 @@ Minimum summary rows:
 - `Free baseline`
 - `Premium live hydration`
 - `Push entry targeting`
-- `Per-card fallback isolation`
+- `Per-card unavailable isolation`
 - `Settings-to-dashboard refresh`
 - `Lunar push suppression`
 - `Burnout push suppression`

@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createAstrologyApi } from './astrologyApiCore';
+import {
+  createAstrologyApi,
+  FULL_NATAL_ANALYSIS_FETCH_TIMEOUT_MS,
+  NATAL_CHART_FETCH_TIMEOUT_MS,
+} from './astrologyApiCore';
+
+type TestRequestInit = RequestInit & {
+  timeoutMs?: number;
+};
 
 class FakeApiError extends Error {
   status: number;
@@ -84,8 +92,92 @@ test('astrology api career vibe plan query defaults to refresh=false', async () 
   ]);
 });
 
+test('astrology api full natal analysis uses extended timeout for generation', async () => {
+  const calls: Array<{ path: string; init?: TestRequestInit }> = [];
+  const api = createAstrologyApi({
+    authorizedFetch: async (path, init) => {
+      calls.push({ path, init });
+      return new Response(JSON.stringify({}), { status: 200 });
+    },
+    parseJsonBody: async () => ({}),
+    ApiError: FakeApiError as never,
+  });
+
+  await api.fetchFullNatalCareerAnalysis();
+
+  assert.deepEqual(
+    calls.map((call) => call.path),
+    [
+      '/api/astrology/full-natal-analysis',
+    ]
+  );
+  assert.deepEqual(
+    calls.map((call) => call.init?.timeoutMs),
+    [
+      FULL_NATAL_ANALYSIS_FETCH_TIMEOUT_MS,
+    ]
+  );
+});
+
+test('astrology api full natal progress uses generic progress endpoint', async () => {
+  const paths: string[] = [];
+  const api = createAstrologyApi({
+    authorizedFetch: async (path) => {
+      paths.push(path);
+      return new Response(JSON.stringify({ operation: 'full_natal_career_analysis' }), { status: 200 });
+    },
+    parseJsonBody: async () => ({ operation: 'full_natal_career_analysis' }),
+    ApiError: FakeApiError as never,
+  });
+
+  const payload = await api.fetchFullNatalCareerAnalysisProgress();
+
+  assert.deepEqual(paths, ['/api/astrology/full-natal-analysis/progress']);
+  assert.equal(payload.operation, 'full_natal_career_analysis');
+});
+
+test('astrology api cached full natal analysis returns null when report is not generated', async () => {
+  const paths: string[] = [];
+  const api = createAstrologyApi({
+    authorizedFetch: async (path) => {
+      paths.push(path);
+      return new Response(JSON.stringify({ error: 'Full natal analysis has not been generated yet.' }), {
+        status: 404,
+      });
+    },
+    parseJsonBody: async () => ({
+      error: 'Full natal analysis has not been generated yet.',
+      code: 'full_natal_analysis_not_ready',
+    }),
+    ApiError: FakeApiError as never,
+  });
+
+  const payload = await api.fetchCachedFullNatalCareerAnalysis();
+
+  assert.equal(payload, null);
+  assert.deepEqual(paths, ['/api/astrology/full-natal-analysis?cacheOnly=true']);
+});
+
+test('astrology api cached full natal analysis preserves setup errors', async () => {
+  const api = createAstrologyApi({
+    authorizedFetch: async () => new Response(JSON.stringify({ error: 'Natal chart not found.' }), { status: 404 }),
+    parseJsonBody: async () => ({ error: 'Natal chart not found.' }),
+    ApiError: FakeApiError as never,
+  });
+
+  await assert.rejects(
+    () => api.fetchCachedFullNatalCareerAnalysis(),
+    (error: unknown) => {
+      assert.ok(error instanceof FakeApiError);
+      assert.equal(error.status, 404);
+      assert.equal(error.message, 'Natal chart not found.');
+      return true;
+    }
+  );
+});
+
 test('astrology api natal chart sends POST body and surfaces backend error message', async () => {
-  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const calls: Array<{ path: string; init?: TestRequestInit }> = [];
   const successApi = createAstrologyApi({
     authorizedFetch: async (path, init) => {
       calls.push({ path, init });
@@ -108,6 +200,7 @@ test('astrology api natal chart sends POST body and surfaces backend error messa
   assert.equal(calls.length, 1);
   assert.equal(calls[0].path, '/api/astrology/natal-chart');
   assert.equal(calls[0].init?.method, 'POST');
+  assert.equal(calls[0].init?.timeoutMs, NATAL_CHART_FETCH_TIMEOUT_MS);
   assert.equal((calls[0].init?.headers as Record<string, string>)['Content-Type'], 'application/json');
   const body = JSON.parse(String(calls[0].init?.body));
   assert.equal(body.city, 'Warsaw');

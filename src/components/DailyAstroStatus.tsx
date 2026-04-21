@@ -6,89 +6,107 @@ import { Canvas, Rect, RadialGradient, vec, Blur, Group } from '@shopify/react-n
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Stop, Rect as SvgRect } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import type { CareerVibePlanResponse } from '../services/astrologyApi';
-import { syncCareerVibePlanCache, type CareerVibePlanSourceMode } from '../services/careerVibePlanSync';
+import {
+  getCachedCareerVibePlanForCurrentUser,
+  syncCareerVibePlanCache,
+  type CareerVibePlanSourceMode,
+} from '../services/careerVibePlanSync';
 import type { AppNavigationProp } from '../types/navigation';
 import { useAppTheme } from '../theme/ThemeModeProvider';
 import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
 import { adaptColorOpacity, adaptOpacity } from '../utils/brightnessAdaptation';
 import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
+import type { DashboardCareerFeaturePrerequisites } from '../hooks/useDashboardPrerequisites';
 
-const FALLBACK_CAREER_PLAN: CareerVibePlanResponse = {
-  dateKey: 'sample',
-  cached: false,
-  schemaVersion: 'career-vibe-plan-v1',
-  tier: 'free',
-  narrativeSource: 'template',
-  model: 'fallback',
-  promptVersion: 'fallback',
-  generatedAt: '',
-  staleAfter: '',
-  modeLabel: 'High Execution Mode',
-  metrics: {
-    energy: 92,
-    focus: 78,
-    luck: 65,
-    opportunity: 65,
-    aiSynergy: 82,
-  },
-  plan: {
-    headline: 'Mars in 10th House',
-    summary: 'Strong execution energy is available today. Close one important task before opening new threads.',
-    primaryAction: 'Close one meaningful deliverable before opening new threads.',
-    bestFor: ['Deep work', 'Shipping decisions', 'AI-assisted drafting'],
-    avoid: ['Rushing final approvals', 'Breaking deep work with low-value pings'],
-    peakWindow: '2-4 PM',
-    focusStrategy: 'Put the hardest work in the first protected block, then move admin work after the deliverable is closed.',
-    communicationStrategy: 'Use the strongest window for specific asks and follow-ups with a clear next step.',
-    aiWorkStrategy: 'Use AI for structured drafts and review checklists, then run a final human approval pass.',
-    riskGuardrail: 'Close the loop with one explicit review checkpoint before expanding scope.',
-  },
-  explanation: {
-    drivers: ['Sample plan is shown while fresh career signals are unavailable.'],
-    cautions: ['Open Horojob again when the connection is stable to refresh the plan.'],
-    metricNotes: [],
-  },
-  sources: {
-    dailyTransitDateKey: 'sample',
-    aiSynergyDateKey: null,
-    dailyVibeAlgorithmVersion: 'fallback',
-    aiSynergyAlgorithmVersion: null,
-  },
-};
+const SkeletonBar = ({
+  width,
+  height,
+  color,
+}: {
+  width: number | `${number}%`;
+  height: number;
+  color: string;
+}) => (
+  <View
+    style={{
+      width,
+      height,
+      borderRadius: 6,
+      backgroundColor: color,
+    }}
+  />
+);
 
-export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
+export const DailyAstroStatus = ({
+  onReady,
+  careerPrerequisites,
+}: {
+  onReady?: () => void;
+  careerPrerequisites?: DashboardCareerFeaturePrerequisites;
+}) => {
   const theme = useAppTheme();
   const navigation = useNavigation<AppNavigationProp<'Dashboard'>>();
   const { channels } = useBrightnessAdaptation();
-  const [careerPlan, setCareerPlan] = useState<CareerVibePlanResponse>(FALLBACK_CAREER_PLAN);
+  const [careerPlan, setCareerPlan] = useState<CareerVibePlanResponse | null>(null);
   const [sourceMode, setSourceMode] = useState<CareerVibePlanSourceMode>('empty');
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
   const hasSignaledReadyRef = React.useRef(false);
+  const displayPlan = careerPlan;
+  const isPlanNarrativeReady = Boolean(displayPlan?.plan && displayPlan.narrativeStatus === 'ready');
+  const shouldShowSkeleton = isLoading && !careerPlan;
+  const isCareerPlanBlocked = careerPrerequisites?.isReadyForCareerFeatures === false;
+  const canPressPlanAction =
+    !shouldShowSkeleton &&
+    careerPrerequisites?.reason !== 'checking' &&
+    (isCareerPlanBlocked || isPlanNarrativeReady);
   const openPlan = React.useCallback(() => {
+    if (!canPressPlanAction) return;
+    if (isCareerPlanBlocked) {
+      navigation.navigate('NatalChart');
+      return;
+    }
     navigation.navigate('CareerVibePlan');
-  }, [navigation]);
+  }, [canPressPlanAction, isCareerPlanBlocked, navigation]);
   const statusLabel = React.useMemo(() => {
     if (SHOULD_EXPOSE_TECHNICAL_SURFACES) {
-      return isLoading ? 'Syncing...' : sourceMode === 'cache' ? 'Saved' : errorText ? 'Sample' : careerPlan.cached ? 'Cached' : 'Today';
+      return isLoading
+        ? 'Syncing...'
+        : sourceMode === 'cache'
+          ? 'Saved'
+          : errorText || !isPlanNarrativeReady
+            ? displayPlan?.narrativeStatus ?? 'Unavailable'
+            : displayPlan?.cached
+              ? 'Cached'
+              : 'Today';
     }
     if (isLoading) return 'Updating';
-    if (errorText) return 'Preview';
+    if (displayPlan?.narrativeStatus === 'pending') return 'Preparing';
+    if (errorText || !isPlanNarrativeReady) return 'Unavailable';
     return 'Today';
-  }, [careerPlan.cached, errorText, isLoading, sourceMode]);
+  }, [displayPlan?.cached, displayPlan?.narrativeStatus, errorText, isLoading, isPlanNarrativeReady, sourceMode]);
   const displayErrorText = React.useMemo(() => {
-    if (!errorText) return null;
-    if (SHOULD_EXPOSE_TECHNICAL_SURFACES) return errorText;
+    if (!errorText && isPlanNarrativeReady) return null;
+    if (SHOULD_EXPOSE_TECHNICAL_SURFACES) return errorText ?? `Narrative status: ${displayPlan?.narrativeStatus ?? 'missing'}`;
     if (sourceMode === 'cache') return "Showing your saved plan while today's update is unavailable.";
-    return "Today's Career Vibe could not update yet. Reopen Horojob when the connection is stable.";
-  }, [errorText, sourceMode]);
+    if (displayPlan?.narrativeStatus === 'pending') return "Today's plan is still preparing. The metrics are ready.";
+    return "Today's Career Vibe could not prepare the full plan yet. Try again when the connection is stable.";
+  }, [displayPlan?.narrativeStatus, errorText, isPlanNarrativeReady, sourceMode]);
 
   useEffect(() => {
     let mounted = true;
     const run = async () => {
       setIsLoading(true);
       try {
+        const cached = await getCachedCareerVibePlanForCurrentUser();
+        if (!mounted) return;
+        if (cached.payload) {
+          setCareerPlan(cached.payload);
+          setSourceMode(cached.source);
+          setErrorText(cached.errorText);
+        }
+
         const result = await syncCareerVibePlanCache();
         if (!mounted) return;
         if (result.snapshot.payload) {
@@ -96,15 +114,15 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
           setSourceMode(result.snapshot.source);
           setErrorText(result.snapshot.errorText);
         } else {
-          setCareerPlan(FALLBACK_CAREER_PLAN);
+          setCareerPlan(null);
           setSourceMode('empty');
-          setErrorText(result.snapshot.errorText ?? 'Using sample plan. Fresh career signals did not sync.');
+          setErrorText(result.snapshot.errorText ?? 'Fresh career signals did not sync.');
         }
       } catch {
         if (mounted) {
-          setCareerPlan(FALLBACK_CAREER_PLAN);
+          setCareerPlan(null);
           setSourceMode('empty');
-          setErrorText('Using sample plan. Fresh career signals did not sync.');
+          setErrorText('Fresh career signals did not sync.');
         }
       } finally {
         if (mounted) {
@@ -119,17 +137,22 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
   }, []);
 
   useEffect(() => {
+    if (shouldShowSkeleton || !displayPlan?.plan) {
+      setTyped('');
+      return;
+    }
     let i = 0;
+    const summary = displayPlan.plan.summary;
     const interval = setInterval(() => {
-      if (i <= careerPlan.plan.summary.length) {
-        setTyped(careerPlan.plan.summary.slice(0, i));
+      if (i <= summary.length) {
+        setTyped(summary.slice(0, i));
         i++;
       } else {
         clearInterval(interval);
       }
     }, 30);
     return () => clearInterval(interval);
-  }, [careerPlan.plan.summary]);
+  }, [displayPlan?.plan, shouldShowSkeleton]);
 
   useEffect(() => {
     if (!isLoading && !hasSignaledReadyRef.current) {
@@ -137,6 +160,18 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
       onReady?.();
     }
   }, [isLoading, onReady]);
+
+  const skeletonColor = adaptColorOpacity('rgba(255,255,255,0.09)', channels.glowOpacityMultiplier);
+  const skeletonAccent = adaptColorOpacity('rgba(201,168,76,0.16)', channels.glowOpacityMultiplier);
+  const buttonLabel = shouldShowSkeleton
+    ? 'Preparing plan'
+    : careerPrerequisites?.isReadyForCareerFeatures === false
+      ? careerPrerequisites.actionLabel
+      : isPlanNarrativeReady
+        ? 'Open full plan'
+        : displayPlan?.narrativeStatus === 'pending'
+          ? 'Preparing plan'
+          : 'Plan unavailable';
 
   return (
     <View className="px-5 py-2">
@@ -265,12 +300,17 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
         <View className="mb-5">
           <View className="flex-row items-center mb-2">
             <Zap size={16} color={theme.colors.gold} style={{ marginRight: 6 }} />
-            <Text
-              className="text-[16px] font-semibold tracking-tight"
-              style={{ color: theme.colors.foreground, flexShrink: 1 }}
-            >
-              {careerPlan.plan.headline}
-            </Text>
+            {shouldShowSkeleton ? (
+              <SkeletonBar width="68%" height={18} color={skeletonColor} />
+            ) : (
+              <Text
+                className="text-[16px] font-semibold tracking-tight"
+                style={{ color: theme.colors.foreground, flexShrink: 1 }}
+              >
+                {displayPlan?.plan?.headline ??
+                  (displayPlan?.narrativeStatus === 'pending' ? "Today's plan is preparing" : 'Career Vibe is unavailable')}
+              </Text>
+            )}
           </View>
 
           <View className="mb-3">
@@ -282,9 +322,13 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
                 borderWidth: 1,
               }}
             >
-              <Text className="text-[12px] font-semibold" style={{ color: theme.colors.gold }}>
-                {careerPlan.modeLabel}
-              </Text>
+              {shouldShowSkeleton ? (
+                <SkeletonBar width={118} height={15} color={skeletonAccent} />
+              ) : (
+                <Text className="text-[12px] font-semibold" style={{ color: theme.colors.gold }}>
+                  {displayPlan?.modeLabel ?? 'Career Vibe'}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -302,21 +346,37 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
             >
               Best move
             </Text>
-            <Text className="text-[14px] leading-[20px] font-semibold" style={{ color: theme.colors.foreground }}>
-              {careerPlan.plan.primaryAction}
-            </Text>
+            {shouldShowSkeleton ? (
+              <View style={{ height: 42, justifyContent: 'center' }}>
+                <SkeletonBar width="92%" height={13} color={skeletonColor} />
+                <View style={{ height: 8 }} />
+                <SkeletonBar width="58%" height={13} color={skeletonColor} />
+              </View>
+            ) : (
+              <Text className="text-[14px] leading-[20px] font-semibold" style={{ color: theme.colors.foreground }}>
+                {displayPlan?.plan?.primaryAction ?? 'The full plan text is not ready yet.'}
+              </Text>
+            )}
           </View>
 
           <View className="flex-row items-center min-h-[44px]">
-            <Text
-              className="text-[14px] leading-[22px]"
-              style={{ color: adaptColorOpacity('rgba(212,212,224,0.75)', channels.textOpacityMultiplier) }}
-            >
-              {typed}
-            </Text>
+            {shouldShowSkeleton ? (
+              <View style={{ width: '100%' }}>
+                <SkeletonBar width="96%" height={13} color={skeletonColor} />
+                <View style={{ height: 9 }} />
+                <SkeletonBar width="74%" height={13} color={skeletonColor} />
+              </View>
+            ) : (
+              <Text
+                className="text-[14px] leading-[22px]"
+                style={{ color: adaptColorOpacity('rgba(212,212,224,0.75)', channels.textOpacityMultiplier) }}
+              >
+                {typed || displayErrorText}
+              </Text>
+            )}
           </View>
 
-          {displayErrorText ? (
+          {!shouldShowSkeleton && displayErrorText ? (
             <Text
               className="text-[11px] leading-[16px] mt-2"
               style={{ color: adaptColorOpacity('rgba(201,168,76,0.72)', channels.textOpacityMultiplier) }}
@@ -327,7 +387,19 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
 
           <View className="mt-3">
             <View className="flex-row flex-wrap">
-              {careerPlan.plan.bestFor.slice(0, 3).map((item) => (
+              {shouldShowSkeleton ? [72, 96, 82].map((item) => (
+                <View
+                  key={`best-skeleton:${item}`}
+                  className="px-2.5 py-1 rounded-md mr-2 mb-2"
+                  style={{
+                    backgroundColor: adaptColorOpacity('rgba(56,204,136,0.08)', channels.glowOpacityMultiplier),
+                    borderColor: adaptColorOpacity('rgba(56,204,136,0.12)', channels.borderOpacityMultiplier),
+                    borderWidth: 1,
+                  }}
+                >
+                  <SkeletonBar width={item} height={13} color={adaptColorOpacity('rgba(56,204,136,0.16)', channels.glowOpacityMultiplier)} />
+                </View>
+              )) : (displayPlan?.plan?.bestFor ?? []).slice(0, 3).map((item) => (
                 <View
                   key={`best:${item}`}
                   className="px-2.5 py-1 rounded-md mr-2 mb-2"
@@ -343,22 +415,26 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
                 </View>
               ))}
             </View>
-            <Text
-              className="text-[12px] leading-[17px]"
-              numberOfLines={2}
-              style={{ color: adaptColorOpacity('rgba(212,212,224,0.52)', channels.textOpacityMultiplier) }}
-            >
-              Avoid: {careerPlan.plan.avoid.slice(0, 2).join(' | ')}
-            </Text>
+            {shouldShowSkeleton ? (
+              <SkeletonBar width="84%" height={13} color={skeletonColor} />
+            ) : displayPlan?.plan ? (
+              <Text
+                className="text-[12px] leading-[17px]"
+                numberOfLines={2}
+                style={{ color: adaptColorOpacity('rgba(212,212,224,0.52)', channels.textOpacityMultiplier) }}
+              >
+                Avoid: {displayPlan.plan.avoid.slice(0, 2).join(' | ')}
+              </Text>
+            ) : null}
           </View>
         </View>
 
         <View className="flex-row flex-wrap" style={{ gap: 10 }}>
           {[
-            { label: 'Energy', value: careerPlan.metrics.energy, color: '#C9A84C' },
-            { label: 'Focus', value: careerPlan.metrics.focus, color: '#5A3ACC' },
-            { label: 'Opportunity', value: careerPlan.metrics.opportunity, color: '#38CC88' },
-            { label: 'AI Fit', value: careerPlan.metrics.aiSynergy, color: '#A08CFF' },
+            { label: 'Energy', value: displayPlan?.metrics.energy ?? null, color: '#C9A84C' },
+            { label: 'Focus', value: displayPlan?.metrics.focus ?? null, color: '#5A3ACC' },
+            { label: 'Opportunity', value: displayPlan?.metrics.opportunity ?? null, color: '#38CC88' },
+            { label: 'AI Fit', value: displayPlan?.metrics.aiSynergy ?? null, color: '#A08CFF' },
           ].map((stat) => (
             <View key={stat.label} style={{ width: '47%' }}>
               <View className="flex-row justify-between items-center mb-1.5">
@@ -368,9 +444,13 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
                 >
                   {stat.label}
                 </Text>
-                <Text className="text-[10px] font-bold" style={{ color: stat.color }}>
-                  {stat.value}%
-                </Text>
+                {shouldShowSkeleton ? (
+                  <SkeletonBar width={28} height={10} color={skeletonColor} />
+                ) : (
+                  <Text className="text-[10px] font-bold" style={{ color: stat.color }}>
+                    {stat.value === null ? '--' : `${stat.value}%`}
+                  </Text>
+                )}
               </View>
               <View
                 className="h-1 rounded-full overflow-hidden"
@@ -380,7 +460,7 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
               >
                 <View
                   className="h-full rounded-full"
-                  style={{ width: `${stat.value}%`, backgroundColor: stat.color }}
+                  style={{ width: shouldShowSkeleton || stat.value === null ? '46%' : `${stat.value}%`, backgroundColor: stat.color }}
                 />
               </View>
             </View>
@@ -389,15 +469,17 @@ export const DailyAstroStatus = ({ onReady }: { onReady?: () => void }) => {
 
         <Pressable
           onPress={openPlan}
+          disabled={!canPressPlanAction}
           className="flex-row items-center justify-center mt-4 rounded-[14px] py-3"
           style={{
+            opacity: canPressPlanAction ? 1 : 0.7,
             backgroundColor: adaptColorOpacity('rgba(201,168,76,0.1)', channels.glowOpacityMultiplier),
             borderColor: adaptColorOpacity('rgba(201,168,76,0.18)', channels.borderOpacityMultiplier),
             borderWidth: 1,
           }}
         >
           <Text className="text-[13px] font-black" style={{ color: theme.colors.gold }}>
-            Open full plan
+            {buttonLabel}
           </Text>
           <ChevronRight size={15} color={theme.colors.gold} style={{ marginLeft: 4 }} />
         </Pressable>

@@ -28,8 +28,8 @@ test('dashboard insights core keeps frozen defaults for non-premium plans', () =
 test('dashboard insights core exposes unavailable state without preview source', () => {
   const state = createUnavailableDashboardInsightsState();
 
-  assert.equal(state.burnout.source, 'fallback');
-  assert.equal(state.lunar.source, 'fallback');
+  assert.equal(state.burnout.source, 'unavailable');
+  assert.equal(state.lunar.source, 'unavailable');
   assert.equal(state.burnout.isHydrating, false);
   assert.equal(state.lunar.isHydrating, false);
   assert.equal(state.burnout.lastSyncedAt, null);
@@ -57,7 +57,7 @@ test('dashboard insights core maps premium results into live snapshots', () => {
   assert.equal(state.lunar.lastSyncedAt, '2026-03-31T08:46:00.000Z');
 });
 
-test('dashboard insights core falls back per-card when premium fetch fails', () => {
+test('dashboard insights core uses per-card unavailable state when premium fetch fails', () => {
   const state = resolveDashboardInsightsState({
     plan: 'premium',
     burnoutResult: { status: 'rejected', reason: new Error('burnout failed') },
@@ -66,7 +66,7 @@ test('dashboard insights core falls back per-card when premium fetch fails', () 
     referenceDate: new Date('2026-03-31T10:00:00.000Z'),
   });
 
-  assert.equal(state.burnout.source, 'fallback');
+  assert.equal(state.burnout.source, 'unavailable');
   assert.equal(state.lunar.source, 'live');
   assert.equal(state.burnout.snapshot.headline, 'Reduce Load Before It Spikes');
   assert.equal(state.lunar.snapshot.headline, 'Protect Your Focus Window');

@@ -4,13 +4,16 @@ import type { WritableCalendarOption } from '../../services/calendar';
 import {
   getCalendarPermissionState,
   listWritableCalendarOptions,
+  removeInterviewStrategyCalendarEvents,
   requestCalendarPermission,
   resolvePreferredCalendarId,
   syncInterviewStrategyCalendarEvents,
 } from '../../services/calendar';
 import { trackAnalyticsEvent } from '../../services/analytics';
 import { ApiError, ensureAuthSession } from '../../services/authSession';
+import { syncNatalChartCache } from '../../services/natalChartSync';
 import type { SubscriptionPlan } from '../../services/morningBriefingSync';
+import { syncInterviewStrategyPlan } from '../../services/interviewStrategyPlanSync';
 import {
   fetchInterviewStrategyPlan,
   upsertInterviewStrategySettings,
@@ -29,6 +32,7 @@ import {
   saveInterviewStrategyCalendarSyncMapForUser,
   saveInterviewStrategySelectedCalendarIdForUser,
 } from '../../utils/interviewStrategyStorage';
+import { resolveInterviewStrategyPreparationAlert } from './interviewStrategySettingsCore';
 import { resolveDeviceTimezoneIana } from '../settingsScreenCore';
 
 export function useInterviewStrategySettings(args: {
@@ -50,18 +54,27 @@ export function useInterviewStrategySettings(args: {
   const [isInterviewSectionExpanded, setIsInterviewSectionExpanded] = React.useState(false);
   const [isGeneratingInterviewPlan, setIsGeneratingInterviewPlan] = React.useState(false);
   const [isSyncingInterviewCalendar, setIsSyncingInterviewCalendar] = React.useState(false);
+  const [isRemovingInterviewCalendarEvents, setIsRemovingInterviewCalendarEvents] = React.useState(false);
   const [isSavingInterviewSettings, setIsSavingInterviewSettings] = React.useState(false);
   const [interviewSyncSummary, setInterviewSyncSummary] = React.useState<string | null>(null);
+  const [interviewErrorText, setInterviewErrorText] = React.useState<string | null>(null);
 
   const selectedInterviewCalendarOption = interviewSelectedCalendarId
     ? interviewCalendarOptions.find((option) => option.id === interviewSelectedCalendarId) ?? null
     : null;
+  const hasInterviewCalendarEvents = Object.keys(interviewCalendarSyncMap).length > 0;
 
   const resolveActiveUserId = async () => {
     if (sessionUserId) return sessionUserId;
     const session = await ensureAuthSession();
     setSessionUserId(session.user.id);
     return session.user.id;
+  };
+
+  const ensureInterviewStrategyNatalChartReady = async () => {
+    const syncResult = await syncNatalChartCache();
+    if (syncResult.status === 'synced') return;
+    throw new Error(syncResult.errorText);
   };
 
   const resetInterviewState = (options?: { clearSessionUserId?: boolean }) => {
@@ -77,6 +90,7 @@ export function useInterviewStrategySettings(args: {
     setIsInterviewCalendarListVisible(false);
     setIsInterviewSectionExpanded(false);
     setInterviewSyncSummary(null);
+    setInterviewErrorText(null);
   };
 
   const performInterviewCalendarSync = (
@@ -89,11 +103,11 @@ export function useInterviewStrategySettings(args: {
 
     if (!targetPlan || targetPlan.slots.length === 0) {
       if (!silent) {
-        Alert.alert('Generate Plan First', 'Generate interview strategy before adding events to calendar.');
+        Alert.alert('No Windows to Add', 'Interview windows are still preparing, or there are no standout windows right now.');
       }
       return;
     }
-    if (isSyncingInterviewCalendar) return;
+    if (isSyncingInterviewCalendar || isRemovingInterviewCalendarEvents) return;
 
     setIsSyncingInterviewCalendar(true);
     setInterviewSyncSummary(null);
@@ -122,7 +136,7 @@ export function useInterviewStrategySettings(args: {
           if (!silent) {
             Alert.alert(
               'Calendar Permission Required',
-              'Enable calendar access in system settings to sync interview strategy slots.'
+              'Enable calendar access in system settings to add interview reminders.'
             );
           }
           return;
@@ -148,21 +162,10 @@ export function useInterviewStrategySettings(args: {
         setInterviewCalendarSyncMap(syncResult.map);
         await saveInterviewStrategyCalendarSyncMapForUser(userId, syncResult.map);
 
-        const summaryParts = [
-          `Added ${syncResult.created}`,
-          `Updated ${syncResult.updated}`,
-          `Skipped ${syncResult.skipped}`,
-        ];
-        if (syncResult.recovered > 0) {
-          summaryParts.push(`Recovered links ${syncResult.recovered}`);
-        }
-        if (syncResult.pruned > 0) {
-          summaryParts.push(`Pruned stale ${syncResult.pruned}`);
-        }
-        if (syncResult.failed > 0) {
-          summaryParts.push(`Failed ${syncResult.failed}`);
-        }
-        const summary = summaryParts.join(' | ');
+        const summary =
+          syncResult.failed > 0
+            ? 'Some calendar reminders could not be updated. Try again in a moment.'
+            : 'Calendar reminders are up to date.';
         setInterviewSyncSummary(summary);
 
         trackAnalyticsEvent('interview_strategy_calendar_sync_completed', {
@@ -176,16 +179,99 @@ export function useInterviewStrategySettings(args: {
         });
 
         if (!silent) {
-          Alert.alert('Calendar Sync Complete', summary);
+          Alert.alert('Calendar Updated', summary);
         }
       } catch {
         if (!silent) {
-          Alert.alert('Sync Failed', 'Could not sync interview slots to calendar right now.');
+          Alert.alert('Sync Failed', 'Could not update interview reminders right now.');
         }
       } finally {
         setIsSyncingInterviewCalendar(false);
       }
     })();
+  };
+
+  const removeInterviewCalendarEvents = async (options?: { requestPermission?: boolean; silent?: boolean }) => {
+    const requestPermission = options?.requestPermission ?? true;
+    const silent = options?.silent ?? false;
+    if (isRemovingInterviewCalendarEvents) return null;
+
+    setIsRemovingInterviewCalendarEvents(true);
+    try {
+      const permissionState = requestPermission
+        ? await requestCalendarPermission()
+        : await getCalendarPermissionState();
+      const permissionCache: InterviewStrategyCalendarPermissionCache = {
+        status: permissionState.status,
+        canAskAgain: permissionState.canAskAgain,
+        updatedAt: new Date().toISOString(),
+      };
+      setInterviewCalendarPermissionCache(permissionCache);
+
+      const userId = await resolveActiveUserId();
+      await saveInterviewStrategyCalendarPermissionCacheForUser(userId, permissionCache);
+
+      if (permissionState.status !== 'granted') {
+        if (!silent) {
+          Alert.alert(
+            'Calendar Permission Required',
+            permissionState.canAskAgain
+              ? 'Allow calendar access to remove Horojob interview windows from this device.'
+              : 'Enable calendar access in system settings to remove Horojob interview windows.'
+          );
+        }
+        return null;
+      }
+
+      const result = await removeInterviewStrategyCalendarEvents({
+        plan: interviewPlan,
+        existingMap: interviewCalendarSyncMap,
+      });
+      setInterviewCalendarSyncMap(result.map);
+      await saveInterviewStrategyCalendarSyncMapForUser(userId, result.map);
+
+      const summary =
+        result.deleted > 0
+          ? 'Removed Horojob interview reminders from this device.'
+          : 'No Horojob interview reminders were found on this device.';
+      const detail = result.failed > 0 ? `${summary} Some reminders could not be removed.` : summary;
+      setInterviewSyncSummary(detail);
+
+      trackAnalyticsEvent('interview_strategy_calendar_remove_completed', {
+        deleted: result.deleted,
+        failed: result.failed,
+        notFound: result.notFound,
+        skipped: result.skipped,
+        scanned: result.scanned,
+        source: silent ? 'auto' : 'manual',
+      });
+
+      if (!silent) {
+        Alert.alert('Calendar Cleaned Up', detail);
+      }
+
+      return result;
+    } catch {
+      if (!silent) {
+        Alert.alert('Calendar Cleanup Failed', 'Could not remove interview windows from calendar right now.');
+      }
+      return null;
+    } finally {
+      setIsRemovingInterviewCalendarEvents(false);
+    }
+  };
+
+  const handleRemoveInterviewStrategyFromCalendar = () => {
+    if (plan !== 'premium') {
+      trackAnalyticsEvent('interview_strategy_premium_gate_hit', { source: 'settings_calendar_remove' });
+      navigateToPremium();
+      return;
+    }
+    if (isSyncingInterviewCalendar || isRemovingInterviewCalendarEvents || isSavingInterviewSettings) return;
+    trackAnalyticsEvent('interview_strategy_calendar_remove_tapped', {
+      hasCalendarEvents: hasInterviewCalendarEvents,
+    });
+    void removeInterviewCalendarEvents({ requestPermission: true, silent: false });
   };
 
   const bootstrapInterviewState = async (
@@ -210,18 +296,32 @@ export function useInterviewStrategySettings(args: {
     setIsInterviewCalendarListVisible(false);
     setIsInterviewSectionExpanded(false);
     setInterviewSyncSummary(null);
+    setInterviewErrorText(null);
 
     if (effectivePlan !== 'premium') {
       return;
     }
 
     try {
-      const interviewPayload = await fetchInterviewStrategyPlan({ refresh: false });
+      const { payload: interviewPayload } = await syncInterviewStrategyPlan({ autoEnable: true });
       if (!isMounted()) return;
 
       setInterviewSettings(interviewPayload.settings);
       setInterviewPlan(interviewPayload.plan);
-      setIsInterviewSectionExpanded(Boolean(interviewPayload.settings.enabled || interviewPayload.plan.slots.length > 0));
+      setIsInterviewSectionExpanded(Boolean(interviewPayload.settings.enabled));
+
+      if (interviewPayload.settings.enabled) {
+        trackAnalyticsEvent('interview_strategy_settings_panel_viewed', {
+          source: 'settings_bootstrap',
+          slotCount: interviewPayload.plan.slots.length,
+          hasCalendarEvents: Object.keys(savedInterviewSyncMap).length > 0,
+        });
+        if (interviewPayload.plan.slots.length === 0) {
+          trackAnalyticsEvent('interview_strategy_no_slots_shown', {
+            source: 'settings_bootstrap',
+          });
+        }
+      }
 
       if (interviewPayload.settings.enabled && interviewPayload.plan.slots.length > 0) {
         const permissionState = await getCalendarPermissionState();
@@ -238,7 +338,11 @@ export function useInterviewStrategySettings(args: {
       if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
         setInterviewSettings(null);
         setInterviewPlan(null);
+        setInterviewErrorText(null);
+        return;
       }
+      const alert = resolveInterviewStrategyPreparationAlert(error);
+      setInterviewErrorText(alert.message);
     }
   };
 
@@ -304,7 +408,13 @@ export function useInterviewStrategySettings(args: {
       navigateToPremium();
       return;
     }
-    if (isSyncingInterviewCalendar || isGeneratingInterviewPlan || isSavingInterviewSettings || isLoadingInterviewCalendars) return;
+    if (
+      isSyncingInterviewCalendar ||
+      isRemovingInterviewCalendarEvents ||
+      isGeneratingInterviewPlan ||
+      isSavingInterviewSettings ||
+      isLoadingInterviewCalendars
+    ) return;
     if (isInterviewCalendarListVisible) {
       setIsInterviewCalendarListVisible(false);
       return;
@@ -321,7 +431,7 @@ export function useInterviewStrategySettings(args: {
   };
 
   const handleSelectInterviewCalendar = (calendarId: string | null) => {
-    if (isSyncingInterviewCalendar || isGeneratingInterviewPlan || isSavingInterviewSettings) return;
+    if (isSyncingInterviewCalendar || isRemovingInterviewCalendarEvents || isGeneratingInterviewPlan || isSavingInterviewSettings) return;
     setInterviewSelectedCalendarId(calendarId);
     setIsInterviewCalendarListVisible(false);
     setInterviewSyncSummary(null);
@@ -335,35 +445,30 @@ export function useInterviewStrategySettings(args: {
     })();
   };
 
-  const handleGenerateInterviewStrategy = () => {
+  const handleRetryInterviewStrategy = () => {
     if (plan !== 'premium') {
-      trackAnalyticsEvent('interview_strategy_premium_gate_hit', { source: 'settings_generate' });
+      trackAnalyticsEvent('interview_strategy_premium_gate_hit', { source: 'settings_retry' });
       navigateToPremium();
       return;
     }
     if (isGeneratingInterviewPlan) return;
 
-    trackAnalyticsEvent('interview_strategy_generate_tapped', {
+    trackAnalyticsEvent('interview_strategy_retry_tapped', {
       plannerMode: 'fixed_natal_sparse',
     });
 
     setIsGeneratingInterviewPlan(true);
     setInterviewSyncSummary(null);
+    setInterviewErrorText(null);
 
     void (async () => {
       try {
-        const timezoneIana = resolveDeviceTimezoneIana();
-        const savedSettings = await upsertInterviewStrategySettings({
-          enabled: true,
-          timezoneIana,
-        });
-
-        const generatedPayload = await fetchInterviewStrategyPlan({ refresh: true });
+        const { payload: generatedPayload } = await syncInterviewStrategyPlan({ autoEnable: true });
         const generatedPlan = generatedPayload.plan;
         const generatedSettings = generatedPayload.settings;
         setInterviewSettings(generatedSettings);
         setInterviewPlan(generatedPlan);
-        setIsInterviewSectionExpanded(true);
+        setIsInterviewSectionExpanded(Boolean(generatedSettings.enabled));
 
         const permissionState = await getCalendarPermissionState();
         if (permissionState.status === 'granted' && generatedSettings.enabled && generatedPlan.slots.length > 0) {
@@ -378,20 +483,26 @@ export function useInterviewStrategySettings(args: {
           weekCount: generatedPlan.weeks.length,
           autofillConfirmedAt: generatedSettings.autoFillConfirmedAt,
           autofillStartAt: generatedSettings.autoFillStartAt,
-          filledUntilDateKey: generatedPlan.filledUntilDateKey ?? savedSettings.settings.filledUntilDateKey,
+          filledUntilDateKey: generatedPlan.filledUntilDateKey ?? generatedSettings.filledUntilDateKey,
         });
 
         if (generatedPlan.slots.length === 0) {
-          trackAnalyticsEvent('interview_strategy_empty_state', {
+          trackAnalyticsEvent('interview_strategy_no_slots_shown', {
             plannerMode: 'fixed_natal_sparse',
+            source: 'settings_retry',
           });
           Alert.alert(
-            'No Recommended Slots',
-            'No natal interview windows passed threshold in the next 30 days. Regenerate after your next transit refresh.'
+            'No Standout Windows',
+            'No interview windows are strong enough to recommend right now. We will keep checking automatically.'
           );
         }
-      } catch {
-        Alert.alert('Generation Failed', 'Could not generate interview strategy right now. Try again in a moment.');
+      } catch (error) {
+        const alert = resolveInterviewStrategyPreparationAlert(error);
+        setInterviewErrorText(alert.message);
+        trackAnalyticsEvent('interview_strategy_retry_failed', {
+          message: alert.message,
+        });
+        Alert.alert(alert.title, alert.message);
       } finally {
         setIsGeneratingInterviewPlan(false);
       }
@@ -405,18 +516,31 @@ export function useInterviewStrategySettings(args: {
       return;
     }
     if (!interviewPlan || interviewPlan.slots.length === 0) {
-      Alert.alert('Generate Plan First', 'Generate interview strategy before adding events to calendar.');
+      trackAnalyticsEvent('interview_strategy_no_slots_shown', {
+        source: 'settings_calendar_sync',
+      });
+      Alert.alert('No Windows to Add', 'Interview windows are still preparing, or there are no standout windows right now.');
       return;
     }
 
+    trackAnalyticsEvent('interview_strategy_calendar_add_tapped', {
+      slotCount: interviewPlan.slots.length,
+      hasExistingCalendarEvents: hasInterviewCalendarEvents,
+    });
+
     Alert.alert(
       'Calendar Access',
-      'Horojob needs calendar access to add your interview focus blocks. Continue?',
+      'Horojob needs calendar access to add your interview calendar reminders. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Continue',
-          onPress: () => performInterviewCalendarSync(),
+          onPress: () => {
+            trackAnalyticsEvent('interview_strategy_calendar_add_confirmed', {
+              slotCount: interviewPlan.slots.length,
+            });
+            performInterviewCalendarSync();
+          },
         },
       ],
       { cancelable: true }
@@ -429,7 +553,7 @@ export function useInterviewStrategySettings(args: {
       navigateToPremium();
       return;
     }
-    if (isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar) return;
+    if (isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar || isRemovingInterviewCalendarEvents) return;
 
     const nextEnabled = !(interviewSettings?.enabled ?? false);
     const timezoneIana = interviewPlan?.timezoneIana ?? resolveDeviceTimezoneIana();
@@ -439,8 +563,13 @@ export function useInterviewStrategySettings(args: {
     };
 
     setIsSavingInterviewSettings(true);
+    setInterviewErrorText(null);
     void (async () => {
       try {
+        if (nextEnabled) {
+          await ensureInterviewStrategyNatalChartReady();
+        }
+
         const saved = await upsertInterviewStrategySettings(settingsPayload);
         const savedSettings = saved.settings;
         setInterviewSettings(savedSettings);
@@ -450,7 +579,18 @@ export function useInterviewStrategySettings(args: {
           setIsInterviewSectionExpanded(false);
           setIsInterviewCalendarListVisible(false);
           setInterviewSyncSummary(null);
-          Alert.alert('Interview Strategy Disabled', 'Automatic interview slot planning is now turned off.');
+          const removalResult = await removeInterviewCalendarEvents({ requestPermission: true, silent: true });
+          const cleanupText = removalResult
+            ? removalResult.deleted > 0
+              ? 'Removed Horojob calendar reminders from this device.'
+              : 'No Horojob calendar reminders were found on this device.'
+            : 'Calendar reminders could not be checked right now.';
+          trackAnalyticsEvent('interview_strategy_toggle_changed', {
+            enabled: false,
+            calendarDeleted: removalResult?.deleted ?? null,
+            calendarFailed: removalResult?.failed ?? null,
+          });
+          Alert.alert('Interview Strategy Disabled', `Interview Strategy is turned off. ${cleanupText}`);
           return;
         }
 
@@ -467,7 +607,12 @@ export function useInterviewStrategySettings(args: {
           });
         }
 
-        Alert.alert('Interview Strategy Enabled', 'Automatic interview slot planning is now active.');
+        trackAnalyticsEvent('interview_strategy_toggle_changed', {
+          enabled: true,
+          slotCount: interviewPayload.plan.slots.length,
+        });
+
+        Alert.alert('Interview Strategy Enabled', 'Interview Strategy is on. We will keep your timing windows ready automatically.');
       } catch (error) {
         if (error instanceof ApiError) {
           if (error.status === 403) {
@@ -479,6 +624,12 @@ export function useInterviewStrategySettings(args: {
             return;
           }
         }
+        if (nextEnabled) {
+          const alert = resolveInterviewStrategyPreparationAlert(error);
+          setInterviewErrorText(alert.message);
+          Alert.alert(alert.title, alert.message);
+          return;
+        }
         Alert.alert('Update Failed', 'Could not update interview strategy right now. Try again in a moment.');
       } finally {
         setIsSavingInterviewSettings(false);
@@ -487,10 +638,13 @@ export function useInterviewStrategySettings(args: {
   };
 
   const handleInterviewFeatureRowPress = () => {
-    if (isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar) return;
+    if (isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar || isRemovingInterviewCalendarEvents) return;
     if (plan !== 'premium') {
       trackAnalyticsEvent('interview_strategy_premium_gate_hit', { source: 'settings_row' });
       navigateToPremium();
+      return;
+    }
+    if (!(interviewSettings?.enabled ?? false)) {
       return;
     }
 
@@ -499,6 +653,11 @@ export function useInterviewStrategySettings(args: {
     if (!nextExpanded) return;
 
     trackAnalyticsEvent('interview_strategy_opened', { source: 'settings' });
+    trackAnalyticsEvent('interview_strategy_settings_panel_viewed', {
+      source: 'settings_row',
+      slotCount: interviewPlan?.slots.length ?? null,
+      hasCalendarEvents: hasInterviewCalendarEvents,
+    });
     if (interviewCalendarPermissionCache?.status === 'granted' && interviewCalendarOptions.length === 0) {
       void refreshInterviewCalendarOptions({ requestPermission: false, silent: true });
     }
@@ -507,7 +666,8 @@ export function useInterviewStrategySettings(args: {
   return {
     bootstrapInterviewState,
     handleAddInterviewStrategyToCalendar,
-    handleGenerateInterviewStrategy,
+    handleRemoveInterviewStrategyFromCalendar,
+    handleRetryInterviewStrategy,
     handleInterviewFeatureRowPress,
     handleInterviewStrategyToggle,
     handleOpenInterviewCalendarPicker,
@@ -517,11 +677,14 @@ export function useInterviewStrategySettings(args: {
     interviewPlan,
     interviewSelectedCalendarId,
     interviewSettings,
+    interviewErrorText,
+    hasInterviewCalendarEvents,
     interviewSyncSummary,
     isGeneratingInterviewPlan,
     isInterviewCalendarListVisible,
     isInterviewSectionExpanded,
     isLoadingInterviewCalendars,
+    isRemovingInterviewCalendarEvents,
     isSavingInterviewSettings,
     isSyncingInterviewCalendar,
     resetInterviewState,

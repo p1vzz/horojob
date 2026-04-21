@@ -13,10 +13,10 @@ import { AiSynergyTile } from '../components/AiSynergyTile';
 import { InterviewStrategy } from '../components/InterviewStrategy';
 import { DeepDiveTile } from '../components/DeepDiveTile';
 import { useDashboardInsights } from '../hooks/useDashboardInsights';
+import { useDashboardPrerequisites } from '../hooks/useDashboardPrerequisites';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
 import { adaptOpacity } from '../utils/brightnessAdaptation';
-import { syncNatalChartCache } from '../services/natalChartSync';
 import { DASHBOARD_BACKGROUND_GRADIENTS } from './dashboardScreenVisuals';
 import {
   buildDashboardAlertPushAnalyticsProperties,
@@ -28,7 +28,6 @@ import { trackAnalyticsEvent } from '../services/analytics';
 import type { AppScreenProps, DashboardAlertFocus } from '../types/navigation';
 
 const { width, height } = Dimensions.get('window');
-type DashboardReadySection = 'insights' | 'natalChart' | 'dailyAstro' | 'aiSynergy' | 'interview' | 'deepDive';
 type AlertCardOffsets = Record<DashboardAlertFocus, number | null>;
 type DashboardScreenProps = AppScreenProps<'Dashboard'> | AppScreenProps<'Profile'>;
 
@@ -48,9 +47,10 @@ export const DashboardScreen = ({ route }: DashboardScreenProps) => {
     burnoutVisible,
     lunarVisible,
   } = useDashboardInsights({
-    showBurnoutFallbackOnError: routeAlertFocus === 'burnout',
-    showLunarFallbackOnError: routeAlertFocus === 'lunar',
+    showBurnoutUnavailableOnError: routeAlertFocus === 'burnout',
+    showLunarUnavailableOnError: routeAlertFocus === 'lunar',
   });
+  const dashboardPrerequisites = useDashboardPrerequisites();
   const scrollViewRef = React.useRef<ScrollView>(null);
   const pendingAlertFocusRef = React.useRef<{
     focus: DashboardAlertFocus;
@@ -65,17 +65,6 @@ export const DashboardScreen = ({ route }: DashboardScreenProps) => {
   });
   const [activeAlertFocus, setActiveAlertFocus] = React.useState<DashboardAlertFocus | null>(null);
   const [activeAlertFocusKey, setActiveAlertFocusKey] = React.useState<number | null>(null);
-  const [readySections, setReadySections] = React.useState<Record<DashboardReadySection, boolean>>({
-    insights: false,
-    natalChart: false,
-    dailyAstro: false,
-    aiSynergy: false,
-    interview: false,
-    deepDive: false,
-  });
-  const markSectionReady = React.useCallback((section: DashboardReadySection) => {
-    setReadySections((current) => (current[section] ? current : { ...current, [section]: true }));
-  }, []);
   const recordAlertCardOffset = React.useCallback((focus: DashboardAlertFocus, y: number) => {
     setAlertCardOffsets((current) => (current[focus] === y ? current : { ...current, [focus]: y }));
   }, []);
@@ -85,31 +74,7 @@ export const DashboardScreen = ({ route }: DashboardScreenProps) => {
   const handleLunarLayout = React.useCallback((event: LayoutChangeEvent) => {
     recordAlertCardOffset('lunar', event.nativeEvent.layout.y);
   }, [recordAlertCardOffset]);
-  const isDashboardReady = Object.values(readySections).every(Boolean);
-
-  React.useEffect(() => {
-    if (isInitialReady) {
-      markSectionReady('insights');
-    }
-  }, [isInitialReady, markSectionReady]);
-
-  React.useEffect(() => {
-    let mounted = true;
-
-    const warmNatalChart = async () => {
-      await syncNatalChartCache().catch(() => {
-        // Dashboard must not get stuck if chart preloading is temporarily unavailable.
-      });
-      if (mounted) {
-        markSectionReady('natalChart');
-      }
-    };
-
-    void warmNatalChart();
-    return () => {
-      mounted = false;
-    };
-  }, [markSectionReady]);
+  const isDashboardReady = isInitialReady && !dashboardPrerequisites.shouldShowDashboardGate;
 
   React.useEffect(() => {
     if (!routeAlertFocus) return;
@@ -287,12 +252,12 @@ export const DashboardScreen = ({ route }: DashboardScreenProps) => {
                 />
               </View>
             ) : null}
-            <DailyAstroStatus onReady={() => markSectionReady('dailyAstro')} />
-            <JobCheckTile />
-            <CareerMatchmakerTile />
-            <AiSynergyTile onReady={() => markSectionReady('aiSynergy')} />
-            <InterviewStrategy onReady={() => markSectionReady('interview')} />
-            <DeepDiveTile onReady={() => markSectionReady('deepDive')} />
+            <DailyAstroStatus careerPrerequisites={dashboardPrerequisites} />
+            <JobCheckTile careerPrerequisites={dashboardPrerequisites} />
+            <CareerMatchmakerTile careerPrerequisites={dashboardPrerequisites} />
+            <AiSynergyTile />
+            <InterviewStrategy careerPrerequisites={dashboardPrerequisites} />
+            <DeepDiveTile careerPrerequisites={dashboardPrerequisites} />
           </View>
         </ScrollView>
         {isDashboardReady ? null : <DashboardReadyGate />}

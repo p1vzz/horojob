@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createNotificationsApi } from './notificationsApiCore';
+import {
+  createNotificationsApi,
+  INTERVIEW_STRATEGY_PLAN_TIMEOUT_MS,
+  INTERVIEW_STRATEGY_REFRESH_TIMEOUT_MS,
+  INTERVIEW_STRATEGY_SETTINGS_TIMEOUT_MS,
+} from './notificationsApiCore';
+
+type TestRequestInit = RequestInit & {
+  timeoutMs?: number;
+};
 
 class FakeApiError extends Error {
   status: number;
@@ -118,9 +127,11 @@ test('notifications api posts burnout insight acknowledge payload to the expecte
 
 test('notifications api builds interview strategy refresh query', async () => {
   const calls: string[] = [];
+  const timeouts: Array<number | undefined> = [];
   const api = createNotificationsApi({
-    authorizedFetch: async (path) => {
+    authorizedFetch: async (path, init) => {
       calls.push(path);
+      timeouts.push(init?.timeoutMs);
       return new Response(
         JSON.stringify({
           enabled: true,
@@ -145,10 +156,11 @@ test('notifications api builds interview strategy refresh query', async () => {
     '/api/notifications/interview-strategy-plan?refresh=false',
     '/api/notifications/interview-strategy-plan?refresh=true',
   ]);
+  assert.deepEqual(timeouts, [INTERVIEW_STRATEGY_PLAN_TIMEOUT_MS, INTERVIEW_STRATEGY_REFRESH_TIMEOUT_MS]);
 });
 
 test('notifications api can save fixed interview strategy settings with minimal payload', async () => {
-  const calls: Array<{ path: string; init?: RequestInit }> = [];
+  const calls: Array<{ path: string; init?: TestRequestInit }> = [];
   const api = createNotificationsApi({
     authorizedFetch: async (path, init) => {
       calls.push({ path, init });
@@ -166,6 +178,7 @@ test('notifications api can save fixed interview strategy settings with minimal 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].path, '/api/notifications/interview-strategy-settings');
   assert.equal(calls[0].init?.method, 'PUT');
+  assert.equal(calls[0].init?.timeoutMs, INTERVIEW_STRATEGY_SETTINGS_TIMEOUT_MS);
   assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
     enabled: true,
     timezoneIana: 'Europe/Warsaw',

@@ -75,13 +75,11 @@ Indexes:
 - `src/hooks/queries/useAiSynergy.ts` also exports `useDailyTransit()` for future consumers that need the full transit payload rather than only the synergy slice.
 - `AiSynergyTile` is wrapped in `React.memo(...)` because it sits inside the dashboard's animated tile stack and no longer needs to re-render for unrelated parent updates.
 
-## Narrative Templates
+## Narrative Generation
 
-Descriptions are built from large template pools (headline/openers/tech/collab/risk/recommendation banks) and selected by deterministic seeded hashing per user+day. `v2` adds `styleProfile` and `narrativeVariantId` to increase deterministic variety while keeping scores fixed.
+The score, band, components, signals, tags, drivers, cautions, and action-priority metadata are deterministic. User-facing headline, summary, description, and recommendations are stored only when a real provider returns schema-valid narrative output.
 
-## Optional LLM Polishing
-
-If enabled, deterministic draft text is polished by OpenAI and stored in history.
+If narrative generation is unavailable or fails, the backend persists the deterministic score payload with `narrativeStatus` and `narrativeFailureCode`; the mobile tile shows a bounded unavailable/preparing state instead of fabricated copy.
 
 - env toggle: `OPENAI_AI_SYNERGY_ENABLED=true|false`
 - model: `OPENAI_AI_SYNERGY_MODEL`
@@ -90,10 +88,8 @@ If enabled, deterministic draft text is polished by OpenAI and stored in history
 
 Stored metadata:
 
-- `narrativeSource` (`template` or `llm`)
+- `narrativeSource` (`llm` or `null`)
+- `narrativeStatus` (`ready`, `pending`, `unavailable`, or `failed`)
+- `narrativeFailureCode` when generation fails
 - `llmModel`
 - `llmPromptVersion`
-
-Fallback behavior:
-
-- any LLM error automatically falls back to deterministic template narrative (score history still persists).

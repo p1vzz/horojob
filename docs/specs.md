@@ -8,6 +8,7 @@
 - Mobile client (this repo): `horojob/`
 - Backend API: `../horojob-server`
 - MongoDB access is configured in backend `.env`
+- The first public release has not shipped yet and production DB starts empty. Until that release, prefer clean current contracts over compatibility shims for old payloads, old indexes, or local development data.
 
 ---
 
@@ -37,7 +38,7 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 1. **Onboarding + Natal Profile:** date/time/city input with profile persistence and server sync.
 2. **Scanner + Job Position Check:** URL preflight/analyze, screenshot analyze flow, premium gate and usage-limit UX.
 3. **AI Synergy and Daily Transit:** dashboard insights + stored history integration.
-4. **Full Natal Career Analysis:** dedicated report screen with refresh/regenerate flow.
+4. **Full Natal Career Analysis:** dedicated one-shot report screen; no user-facing regenerate flow.
 5. **Discover Roles:** recommendation/search flow from backend role catalog.
 
 ### B. Retention & Habit Loop
@@ -56,10 +57,10 @@ Career intelligence app that combines astrology signals with AI-oriented career 
    - default query policy: `5m` stale, `30m` GC, `2` retries, reconnect refetch enabled
    - features can still override those values per hook for heavier AI endpoints
 2. `src/services/aiOrchestration.ts` is the shared mobile entry point for AI request helpers.
-   - available helpers: retry, timeout, fallback, cache-hit/cache-miss tracking
-   - current hook adoption uses retry plus cache metrics; timeout/fallback helpers exist but are not yet wired into active screen flows
+   - available helpers: retry, timeout, cache-hit/cache-miss tracking
+   - current hook adoption uses retry plus cache metrics; timeout helper exists but is not yet wired into active screen flows
 3. `src/services/aiTelemetry.ts` is the shared observability adapter for AI requests.
-   - current state: non-production console logging for request/success/error/fallback/cache events
+   - current state: non-production console logging for request/success/error/cache events
    - future sink point: Sentry/LogRocket/custom analytics, not yet connected in production
 4. `src/schemas/aiSynergySchema.ts`, `src/schemas/careerAnalysisSchema.ts`, and `src/schemas/jobAnalysisSchema.ts` now own runtime validation and inferred mobile types for the main AI-backed payloads.
 5. Adoption status is partial by design.
@@ -71,7 +72,20 @@ Career intelligence app that combines astrology signals with AI-oriented career 
    - wrap request orchestration in a dedicated hook under `src/hooks/queries/*`
    - use `aiOrchestrator` for retry/telemetry boundaries
    - keep screens/components consuming typed hook output instead of raw transport payloads
-7. Current performance boundaries:
+7. AI guidance safety policy:
+   - guidance must be framed as reflective career coaching, not guaranteed prediction
+   - recommendations should stay practical and specific without promising certain outcomes
+   - LLM prompts for career-guidance features must include this framing
+   - LLM failures must not be hidden behind fabricated template reports; the app should show a human-readable error or use a real provider fallback when that provider abstraction exists
+8. User-facing copy policy:
+   - every text visible in production must be written for users, not for engineers
+   - technical labels, model names, provider names, prompt versions, and raw system codes may appear only behind the development/QA technical-surface flag
+   - loader steps should describe what the user can understand is happening without naming internal vendors or implementation details
+9. AI source/provider disclosure policy:
+   - production UI should not show report source, model, or provider by default
+   - development builds may expose source/model/prompt metadata for QA
+   - if legal review identifies a jurisdictional AI-use disclosure requirement, satisfy it with a clear general product-level/user-level notice rather than exposing provider/model internals in every report
+10. Current performance boundaries:
    - `AiSynergyTile`, `JobCheckTile`, and `DeepDiveTile` are memoized to reduce unnecessary dashboard re-renders
    - shared onboarding SVG backgrounds are memoized because the same heavy art is reused across startup and onboarding, while the light variant stays parked for a future v2 rollout
 

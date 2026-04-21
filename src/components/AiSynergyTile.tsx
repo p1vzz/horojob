@@ -12,6 +12,23 @@ import {
 } from './aiSynergyTileCore';
 import { AI_SYNERGY_HELIX_POINTS } from './aiSynergyTileVisuals';
 
+const SkeletonBar = ({
+  width,
+  height,
+}: {
+  width: number | `${number}%`;
+  height: number;
+}) => (
+  <View
+    style={{
+      width,
+      height,
+      borderRadius: 6,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+    }}
+  />
+);
+
 export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) => {
   const theme = useAppTheme();
   const scanAnim = useRef(new Animated.Value(0)).current;
@@ -20,6 +37,12 @@ export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) 
   const hasSignaledReadyRef = useRef(false);
 
   const synergy = selectAiSynergyView(aiSynergy);
+  const shouldShowSkeleton = isLoading && !aiSynergy;
+  const hasSynergy = Boolean(synergy);
+  const isNarrativeReady =
+    synergy?.narrativeStatus === 'ready' &&
+    Boolean(synergy.headline?.trim()) &&
+    Boolean(synergy.description?.trim());
 
   useEffect(() => {
     const scanLoop = Animated.loop(
@@ -60,8 +83,23 @@ export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) 
     outputRange: [8, Math.max(110, cardHeight - 8)],
   });
 
-  const { scoreColor, scoreSubColor } = resolveAiSynergyPalette(synergy.score);
-  const confidenceLabel = formatAiSynergyConfidenceLabel(synergy.confidence);
+  const { scoreColor, scoreSubColor } = resolveAiSynergyPalette(synergy?.score ?? 0);
+  const confidenceLabel = synergy
+    ? formatAiSynergyConfidenceLabel(synergy.confidence)
+    : "Today's signal is not ready";
+  const statusHeadline = isNarrativeReady
+    ? synergy?.headline
+    : synergy?.narrativeStatus === 'pending'
+      ? "Today's guidance is preparing"
+      : "Today's guidance is unavailable";
+  const statusDescription = isNarrativeReady
+    ? synergy?.description
+    : synergy
+      ? "The score is ready, but the written guidance could not be prepared yet. Keep decisions grounded in your own review checkpoints."
+      : "We could not refresh this signal yet. Reopen Horojob when the connection is stable.";
+  const bestMove = isNarrativeReady && synergy?.recommendations[0]
+    ? `Best move: ${synergy.recommendations[0]}`
+    : 'Best move: Use one clear review checkpoint before acting on AI-assisted work.';
 
   return (
     <View className="px-5 py-2">
@@ -130,22 +168,47 @@ export const AiSynergyTile = React.memo(({ onReady }: { onReady?: () => void }) 
           </Text>
         </View>
 
-        <View className="flex-row items-baseline mb-1">
-          <Text className="text-[44px] font-bold" style={{ color: scoreColor }}>{synergy.score}</Text>
-          <Text className="text-[22px] font-bold ml-1" style={{ color: scoreSubColor }}>%</Text>
-        </View>
+        {shouldShowSkeleton ? (
+          <View style={{ minHeight: 154 }}>
+            <View className="flex-row items-baseline mb-3">
+              <SkeletonBar width={82} height={44} />
+              <View style={{ width: 7 }} />
+              <SkeletonBar width={18} height={22} />
+            </View>
+            <View style={{ marginBottom: 14 }}>
+              <SkeletonBar width="62%" height={12} />
+            </View>
+            <View style={{ paddingRight: 40, marginBottom: 16 }}>
+              <SkeletonBar width="96%" height={13} />
+              <View style={{ height: 8 }} />
+              <SkeletonBar width="84%" height={13} />
+              <View style={{ height: 8 }} />
+              <SkeletonBar width="54%" height={13} />
+            </View>
+            <View style={{ paddingRight: 32, marginBottom: 13 }}>
+              <SkeletonBar width="72%" height={11} />
+            </View>
+          </View>
+        ) : (
+          <>
+            <View className="flex-row items-baseline mb-1">
+              <Text className="text-[44px] font-bold" style={{ color: scoreColor }}>{hasSynergy ? synergy?.score : '--'}</Text>
+              <Text className="text-[22px] font-bold ml-1" style={{ color: scoreSubColor }}>{hasSynergy ? '%' : ''}</Text>
+            </View>
 
-        <Text className="text-[12px] mb-3" style={{ color: 'rgba(212,212,224,0.5)' }}>
-          {synergy.headline}
-        </Text>
+            <Text className="text-[12px] mb-3" style={{ color: 'rgba(212,212,224,0.5)' }}>
+              {statusHeadline}
+            </Text>
 
-        <Text className="text-[13px] leading-[20px] mb-4 pr-10" style={{ color: 'rgba(212,212,224,0.75)' }}>
-          {synergy.description}
-        </Text>
+            <Text className="text-[13px] leading-[20px] mb-4 pr-10" style={{ color: 'rgba(212,212,224,0.75)' }}>
+              {statusDescription}
+            </Text>
 
-        <Text className="text-[11px] mb-3 pr-8" style={{ color: 'rgba(212,212,224,0.58)' }}>
-          Best move: {synergy.recommendations[0]}
-        </Text>
+            <Text className="text-[11px] mb-3 pr-8" style={{ color: 'rgba(212,212,224,0.58)' }}>
+              {bestMove}
+            </Text>
+          </>
+        )}
 
         <View className="flex-row items-center">
           <Activity size={11} color="#00FFCC" style={{ opacity: 0.9, marginRight: 6 }} />

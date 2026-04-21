@@ -43,8 +43,8 @@ export function LunarProductivityInsightTile({
     : DARK_LUNAR_PRODUCTIVITY_PALETTE;
   const metricRows = toLunarProductivityMetricRows(snapshot.components);
   const syncLabel = formatDashboardInsightSyncLabel(lastSyncedAt);
-  const isFallback = sourceMode === 'fallback';
-  const canRetry = isFallback && !isHydrating && !!onRetry;
+  const isUnavailable = sourceMode === 'unavailable';
+  const canRetry = isUnavailable && !isHydrating && !!onRetry;
   const highlightOpacity = React.useRef(new Animated.Value(0)).current;
   const directionColor =
     snapshot.directionTone === 'supportive'
@@ -197,16 +197,16 @@ export function LunarProductivityInsightTile({
           </View>
         </View>
 
-        {isFallback ? (
+        {isUnavailable ? (
           <View className="py-3">
             <View className="flex-row items-center mb-2">
               <Sparkles size={17} color={palette.headlineIcon} style={{ marginRight: 7 }} />
               <Text className="text-[16px] font-semibold tracking-tight flex-1" style={{ color: palette.headline }}>
-                {LUNAR_PRODUCTIVITY_TILE_COPY.fallbackHeadline}
+                {LUNAR_PRODUCTIVITY_TILE_COPY.unavailableHeadline}
               </Text>
             </View>
             <Text className="text-[13px] leading-[21px] mb-4" style={{ color: palette.summary }}>
-              {LUNAR_PRODUCTIVITY_TILE_COPY.fallbackSummary}
+              {LUNAR_PRODUCTIVITY_TILE_COPY.unavailableSummary}
             </Text>
             {canRetry ? (
               <Pressable
@@ -220,7 +220,7 @@ export function LunarProductivityInsightTile({
                 }}
               >
                 <Text className="text-[11px] font-semibold tracking-[0.7px]" style={{ color: palette.retryText }}>
-                  {LUNAR_PRODUCTIVITY_TILE_COPY.fallbackAction}
+                  {LUNAR_PRODUCTIVITY_TILE_COPY.unavailableAction}
                 </Text>
               </Pressable>
             ) : null}

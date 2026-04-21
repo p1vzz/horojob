@@ -35,17 +35,17 @@ If this doc conflicts with code, code wins and this doc must be updated.
 ## 3. End-to-End Data Flow
 ### 3.1 Dashboard `Career Vibe` card
 1. Mobile calls `GET /api/astrology/career-vibe-plan?refresh=false`.
-2. Backend returns a tool-like daily plan with metrics, best-use categories, avoid items, peak window, strategies, and explainability notes.
-3. Free users receive deterministic template copy; premium users can receive LLM-polished narrative copy when the backend LLM flag and API key are enabled.
-4. `DailyAstroStatus` renders the plan headline, primary action, summary, `bestFor`, `avoid`, and metrics. It labels `luck` as user-facing `Opportunity`.
+2. Backend returns deterministic metrics and explainability notes immediately.
+3. `plan` is present only when a real provider returns schema-valid narrative output. Otherwise `plan=null` with `narrativeStatus`/`narrativeFailureCode`.
+4. `DailyAstroStatus` renders plan headline, primary action, summary, `bestFor`, and `avoid` only when `plan` is ready; otherwise it shows a bounded preparing/unavailable state and keeps metrics stable. It labels `luck` as user-facing `Opportunity`.
 5. The `Open full plan` action navigates to `CareerVibePlanScreen`.
 6. If live fetch fails and a saved plan exists, the card shows the saved plan with a `Saved` label and inline stale-sync copy.
-7. If no saved plan exists, the card shows a clearly labeled sample plan instead of silently presenting placeholder data as live guidance.
+7. If no saved plan exists and no real plan is ready, the card does not show sample guidance.
 
 ### 3.1.1 Career Vibe detail tool
 1. `CareerVibePlanScreen` calls `GET /api/astrology/career-vibe-plan?refresh=false` on entry.
 2. Manual refresh calls the same endpoint with `refresh=true` only on non-production technical surfaces.
-3. The screen renders the full plan contract:
+3. The screen renders the full plan contract only when `plan` is ready:
   - `primaryAction`
   - `peakWindow`
   - `focusStrategy`
@@ -58,14 +58,14 @@ If this doc conflicts with code, code wins and this doc must be updated.
   - `explanation.cautions`
   - `explanation.metricNotes`
 4. It saves successful payloads in per-user local storage.
-5. It keeps the previous successful plan visible if a manual refresh fails and shows the refresh error inline.
+5. It keeps the previous successful plan visible if a refresh fails and shows the refresh error inline.
 6. `401` and `404` responses clear the local plan cache so a signed-out or profile-missing user does not keep seeing stale personalized guidance.
 7. Production UI hides raw cache/source/model/prompt/schema labels; non-production UI keeps them visible under `EXPO_PUBLIC_APP_ENV`.
 
 ### 3.2 Dashboard `AI Synergy` tile
 1. Same `daily-transit` response may include `aiSynergy`.
-2. `AiSynergyTile` renders `aiSynergy.score`, narrative, and recommendations.
-3. If `aiSynergy` is missing, tile falls back to local static placeholder values.
+2. `AiSynergyTile` renders `aiSynergy.score` whenever the score payload is available.
+3. Narrative and recommendations render only when `aiSynergy.narrativeStatus=ready`; missing or failed narrative shows a bounded unavailable/preparing state.
 
 ### 3.3 Morning widget pipeline
 1. Mobile sync layer calls `GET /api/astrology/morning-briefing` (premium-only).
@@ -271,8 +271,9 @@ Additive fields:
 
 ### 5.4 Narrative layer
 - Deterministic planner builds structured payload (scores + tags + drivers + actions).
-- Deterministic template draft uses style profile and variant id.
-- Optional LLM rewrite is schema-validated and cannot modify numeric fields.
+- User-facing AI Synergy narrative fields are `null` until a real provider returns schema-valid copy.
+- `narrativeStatus` tells the client whether narrative is `ready`, `pending`, `unavailable`, or `failed`.
+- Provider fallback is allowed; fabricated template narrative is not.
 
 ## 6. Morning Briefing Payload (`/morning-briefing`)
 Premium users only (`403` for free users).
@@ -281,7 +282,7 @@ Payload construction:
 - `energy/focus/luck` = clamped daily transit vibe metrics.
 - `aiSynergy`:
   - use `transit.aiSynergy.score` if available;
-  - else fallback:
+  - else derive the metric from transit values:
 
 ```text
 fallbackAi =
@@ -295,16 +296,16 @@ fallbackAi =
 ```
 
 - `headline`:
-  - `transit.aiSynergy.headline` if present and non-empty;
+  - `transit.aiSynergy.headline` only when `transit.aiSynergy.narrativeStatus=ready`;
   - else `transit.vibe.title`.
 - `summary`:
-  - `transit.aiSynergy.summary` if present and non-empty;
+  - `transit.aiSynergy.summary` only when `transit.aiSynergy.narrativeStatus=ready`;
   - else `transit.vibe.summary`.
 - `modeLabel` = `transit.vibe.modeLabel`.
 - additive `insights` object includes:
   - `insights.vibe` (`algorithmVersion`, `drivers`, `cautions`, `tags`)
-  - `insights.aiSynergy` (`algorithmVersion`, `band`, `confidence`, `confidenceBreakdown`, `tags`, `drivers`, `cautions`, `actionsPriority`, `narrativeVariantId`, `styleProfile`)
-- additive `plan` snapshot includes widget-safe fields:
+  - optional `insights.aiSynergy` (`algorithmVersion`, `band`, `confidence`, `confidenceBreakdown`, `tags`, `drivers`, `cautions`, `actionsPriority`, `narrativeVariantId`, `styleProfile`) only when AI Synergy exists
+- additive `plan` snapshot includes widget-safe fields when a real plan is ready:
   - `headline`
   - `summary`
   - `primaryAction`
@@ -322,16 +323,18 @@ Query params:
 Payload construction:
 - `metrics.energy/focus/luck` come from `daily-transit`.
 - `metrics.opportunity` mirrors `luck` for user-facing career timing copy.
-- `metrics.aiSynergy` uses `transit.aiSynergy.score` when available, otherwise the same weighted fallback used by morning briefing.
-- `plan` contains `headline`, `summary`, `primaryAction`, `bestFor`, `avoid`, `peakWindow`, `focusStrategy`, `communicationStrategy`, `aiWorkStrategy`, and `riskGuardrail`.
+- `metrics.aiSynergy` uses `transit.aiSynergy.score` when available, otherwise the same weighted metric derivation used by morning briefing.
+- `plan` contains `headline`, `summary`, `primaryAction`, `bestFor`, `avoid`, `peakWindow`, `focusStrategy`, `communicationStrategy`, `aiWorkStrategy`, and `riskGuardrail` only when `narrativeStatus=ready`; otherwise `plan=null`.
+- `narrativeSource` is `llm` or `null`; template is not a valid production source.
+- `narrativeStatus` is `ready`, `pending`, `unavailable`, or `failed`.
 - `explanation` contains `drivers`, `cautions`, and `metricNotes`.
 - `sources` records daily vibe and AI synergy date/algorithm versions.
 
 LLM behavior:
-- Deterministic scoring and deterministic plan fields are always built first.
-- LLM is attempted only for premium users when `OPENAI_CAREER_VIBE_PLAN_ENABLED=true` and `OPENAI_API_KEY` is set.
+- Deterministic scoring and peak-window derivation are always built first.
+- Provider generation is attempted only for premium users when a primary or backup provider is configured.
 - The LLM may rewrite plan text only; it cannot change metrics, dates, or peak window.
-- Invalid or failed LLM output falls back to deterministic template copy.
+- Invalid or failed provider output sets `plan=null` plus a user-mappable failure status; it does not fall back to deterministic template copy.
 
 ## 7. Android Widget Derived Presentation Model
 Snapshot fields persisted from morning payload:
@@ -449,9 +452,9 @@ Practical interpretation:
 
 ### 11.4 Implemented LLM narrative diversity constraints
 - Deterministic scoring remains source of truth for all numeric fields.
-- LLM may only rewrite narrative text.
+- Provider output may only fill narrative text.
 - LLM output is schema-validated.
-- Any LLM failure falls back to deterministic narrative payload.
+- Any provider failure returns explicit narrative status and no fabricated narrative payload.
 
 ### 11.5 Implemented P1 tool surface
 - Dashboard card remains compact and action-oriented.

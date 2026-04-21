@@ -39,8 +39,8 @@ export function BurnoutInsightTile({
   const palette = isLight ? LIGHT_BURNOUT_INSIGHT_PALETTE : DARK_BURNOUT_INSIGHT_PALETTE;
   const metricRows = toBurnoutInsightMetricRows(snapshot.components);
   const syncLabel = formatDashboardInsightSyncLabel(lastSyncedAt);
-  const isFallback = sourceMode === 'fallback';
-  const canRetry = isFallback && !isHydrating && !!onRetry;
+  const isUnavailable = sourceMode === 'unavailable';
+  const canRetry = isUnavailable && !isHydrating && !!onRetry;
   const highlightOpacity = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -158,16 +158,16 @@ export function BurnoutInsightTile({
           </View>
         </View>
 
-        {isFallback ? (
+        {isUnavailable ? (
           <View className="py-3">
             <View className="flex-row items-center mb-2">
               <AlertTriangle size={17} color={palette.headlineIcon} style={{ marginRight: 7 }} />
               <Text className="text-[16px] font-semibold tracking-tight flex-1" style={{ color: palette.headline }}>
-                {BURNOUT_INSIGHT_TILE_COPY.fallbackHeadline}
+                {BURNOUT_INSIGHT_TILE_COPY.unavailableHeadline}
               </Text>
             </View>
             <Text className="text-[13px] leading-[21px] mb-4" style={{ color: palette.summary }}>
-              {BURNOUT_INSIGHT_TILE_COPY.fallbackSummary}
+              {BURNOUT_INSIGHT_TILE_COPY.unavailableSummary}
             </Text>
             {canRetry ? (
               <Pressable
@@ -181,7 +181,7 @@ export function BurnoutInsightTile({
                 }}
               >
                 <Text className="text-[11px] font-semibold tracking-[0.7px]" style={{ color: palette.retryText }}>
-                  {BURNOUT_INSIGHT_TILE_COPY.fallbackAction}
+                  {BURNOUT_INSIGHT_TILE_COPY.unavailableAction}
                 </Text>
               </Pressable>
             ) : null}

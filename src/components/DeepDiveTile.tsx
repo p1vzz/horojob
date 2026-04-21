@@ -3,20 +3,32 @@ import { View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { Crown, ArrowRight, TrendingUp, AlertTriangle, Sparkles, Orbit, ChevronRight } from 'lucide-react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../types/navigation';
 import { ApiError, ensureAuthSession } from '../services/authSession';
-import { fetchFullNatalCareerAnalysis } from '../services/astrologyApi';
+import { fetchCachedFullNatalCareerAnalysis } from '../services/astrologyApi';
+import { trackAnalyticsEvent } from '../services/analytics';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import {
-  FALLBACK_DEEP_DIVE_SNAPSHOT,
   formatDeepDivePercent,
   toDeepDiveSnapshot,
   type DeepDiveSnapshot,
 } from './deepDiveTileCore';
 import { DEEP_DIVE_BLUR_POSITIONS } from './deepDiveTileVisuals';
+import type { DashboardCareerFeaturePrerequisites } from '../hooks/useDashboardPrerequisites';
 
 const CARD_HEIGHT = 180;
+
+const SkeletonLine = ({ width, height = 12 }: { width: number | `${number}%`; height?: number }) => (
+  <View
+    style={{
+      width,
+      height,
+      borderRadius: 6,
+      backgroundColor: 'rgba(255,255,255,0.08)',
+    }}
+  />
+);
 
 const LockedDeepDiveCard = ({ onPress, isLight }: { onPress: () => void; isLight: boolean }) => (
   <TouchableOpacity
@@ -99,52 +111,288 @@ const LockedDeepDiveCard = ({ onPress, isLight }: { onPress: () => void; isLight
   </TouchableOpacity>
 );
 
-export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) => {
+const GenerateDeepDiveCard = ({
+  isChecking,
+  isLight,
+  onPress,
+}: {
+  isChecking: boolean;
+  isLight: boolean;
+  onPress: () => void;
+}) => (
+  <View
+    className="rounded-[20px] p-4"
+    style={{
+      borderColor: isLight ? 'rgba(180,151,103,0.26)' : 'rgba(201,168,76,0.2)',
+      borderWidth: 1,
+      backgroundColor: isLight ? 'rgba(255,252,246,0.96)' : 'rgba(11,11,18,0.95)',
+    }}
+  >
+    <LinearGradient
+      colors={
+        isLight
+          ? ['rgba(124,92,255,0.08)', 'rgba(201,168,76,0.08)', 'rgba(255,255,255,0.24)']
+          : ['rgba(90,58,204,0.08)', 'rgba(201,168,76,0.06)', 'rgba(10,10,20,0.06)']
+      }
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ position: 'absolute', inset: 0 }}
+    />
+
+    <View
+      className="rounded-[14px] px-3 py-3"
+      style={{
+        backgroundColor: isLight ? 'rgba(201,168,76,0.12)' : 'rgba(201,168,76,0.1)',
+        borderColor: isLight ? 'rgba(170,141,92,0.34)' : 'rgba(201,168,76,0.28)',
+        borderWidth: 1,
+      }}
+    >
+      <View className="flex-row items-center mb-1">
+        <Sparkles size={14} color="#E1C066" />
+        <Text className="text-[22px] font-semibold ml-2" style={{ color: isLight ? 'rgba(85,67,34,0.92)' : 'rgba(240,234,214,0.92)' }}>
+          Career Blueprint
+        </Text>
+      </View>
+      <Text className="text-[12px] leading-[18px]" style={{ color: isLight ? 'rgba(95,77,45,0.86)' : 'rgba(225,215,186,0.82)' }}>
+        Generate a full report with career archetypes, role fit, blind spots, and a 90-day plan.
+      </Text>
+    </View>
+
+    <Pressable
+      onPress={onPress}
+      className="mt-3 rounded-[12px] py-3 px-3 items-center flex-row justify-center"
+      style={{
+        backgroundColor: '#C9A84C',
+        shadowColor: '#C9A84C',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+        elevation: 4,
+      }}
+    >
+      <Text className="text-[13px] font-black" style={{ color: '#09090F' }}>
+        Generate Report
+      </Text>
+      <ArrowRight size={15} color="#09090F" style={{ marginLeft: 8 }} />
+    </Pressable>
+
+    {isChecking ? (
+      <Text className="text-[10px] mt-2" style={{ color: isLight ? 'rgba(126,97,47,0.76)' : 'rgba(232,209,150,0.72)' }}>
+        Checking for a saved report...
+      </Text>
+    ) : null}
+  </View>
+);
+
+const LoadingDeepDiveCard = ({ isLight }: { isLight: boolean }) => (
+  <View
+    className="rounded-[20px] p-4"
+    style={{
+      borderColor: isLight ? 'rgba(180,151,103,0.26)' : 'rgba(201,168,76,0.2)',
+      borderWidth: 1,
+      backgroundColor: isLight ? 'rgba(255,252,246,0.96)' : 'rgba(11,11,18,0.95)',
+      minHeight: 186,
+    }}
+  >
+    <LinearGradient
+      colors={
+        isLight
+          ? ['rgba(124,92,255,0.08)', 'rgba(201,168,76,0.08)', 'rgba(255,255,255,0.24)']
+          : ['rgba(90,58,204,0.08)', 'rgba(201,168,76,0.06)', 'rgba(10,10,20,0.06)']
+      }
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ position: 'absolute', inset: 0 }}
+    />
+
+    <View className="flex-row">
+      {[0, 1, 2].map((index) => (
+        <View
+          key={index}
+          className="flex-1 rounded-[14px] p-3"
+          style={{
+            marginRight: index < 2 ? 8 : 0,
+            minHeight: 104,
+            backgroundColor: index === 0 ? 'rgba(56,204,136,0.08)' : index === 1 ? 'rgba(92,70,212,0.12)' : 'rgba(201,168,76,0.1)',
+            borderColor: index === 0 ? 'rgba(56,204,136,0.18)' : index === 1 ? 'rgba(92,70,212,0.24)' : 'rgba(201,168,76,0.22)',
+            borderWidth: 1,
+          }}
+        >
+          <SkeletonLine width={22} height={15} />
+          <View style={{ height: 14 }} />
+          <SkeletonLine width="74%" height={28} />
+          <View style={{ height: 10 }} />
+          <SkeletonLine width="86%" height={10} />
+          <View style={{ height: 6 }} />
+          <SkeletonLine width="62%" height={10} />
+        </View>
+      ))}
+    </View>
+
+    <View
+      className="rounded-[14px] px-3 py-3 mt-3"
+      style={{
+        backgroundColor: isLight ? 'rgba(201,168,76,0.12)' : 'rgba(201,168,76,0.1)',
+        borderColor: isLight ? 'rgba(170,141,92,0.34)' : 'rgba(201,168,76,0.28)',
+        borderWidth: 1,
+      }}
+    >
+      <SkeletonLine width="58%" height={18} />
+      <View style={{ height: 10 }} />
+      <SkeletonLine width="94%" height={12} />
+      <View style={{ height: 8 }} />
+      <SkeletonLine width="76%" height={12} />
+    </View>
+  </View>
+);
+
+const BlockedDeepDiveCard = ({
+  prerequisites,
+  isLight,
+  onOpenNatalChart,
+}: {
+  prerequisites: DashboardCareerFeaturePrerequisites;
+  isLight: boolean;
+  onOpenNatalChart: () => void;
+}) => {
+  const isChecking = prerequisites.reason === 'checking';
+  return (
+    <View
+      className="rounded-[20px] p-4"
+      style={{
+        borderColor: isLight ? 'rgba(180,151,103,0.26)' : 'rgba(201,168,76,0.2)',
+        borderWidth: 1,
+        backgroundColor: isLight ? 'rgba(255,252,246,0.96)' : 'rgba(11,11,18,0.95)',
+      }}
+    >
+      <LinearGradient
+        colors={
+          isLight
+            ? ['rgba(124,92,255,0.08)', 'rgba(201,168,76,0.08)', 'rgba(255,255,255,0.24)']
+            : ['rgba(90,58,204,0.08)', 'rgba(201,168,76,0.06)', 'rgba(10,10,20,0.06)']
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ position: 'absolute', inset: 0 }}
+      />
+      <View
+        className="rounded-[14px] px-3 py-3"
+        style={{
+          backgroundColor: isLight ? 'rgba(201,168,76,0.12)' : 'rgba(201,168,76,0.1)',
+          borderColor: isLight ? 'rgba(170,141,92,0.34)' : 'rgba(201,168,76,0.28)',
+          borderWidth: 1,
+        }}
+      >
+        <View className="flex-row items-center mb-1">
+          <Sparkles size={14} color="#E1C066" />
+          <Text className="text-[20px] font-semibold ml-2" style={{ color: isLight ? 'rgba(85,67,34,0.92)' : 'rgba(240,234,214,0.92)' }}>
+            {prerequisites.blockTitle}
+          </Text>
+        </View>
+        <Text className="text-[12px] leading-[18px]" style={{ color: isLight ? 'rgba(95,77,45,0.86)' : 'rgba(225,215,186,0.82)' }}>
+          {prerequisites.blockBody}
+        </Text>
+      </View>
+
+      <Pressable
+        onPress={isChecking ? undefined : onOpenNatalChart}
+        disabled={isChecking}
+        className="mt-3 rounded-[12px] py-3 px-3 items-center flex-row justify-center"
+        style={{
+          opacity: isChecking ? 0.62 : 1,
+          backgroundColor: isLight ? 'rgba(201,168,76,0.14)' : 'rgba(201,168,76,0.2)',
+          borderColor: isLight ? 'rgba(170,141,92,0.34)' : 'rgba(201,168,76,0.38)',
+          borderWidth: 1,
+        }}
+      >
+        <Orbit size={13} color="#E1C066" />
+        <Text className="text-[12px] font-semibold ml-1.5" style={{ color: isLight ? 'rgba(102,79,39,0.96)' : 'rgba(240,225,178,0.96)' }}>
+          {prerequisites.actionLabel}
+        </Text>
+      </Pressable>
+    </View>
+  );
+};
+
+export const DeepDiveTile = React.memo(({
+  onReady,
+  careerPrerequisites,
+}: {
+  onReady?: () => void;
+  careerPrerequisites?: DashboardCareerFeaturePrerequisites;
+}) => {
   const navigation = useNavigation<AppNavigationProp>();
   const { isLight } = useThemeMode();
-  const [isPremium, setIsPremium] = useState(false);
+  const [isPremium, setIsPremium] = useState(careerPrerequisites?.isPremium === true);
+  const [hasResolvedPlan, setHasResolvedPlan] = useState(careerPrerequisites?.isPremium !== null && careerPrerequisites?.isPremium !== undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
-  const [snapshot, setSnapshot] = useState<DeepDiveSnapshot>(FALLBACK_DEEP_DIVE_SNAPSHOT);
+  const [snapshot, setSnapshot] = useState<DeepDiveSnapshot | null>(null);
   const hasSignaledReadyRef = React.useRef(false);
+  const isPrerequisiteChecking = Boolean(
+    careerPrerequisites?.isChecking && !careerPrerequisites.isReadyForCareerFeatures
+  );
+  const isPrerequisiteBlocked = Boolean(
+    careerPrerequisites && !careerPrerequisites.isReadyForCareerFeatures && !isPrerequisiteChecking
+  );
 
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      try {
-        const session = await ensureAuthSession();
-        const premium = session.user.subscriptionTier === 'premium';
-        if (!mounted) return;
-        setIsPremium(premium);
-        if (!premium) return;
-
-        const payload = await fetchFullNatalCareerAnalysis();
-        if (!mounted) return;
-        setNeedsProfileSetup(false);
-        setSnapshot(toDeepDiveSnapshot(payload.analysis));
-      } catch (error) {
-        if (!mounted) return;
-        if (error instanceof ApiError && error.status === 403) {
-          setIsPremium(false);
-          return;
-        }
-        if (error instanceof ApiError && error.status === 404) {
-          setNeedsProfileSetup(true);
-          return;
-        }
-        setSnapshot(FALLBACK_DEEP_DIVE_SNAPSHOT);
-      } finally {
-        if (mounted) {
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const run = async () => {
+        if (careerPrerequisites && !careerPrerequisites.isReadyForCareerFeatures) {
+          if (careerPrerequisites.isPremium !== null) {
+            setIsPremium(careerPrerequisites.isPremium);
+            setHasResolvedPlan(true);
+          }
+          setNeedsProfileSetup(false);
+          setSnapshot(null);
           setIsLoading(false);
+          return;
         }
-      }
-    };
 
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+        if (!hasSignaledReadyRef.current) {
+          setIsLoading(true);
+        }
+        try {
+          const session = await ensureAuthSession();
+          const premium = session.user.subscriptionTier === 'premium';
+          if (!mounted) return;
+          setIsPremium(premium);
+          setHasResolvedPlan(true);
+          if (!premium) return;
+
+          setNeedsProfileSetup(false);
+          const payload = await fetchCachedFullNatalCareerAnalysis();
+          if (!mounted) return;
+          setSnapshot(payload ? toDeepDiveSnapshot(payload.analysis) : null);
+        } catch (error) {
+          if (!mounted) return;
+          if (error instanceof ApiError && error.status === 403) {
+            setIsPremium(false);
+            setHasResolvedPlan(true);
+            return;
+          }
+          if (error instanceof ApiError && error.status === 404) {
+            setSnapshot(null);
+            setNeedsProfileSetup(true);
+            return;
+          }
+          setHasResolvedPlan(true);
+          setSnapshot(null);
+        } finally {
+          if (mounted) {
+            setIsLoading(false);
+          }
+        }
+      };
+
+      void run();
+      return () => {
+        mounted = false;
+      };
+    }, [careerPrerequisites?.isPremium, careerPrerequisites?.isReadyForCareerFeatures])
+  );
 
   useEffect(() => {
     if (!isLoading && !hasSignaledReadyRef.current) {
@@ -153,7 +401,23 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
     }
   }, [isLoading, onReady]);
 
-  const handleOpenAnalysis = () => navigation.navigate('FullNatalCareerAnalysis');
+  const handleOpenAnalysis = () => {
+    trackAnalyticsEvent('full_natal_report_dashboard_cta_tapped', {
+      state: snapshot ? 'saved_report' : 'generate',
+      premium: isPremium,
+      prerequisitesReady: !isPrerequisiteBlocked,
+    });
+    navigation.navigate('FullNatalCareerAnalysis');
+  };
+  const handleOpenNatalChart = () => {
+    trackAnalyticsEvent('full_natal_report_natal_chart_cta_tapped', {
+      source: 'dashboard_tile',
+      reason: careerPrerequisites?.reason ?? (needsProfileSetup ? 'profile_setup' : 'unknown'),
+    });
+    navigation.navigate('NatalChart');
+  };
+  const shouldShowLoadingCard = isPrerequisiteChecking || (!hasResolvedPlan && !isPrerequisiteBlocked) || (isPremium && isLoading && !snapshot && !needsProfileSetup);
+  const canOpenAnalysis = isPremium && !shouldShowLoadingCard && !isPrerequisiteBlocked;
 
   return (
     <View className="px-5 py-2 pb-12">
@@ -164,13 +428,19 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
         >
           Deep Dive Analysis
         </Text>
-        {isPremium ? (
+        {isPremium && canOpenAnalysis ? (
           <Pressable onPress={handleOpenAnalysis} className="flex-row items-center">
             <Text className="text-[11px] font-semibold" style={{ color: 'rgba(201,168,76,0.92)' }}>
-              Full Report
+              {snapshot ? 'Full Report' : 'Generate'}
             </Text>
             <ChevronRight size={13} color="rgba(201,168,76,0.92)" />
           </Pressable>
+        ) : isPremium ? (
+          <View className="flex-row items-center">
+            <Text className="text-[10px] font-semibold" style={{ color: 'rgba(201,168,76,0.72)' }}>
+              {shouldShowLoadingCard ? 'Checking' : 'Locked'}
+            </Text>
+          </View>
         ) : (
           <View className="flex-row items-center bg-[#C9A84C]/10 px-2 py-0.5 rounded-full border border-[#C9A84C]/20">
             <Crown size={10} color="#C9A84C" />
@@ -179,7 +449,15 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
         )}
       </View>
 
-      {isPremium ? needsProfileSetup ? (
+      {shouldShowLoadingCard ? (
+        <LoadingDeepDiveCard isLight={isLight} />
+      ) : isPrerequisiteBlocked && (isPremium || careerPrerequisites?.isPremium === null) && careerPrerequisites ? (
+        <BlockedDeepDiveCard
+          prerequisites={careerPrerequisites}
+          isLight={isLight}
+          onOpenNatalChart={handleOpenNatalChart}
+        />
+      ) : isPremium ? needsProfileSetup ? (
         <View
           className="rounded-[20px] p-4"
           style={{
@@ -219,7 +497,7 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
 
           <View className="flex-row mt-3">
             <Pressable
-              onPress={() => navigation.navigate('NatalChart')}
+              onPress={handleOpenNatalChart}
               className="flex-1 rounded-[12px] py-2.5 mr-2 items-center flex-row justify-center"
               style={{
                 backgroundColor: isLight ? 'rgba(92,70,212,0.12)' : 'rgba(92,70,212,0.16)',
@@ -234,9 +512,10 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
             </Pressable>
 
             <Pressable
-              onPress={handleOpenAnalysis}
+              disabled
               className="flex-1 rounded-[12px] py-2.5 items-center flex-row justify-center"
               style={{
+                opacity: 0.58,
                 backgroundColor: isLight ? 'rgba(201,168,76,0.14)' : 'rgba(201,168,76,0.2)',
                 borderColor: isLight ? 'rgba(170,141,92,0.34)' : 'rgba(201,168,76,0.38)',
                 borderWidth: 1,
@@ -244,12 +523,12 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
             >
               <Sparkles size={13} color="#E1C066" />
               <Text className="text-[12px] font-semibold ml-1.5" style={{ color: isLight ? 'rgba(102,79,39,0.96)' : 'rgba(240,225,178,0.96)' }}>
-                Full Report
+                Report Locked
               </Text>
             </Pressable>
           </View>
         </View>
-      ) : (
+      ) : snapshot ? (
         <View
           className="rounded-[20px] p-4"
           style={{
@@ -363,7 +642,7 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
 
           <View className="flex-row mt-3">
             <Pressable
-              onPress={() => navigation.navigate('NatalChart')}
+              onPress={handleOpenNatalChart}
               className="flex-1 rounded-[12px] py-2.5 mr-2 items-center flex-row justify-center"
               style={{
                 backgroundColor: isLight ? 'rgba(92,70,212,0.12)' : 'rgba(92,70,212,0.16)',
@@ -399,6 +678,8 @@ export const DeepDiveTile = React.memo(({ onReady }: { onReady?: () => void }) =
             </Text>
           ) : null}
         </View>
+      ) : (
+        <GenerateDeepDiveCard isChecking={isLoading} isLight={isLight} onPress={handleOpenAnalysis} />
       ) : (
         <LockedDeepDiveCard onPress={handleOpenAnalysis} isLight={isLight} />
       )}

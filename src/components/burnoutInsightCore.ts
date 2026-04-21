@@ -14,10 +14,10 @@ export type BurnoutInsightMetricRow = BurnoutInsightMetric & {
 
 export const BURNOUT_INSIGHT_TILE_COPY = {
   badge: 'Burnout Radar',
-  fallbackHeadline: 'Could not update burnout guidance',
-  fallbackSummary:
+  unavailableHeadline: 'Could not update burnout guidance',
+  unavailableSummary:
     "Today's burnout guidance is temporarily unavailable. Try again before using this card for planning.",
-  fallbackAction: 'Try Again',
+  unavailableAction: 'Try Again',
 } as const;
 
 export function clampBurnoutInsightValue(value: number) {

@@ -22,6 +22,8 @@ type ZodiacCardLoaderFullscreenProps = {
   sign: ZodiacSign;
   text?: string;
   subtitle?: string;
+  steps?: readonly string[];
+  activeStepIndex?: number;
   appearance?: LoaderAppearance;
 };
 
@@ -634,6 +636,8 @@ export const ZodiacCardLoaderFullscreen = ({
   sign,
   text = 'Consulting the stars...',
   subtitle,
+  steps,
+  activeStepIndex = 0,
   appearance = 'dark',
 }: ZodiacCardLoaderFullscreenProps) => {
   const ambientPulse = useRef(new Animated.Value(0)).current;
@@ -705,6 +709,38 @@ export const ZodiacCardLoaderFullscreen = ({
           brightnessChannels={channels}
         />
         {subtitle ? <Text style={[styles.fullscreenSubtitle, { color: palette.fullscreenSubtitle }]}>{subtitle}</Text> : null}
+        {steps && steps.length > 0 ? (
+          <View style={styles.fullscreenSteps}>
+            {steps.map((step, index) => {
+              const isActive = index === activeStepIndex;
+              const isDone = index < activeStepIndex;
+              return (
+                <View key={step} style={styles.fullscreenStepRow}>
+                  <View
+                    style={[
+                      styles.fullscreenStepDot,
+                      {
+                        backgroundColor: isActive || isDone ? palette.loadingText : 'transparent',
+                        borderColor: isActive || isDone ? palette.loadingText : palette.fullscreenSubtitle,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.fullscreenStepText,
+                      {
+                        color: isActive ? palette.loadingText : palette.fullscreenSubtitle,
+                        opacity: isDone || isActive ? 1 : 0.62,
+                      },
+                    ]}
+                  >
+                    {step}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -801,6 +837,30 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     textAlign: 'center',
+  },
+  fullscreenSteps: {
+    width: '100%',
+    maxWidth: 310,
+    minHeight: 168,
+    marginTop: 18,
+    gap: 9,
+  },
+  fullscreenStepRow: {
+    minHeight: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fullscreenStepDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 99,
+    borderWidth: 1,
+    marginRight: 9,
+  },
+  fullscreenStepText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
   ambientCircleA: {
     position: 'absolute',

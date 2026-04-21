@@ -1,6 +1,6 @@
 # Dashboard Insight Cards Behavior
 **Status:** Active  
-**Last synced:** 2026-04-13
+**Last synced:** 2026-04-21
 
 ## Goal
 
@@ -22,16 +22,16 @@ Document real dashboard insight-card behavior to avoid confusion between feature
 - If a premium user sees an in-threshold same-day insight before the corresponding push is sent, the dashboard acknowledge path calls:
   - `POST /api/notifications/burnout-seen`
   - `POST /api/notifications/lunar-productivity-seen`
-- Fallback policy is per-card:
+- Unavailable-state policy is per-card:
   - `free` plan -> frozen snapshot data kept in state, but alert cards stay hidden because no live threshold can be confirmed
   - regular dashboard `403` / `404` / transport failure -> affected alert card stays hidden because threshold cannot be confirmed
   - push-entry `403` / `404` / transport failure -> degraded unavailable state for the targeted alert card only
   - successful premium fetch -> live snapshot
 - Hydration is also per-card:
   - each card owns its own `SYNCING` state
-  - retrying one fallback card does not block the other card
-- Live cards and push-entry fallback cards may show a local `Updated ...` label based on the last successful live sync timestamp.
-- Fallback cards do not show frozen percentages, severity labels, reasons, or metric bars. They show a plain unavailable message and a `Try Again` action.
+  - retrying one unavailable card does not block the other card
+- Live cards and push-entry unavailable cards may show a local `Updated ...` label based on the last successful live sync timestamp.
+- Unavailable cards do not show frozen percentages, severity labels, reasons, or metric bars. They show a plain unavailable message and a `Try Again` action.
 - Refresh happens on screen focus, so returning from `Settings` re-runs snapshot hydration.
 - When the burnout plan is in threshold or the lunar plan is inside the display range and a same-day push is still pending, the dashboard acknowledge path suppresses that pending push after the card is surfaced.
 - Manual release validation lives in `docs/dashboard-insight-cards-smoke-checklist.md`.
@@ -40,7 +40,7 @@ Document real dashboard insight-card behavior to avoid confusion between feature
 
 - `src/services/dashboardInsightSnapshots.ts` is the mobile source of truth for dashboard-card snapshot shape.
 - The module defines:
-  - frozen fallback snapshots used by preview/default state
+  - frozen preview snapshots used by preview/default state
   - `toBurnoutInsightSnapshotFromPlan(payload)`
   - `toLunarProductivityInsightSnapshotFromPlan(payload)`
 - Adapter intent:
@@ -58,7 +58,7 @@ Current metric compression rules:
 
 - Burnout and lunar cards show user-facing guidance, not raw model diagnostics.
 - Burnout no longer renders the source badge, algorithm-version pill, derived-model footnote, or decorative background glow sphere.
-- Fallback/retry behavior remains available through `Try Again` only for push-entry recovery states, without showing a misleading risk score.
+- Unavailable/retry behavior remains available through `Try Again` only for push-entry recovery states, without showing a misleading risk score.
 
 ## Theme Behavior
 
@@ -88,7 +88,7 @@ Current metric compression rules:
 
 ## Follow-Up Decisions To Record Later
 
-1. Should fallback state show an explicit "temporarily unavailable" badge?
+1. Should unavailable state show an explicit "temporarily unavailable" badge?
 
 ## Related Files
 

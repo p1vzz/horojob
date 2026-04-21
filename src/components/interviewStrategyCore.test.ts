@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { InterviewStrategySlot } from '../types/interviewStrategy';
 import {
-  FALLBACK_INTERVIEW_INSIGHT,
+  DEFAULT_INTERVIEW_INSIGHT,
   buildInterviewStrategyInsight,
   clampInterviewStrategyScore,
   formatInterviewStrategySlotTitle,
   formatInterviewStrategyTimeRange,
   resolveInterviewStrategyScoreTone,
+  resolveInterviewStrategyTimingLabel,
   toInterviewSlotRows,
 } from './interviewStrategyCore';
 
@@ -81,8 +82,8 @@ test('interview strategy core formats time range and slot rows', () => {
   });
 });
 
-test('interview strategy core builds fallback or derived insight text', () => {
-  assert.equal(buildInterviewStrategyInsight(undefined), FALLBACK_INTERVIEW_INSIGHT);
+test('interview strategy core builds default or derived insight text', () => {
+  assert.equal(buildInterviewStrategyInsight(undefined), DEFAULT_INTERVIEW_INSIGHT);
 
   const explicit = createSlot({ explanation: 'B'.repeat(72) });
   assert.equal(buildInterviewStrategyInsight(explicit), 'B'.repeat(72));
@@ -105,24 +106,36 @@ test('interview strategy core builds fallback or derived insight text', () => {
     }
   );
 
-  assert.match(derived, /^Tomorrow \(10:00 - 10:45\) rates at 88% for interviews:/);
+  assert.match(derived, /^Tomorrow \(10:00 - 10:45\) looks supportive for interviews:/);
   assert.match(derived, /career momentum is elevated and AI synergy is supportive\./);
 });
 
 test('interview strategy core resolves score tone thresholds', () => {
-  assert.deepEqual(resolveInterviewStrategyScoreTone(95), {
+  assert.deepEqual(resolveInterviewStrategyScoreTone(82, { isTopPick: true }), {
     accent: '#38CC88',
-    border: 'rgba(56,204,136,0.38)',
-    background: 'rgba(56,204,136,0.11)',
+    border: 'rgba(56,204,136,0.32)',
+    background: 'rgba(56,204,136,0.08)',
+  });
+  assert.deepEqual(resolveInterviewStrategyScoreTone(95), {
+    accent: '#C9A84C',
+    border: 'rgba(201,168,76,0.3)',
+    background: 'rgba(201,168,76,0.075)',
   });
   assert.deepEqual(resolveInterviewStrategyScoreTone(82), {
-    accent: '#C9A84C',
-    border: 'rgba(201,168,76,0.34)',
-    background: 'rgba(201,168,76,0.1)',
+    accent: '#D9C06B',
+    border: 'rgba(217,192,107,0.24)',
+    background: 'rgba(217,192,107,0.06)',
   });
   assert.deepEqual(resolveInterviewStrategyScoreTone(70), {
-    accent: '#D9C06B',
-    border: 'rgba(217,192,107,0.3)',
-    background: 'rgba(217,192,107,0.09)',
+    accent: '#CFC5A7',
+    border: 'rgba(207,197,167,0.2)',
+    background: 'rgba(255,255,255,0.035)',
   });
+});
+
+test('interview strategy core resolves qualitative timing labels', () => {
+  assert.equal(resolveInterviewStrategyTimingLabel(95, { isTopPick: true }), 'Best');
+  assert.equal(resolveInterviewStrategyTimingLabel(95), 'Strong');
+  assert.equal(resolveInterviewStrategyTimingLabel(82), 'Favorable');
+  assert.equal(resolveInterviewStrategyTimingLabel(70), 'Supportive');
 });

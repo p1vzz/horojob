@@ -26,10 +26,10 @@ test('lunar productivity insight core normalizes metric rows for progress widths
 });
 
 test('lunar productivity insight core keeps the frozen snapshot stable', () => {
-  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.fallbackHeadline, 'Could not update lunar guidance');
-  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.fallbackAction, 'Try Again');
-  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.fallbackSummary.includes('84'), false);
-  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.fallbackSummary.toLowerCase().includes('disruptive'), false);
+  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.unavailableHeadline, 'Could not update lunar guidance');
+  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.unavailableAction, 'Try Again');
+  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.unavailableSummary.includes('84'), false);
+  assert.equal(LUNAR_PRODUCTIVITY_TILE_COPY.unavailableSummary.toLowerCase().includes('disruptive'), false);
   assert.equal(FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT.algorithmVersion, 'lunar-productivity-risk-v1');
   assert.equal(FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT.reasons.length, 3);
   assert.equal(FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT.components[0]?.label, 'Rhythm Pressure');

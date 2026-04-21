@@ -58,6 +58,7 @@ type BuildSettingsPremiumFeaturesViewModelArgs = {
   interviewSelectedCalendarId: string | null;
   interviewSettings: Pick<InterviewStrategySettings, 'enabled' | 'filledUntilDateKey'> | null;
   isGeneratingInterviewPlan: boolean;
+  isRemovingInterviewCalendarEvents: boolean;
   isSavingInterviewSettings: boolean;
   isSyncingInterviewCalendar: boolean;
   selectedInterviewCalendarOption: WritableCalendarOption | null;
@@ -177,6 +178,7 @@ export function buildSettingsPremiumFeaturesViewModel(
     interviewSelectedCalendarId,
     interviewSettings,
     isGeneratingInterviewPlan,
+    isRemovingInterviewCalendarEvents,
     isSavingInterviewSettings,
     isSyncingInterviewCalendar,
     selectedInterviewCalendarOption,
@@ -210,25 +212,28 @@ export function buildSettingsPremiumFeaturesViewModel(
   const interviewEnabled = interviewSettings?.enabled ?? false;
   const interviewStatusLabel = resolveFeatureStatusLabel({
     plan,
-    busy: isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar,
+    busy: isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar || isRemovingInterviewCalendarEvents,
     enabled: interviewEnabled,
     activeLabel: 'Auto',
-    inactiveLabel: 'Set up',
+    inactiveLabel: 'Off',
   });
 
-  const interviewSlotsLabel = interviewPlan ? `${interviewPlan.slots.length} slots` : null;
-  const interviewCalendarTargetLabel = selectedInterviewCalendarOption
-    ? `Target ${formatInterviewCalendarOptionLabel(selectedInterviewCalendarOption)}`
-    : interviewSelectedCalendarId
-      ? 'Target selected'
-      : 'Target auto';
-  const interviewPermissionLabel = interviewCalendarPermissionStatus
+  const interviewSlotsLabel =
+    interviewEnabled && interviewPlan
+      ? interviewPlan.slots.length > 0
+        ? 'Windows ready'
+        : 'No standout windows'
+      : null;
+  const interviewCalendarTargetLabel = interviewEnabled
+    ? selectedInterviewCalendarOption
+      ? `Target ${formatInterviewCalendarOptionLabel(selectedInterviewCalendarOption)}`
+      : interviewSelectedCalendarId
+        ? 'Target selected'
+        : 'Target Horojob'
+    : null;
+  const interviewPermissionLabel = interviewEnabled && interviewCalendarPermissionStatus
     ? `Calendar ${interviewCalendarPermissionStatus}`
     : null;
-  const interviewHorizonLabel = interviewSettings?.filledUntilDateKey
-    ? `Filled until ${interviewSettings.filledUntilDateKey}`
-    : null;
-
   return {
     premiumFeatureStates: {
       widget: {
@@ -275,12 +280,11 @@ export function buildSettingsPremiumFeaturesViewModel(
       calendar: {
         activeThumbColor: 'rgba(201,168,76,0.9)',
         activeTrackColor: 'rgba(201,168,76,0.32)',
-        busy: isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar,
+        busy: isSavingInterviewSettings || isGeneratingInterviewPlan || isSyncingInterviewCalendar || isRemovingInterviewCalendarEvents,
         detailLines: toDetailLines([
           interviewSlotsLabel,
           interviewPermissionLabel,
           interviewCalendarTargetLabel,
-          interviewHorizonLabel,
         ]),
         onPress: handleInterviewFeatureRowPress,
         onTogglePress: handleInterviewStrategyToggle,

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Clock3,
   Crown,
+  Info,
   MapPin,
   MoonStar,
   Sun,
@@ -21,6 +22,7 @@ import {
   formatInterviewCalendarOptionLabel,
   formatInterviewSlotWindow,
 } from '../settingsScreenCore';
+import { resolveInterviewStrategyTimingLabel } from '../../components/interviewStrategyCore';
 
 type SettingsIcon = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -74,12 +76,15 @@ const premiumFeatureRows: PremiumFeatureRow[] = [
   {
     id: 'calendar',
     title: 'Interview Strategy',
-    subtitle: 'Generate and sync best interview windows',
+    subtitle: 'Strong timing for interviews and follow-ups',
     Icon: CalendarClock,
     iconColor: '#7C5CFF',
     iconBg: 'rgba(124,92,255,0.12)',
   },
 ];
+
+const INTERVIEW_CALENDAR_HELP_TEXT =
+  'Horojob saves these reminders to a separate calendar so your main schedule stays clean. Apple Calendar usually shows it right away. Google Calendar may keep new local calendars hidden until you turn on Horojob in the calendar list.';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -416,15 +421,19 @@ export function SettingsInterviewStrategyPanel(props: {
   interviewPlan: InterviewStrategyPlan | null;
   interviewSelectedCalendarId: string | null;
   interviewSettings: InterviewStrategySettings | null;
+  interviewErrorText: string | null;
+  hasInterviewCalendarEvents: boolean;
   interviewSyncSummary: string | null;
   isGeneratingInterviewPlan: boolean;
   isInterviewCalendarListVisible: boolean;
   isLoadingInterviewCalendars: boolean;
+  isRemovingInterviewCalendarEvents: boolean;
   isSavingInterviewSettings: boolean;
   isSyncingInterviewCalendar: boolean;
   onAddToCalendar: () => void;
-  onGenerate: () => void;
+  onRemoveFromCalendar: () => void;
   onOpenCalendarPicker: () => void;
+  onRetry: () => void;
   onSelectInterviewCalendar: (calendarId: string | null) => void;
   selectedInterviewCalendarOption: WritableCalendarOption | null;
 }) {
@@ -432,22 +441,49 @@ export function SettingsInterviewStrategyPanel(props: {
     interviewCalendarOptions,
     interviewPlan,
     interviewSelectedCalendarId,
-    interviewSettings,
+    interviewErrorText,
+    hasInterviewCalendarEvents,
     interviewSyncSummary,
     isGeneratingInterviewPlan,
     isInterviewCalendarListVisible,
     isLoadingInterviewCalendars,
+    isRemovingInterviewCalendarEvents,
     isSavingInterviewSettings,
     isSyncingInterviewCalendar,
     onAddToCalendar,
-    onGenerate,
+    onRemoveFromCalendar,
     onOpenCalendarPicker,
+    onRetry,
     onSelectInterviewCalendar,
     selectedInterviewCalendarOption,
   } = props;
 
   const isCalendarPickerDisabled =
-    isSyncingInterviewCalendar || isGeneratingInterviewPlan || isSavingInterviewSettings || isLoadingInterviewCalendars;
+    isSyncingInterviewCalendar ||
+    isRemovingInterviewCalendarEvents ||
+    isGeneratingInterviewPlan ||
+    isSavingInterviewSettings ||
+    isLoadingInterviewCalendars;
+  const [isCalendarHelpVisible, setIsCalendarHelpVisible] = React.useState(false);
+  const handleOpenCalendarPicker = React.useCallback(() => {
+    setIsCalendarHelpVisible(false);
+    onOpenCalendarPicker();
+  }, [onOpenCalendarPicker]);
+  const handleSelectInterviewCalendar = React.useCallback(
+    (calendarId: string | null) => {
+      setIsCalendarHelpVisible(false);
+      onSelectInterviewCalendar(calendarId);
+    },
+    [onSelectInterviewCalendar]
+  );
+  let strongestInterviewSlotId: string | null = null;
+  if (interviewPlan?.slots.length) {
+    let strongestSlot = interviewPlan.slots[0];
+    for (const slot of interviewPlan.slots) {
+      if (slot.score > strongestSlot.score) strongestSlot = slot;
+    }
+    strongestInterviewSlotId = strongestSlot.id;
+  }
 
   return (
     <View
@@ -464,37 +500,48 @@ export function SettingsInterviewStrategyPanel(props: {
             INTERVIEW STRATEGY
           </Text>
           <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.94)' }}>
-            Sparse natal interview windows for next 30 days
+            Strong interview timing for the upcoming month
           </Text>
           <Text className="text-[11px] mt-1" style={{ color: 'rgba(212,212,224,0.56)' }}>
-            4-5 strongest monthly ranges, one focused block per selected day
+            Only days with clear supportive signals are shown
           </Text>
-          {interviewSettings?.autoFillConfirmedAt ? (
-            <Text className="text-[10px] mt-1" style={{ color: 'rgba(212,212,224,0.5)' }}>
-              Autofill active since {new Date(interviewSettings.autoFillConfirmedAt).toLocaleDateString()}
-            </Text>
-          ) : null}
-          {interviewSettings?.filledUntilDateKey ? (
-            <Text className="text-[10px] mt-1" style={{ color: 'rgba(212,212,224,0.5)' }}>
-              Server horizon: {interviewSettings.filledUntilDateKey}
-            </Text>
-          ) : null}
         </View>
-        <Pressable
-          onPress={onGenerate}
-          className="px-3 py-2 rounded-[10px]"
+        {interviewErrorText ? (
+          <Pressable
+            onPress={onRetry}
+            disabled={isGeneratingInterviewPlan}
+            className="px-3 py-2 rounded-[10px]"
+            style={{
+              backgroundColor: 'rgba(160,140,255,0.16)',
+              borderColor: 'rgba(160,140,255,0.34)',
+              borderWidth: 1,
+              opacity: isGeneratingInterviewPlan ? 0.8 : 1,
+            }}
+          >
+            <Text className="text-[11px] font-semibold" style={{ color: 'rgba(221,214,255,0.98)' }}>
+              {isGeneratingInterviewPlan ? 'Retrying...' : 'Retry'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {interviewErrorText ? (
+        <View
+          className="mt-3 rounded-[10px] px-2.5 py-2.5"
           style={{
-            backgroundColor: 'rgba(160,140,255,0.16)',
-            borderColor: 'rgba(160,140,255,0.34)',
+            backgroundColor: 'rgba(255,107,107,0.08)',
+            borderColor: 'rgba(255,107,107,0.24)',
             borderWidth: 1,
-            opacity: isGeneratingInterviewPlan ? 0.8 : 1,
           }}
         >
-          <Text className="text-[11px] font-semibold" style={{ color: 'rgba(221,214,255,0.98)' }}>
-            {isGeneratingInterviewPlan ? 'Generating...' : 'Generate'}
+          <Text className="text-[11px] font-semibold" style={{ color: 'rgba(255,196,196,0.96)' }}>
+            Interview windows did not update
           </Text>
-        </Pressable>
-      </View>
+          <Text className="text-[10px] mt-1" style={{ color: 'rgba(255,220,220,0.62)' }}>
+            {interviewErrorText}
+          </Text>
+        </View>
+      ) : null}
 
       <View
         className="mt-3 rounded-[10px] px-3 py-2.5"
@@ -506,19 +553,31 @@ export function SettingsInterviewStrategyPanel(props: {
       >
         <View className="flex-row items-center justify-between">
           <View className="flex-1 pr-2">
-            <Text className="text-[10px] tracking-[1.1px] font-semibold mb-0.5" style={{ color: 'rgba(212,212,224,0.5)' }}>
-              TARGET CALENDAR
-            </Text>
+            <View className="flex-row items-center mb-0.5">
+              <Text className="text-[10px] tracking-[1.1px] font-semibold" style={{ color: 'rgba(212,212,224,0.5)' }}>
+                TARGET CALENDAR
+              </Text>
+              <Pressable
+                onPress={() => setIsCalendarHelpVisible((value) => !value)}
+                accessibilityRole="button"
+                accessibilityLabel="Calendar visibility help"
+                className="ml-1.5 p-1 rounded-[8px]"
+                hitSlop={8}
+                style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+              >
+                <Info size={12} color="rgba(212,212,224,0.52)" />
+              </Pressable>
+            </View>
             <Text className="text-[12px] font-semibold" numberOfLines={1} style={{ color: 'rgba(233,233,242,0.92)' }}>
               {selectedInterviewCalendarOption
                 ? formatInterviewCalendarOptionLabel(selectedInterviewCalendarOption)
                 : interviewSelectedCalendarId
                   ? 'Selected calendar'
-                  : 'Auto (default writable calendar)'}
+                  : 'Auto (Horojob calendar)'}
             </Text>
           </View>
           <Pressable
-            onPress={onOpenCalendarPicker}
+            onPress={handleOpenCalendarPicker}
             disabled={isCalendarPickerDisabled}
             className="px-2.5 py-1.5 rounded-[9px]"
             style={{
@@ -534,10 +593,47 @@ export function SettingsInterviewStrategyPanel(props: {
           </Pressable>
         </View>
 
+        {isCalendarHelpVisible ? (
+          <View className="mt-2" style={{ maxWidth: 320 }}>
+            <View
+              style={{
+                width: 10,
+                height: 10,
+                marginLeft: 84,
+                marginBottom: -5,
+                backgroundColor: 'rgba(22,20,28,0.98)',
+                borderLeftWidth: 1,
+                borderTopWidth: 1,
+                borderLeftColor: 'rgba(255,255,255,0.08)',
+                borderTopColor: 'rgba(255,255,255,0.08)',
+                transform: [{ rotate: '45deg' }],
+                zIndex: 1,
+              }}
+            />
+            <View
+              className="rounded-[12px] px-3 py-2"
+              style={{
+                backgroundColor: 'rgba(22,20,28,0.98)',
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                shadowColor: '#000',
+                shadowOpacity: 0.22,
+                shadowRadius: 18,
+                shadowOffset: { width: 0, height: 10 },
+                elevation: 10,
+              }}
+            >
+              <Text className="text-[11px] leading-[16px]" style={{ color: 'rgba(212,212,224,0.72)' }}>
+                {INTERVIEW_CALENDAR_HELP_TEXT}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {isInterviewCalendarListVisible ? (
           <View className="mt-2">
             <Pressable
-              onPress={() => onSelectInterviewCalendar(null)}
+              onPress={() => handleSelectInterviewCalendar(null)}
               className="rounded-[9px] px-2.5 py-2 mb-2"
               style={{
                 backgroundColor: !interviewSelectedCalendarId ? 'rgba(160,140,255,0.16)' : 'rgba(255,255,255,0.03)',
@@ -547,7 +643,7 @@ export function SettingsInterviewStrategyPanel(props: {
             >
               <View className="flex-row items-center justify-between">
                 <Text className="text-[11px] font-semibold pr-2 flex-1" style={{ color: 'rgba(233,233,242,0.9)' }}>
-                  Auto (default writable calendar)
+                  Auto (Horojob calendar)
                 </Text>
                 {!interviewSelectedCalendarId ? (
                   <Text className="text-[10px] font-semibold" style={{ color: 'rgba(221,214,255,0.9)' }}>
@@ -562,7 +658,7 @@ export function SettingsInterviewStrategyPanel(props: {
               return (
                 <Pressable
                   key={option.id}
-                  onPress={() => onSelectInterviewCalendar(option.id)}
+                  onPress={() => handleSelectInterviewCalendar(option.id)}
                   className="rounded-[9px] px-2.5 py-2 mb-2"
                   style={{
                     backgroundColor: isSelected ? 'rgba(160,140,255,0.16)' : 'rgba(255,255,255,0.03)',
@@ -587,20 +683,59 @@ export function SettingsInterviewStrategyPanel(props: {
         ) : null}
       </View>
 
-      <Pressable
-        onPress={onAddToCalendar}
-        className="mt-3 px-3 py-2.5 rounded-[10px] items-center"
-        style={{
-          backgroundColor: 'rgba(160,140,255,0.16)',
-          borderColor: 'rgba(160,140,255,0.38)',
-          borderWidth: 1,
-          opacity: isSyncingInterviewCalendar ? 0.8 : 1,
-        }}
-      >
-        <Text className="text-[12px] font-semibold" style={{ color: 'rgba(221,214,255,0.98)' }}>
-          {isSyncingInterviewCalendar ? 'Syncing Calendar...' : 'Add to Calendar'}
+      <View className="mt-3">
+        <Text className="text-[11px] leading-[17px] mb-2" style={{ color: 'rgba(212,212,224,0.58)' }}>
+          Add these windows as calendar reminders. They stay marked as free time, and you can remove Horojob reminders anytime.
         </Text>
-      </Pressable>
+        <View className="flex-row">
+          <Pressable
+            onPress={onAddToCalendar}
+            disabled={
+              !interviewPlan ||
+              interviewPlan.slots.length === 0 ||
+              isSavingInterviewSettings ||
+              isSyncingInterviewCalendar ||
+              isRemovingInterviewCalendarEvents
+            }
+            className="flex-1 px-3 py-2.5 rounded-[10px] items-center"
+            style={{
+              backgroundColor: 'rgba(160,140,255,0.16)',
+              borderColor: 'rgba(160,140,255,0.38)',
+              borderWidth: 1,
+              opacity:
+                !interviewPlan ||
+                interviewPlan.slots.length === 0 ||
+                isSavingInterviewSettings ||
+                isSyncingInterviewCalendar ||
+                isRemovingInterviewCalendarEvents
+                  ? 0.62
+                  : 1,
+            }}
+          >
+            <Text className="text-[12px] font-semibold" style={{ color: 'rgba(221,214,255,0.98)' }}>
+              {isSyncingInterviewCalendar ? 'Syncing...' : 'Add to Calendar'}
+            </Text>
+          </Pressable>
+
+          {hasInterviewCalendarEvents ? (
+            <Pressable
+              onPress={onRemoveFromCalendar}
+              disabled={isSavingInterviewSettings || isRemovingInterviewCalendarEvents || isSyncingInterviewCalendar}
+              className="ml-2 px-3 py-2.5 rounded-[10px] items-center"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderColor: 'rgba(255,255,255,0.14)',
+                borderWidth: 1,
+                opacity: isSavingInterviewSettings || isRemovingInterviewCalendarEvents || isSyncingInterviewCalendar ? 0.62 : 1,
+              }}
+            >
+              <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.82)' }}>
+                {isRemovingInterviewCalendarEvents ? 'Removing...' : 'Remove from Calendar'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
 
       {interviewSyncSummary ? (
         <Text className="text-[11px] mt-2" style={{ color: 'rgba(212,212,224,0.56)' }}>
@@ -612,7 +747,7 @@ export function SettingsInterviewStrategyPanel(props: {
         interviewPlan.slots.length > 0 ? (
           <View className="mt-3">
             <Text className="text-[10px] tracking-[1.1px] font-semibold mb-2" style={{ color: 'rgba(212,212,224,0.56)' }}>
-              TOP WINDOWS
+              RECOMMENDED WINDOWS
             </Text>
             {interviewPlan.slots.slice(0, 6).map((slot) => (
               <View
@@ -629,7 +764,7 @@ export function SettingsInterviewStrategyPanel(props: {
                     {formatInterviewSlotWindow(slot.startAt, slot.endAt)}
                   </Text>
                   <Text className="text-[11px] font-semibold" style={{ color: 'rgba(201,168,76,0.92)' }}>
-                    {slot.score}%
+                    {resolveInterviewStrategyTimingLabel(slot.score, { isTopPick: slot.id === strongestInterviewSlotId })}
                   </Text>
                 </View>
                 <Text className="text-[10px] mt-1" style={{ color: 'rgba(212,212,224,0.55)' }}>
@@ -648,16 +783,16 @@ export function SettingsInterviewStrategyPanel(props: {
             }}
           >
             <Text className="text-[11px] font-semibold" style={{ color: 'rgba(233,233,242,0.9)' }}>
-              No slots passed threshold
+              No standout interview windows right now
             </Text>
             <Text className="text-[10px] mt-1" style={{ color: 'rgba(212,212,224,0.55)' }}>
-              Regenerate after the next transit refresh or once your natal chart has been rebuilt.
+              Nothing in the upcoming month clears our confidence bar. Keep applying normally; we will refresh this automatically.
             </Text>
           </View>
         )
       ) : (
         <Text className="text-[11px] mt-3" style={{ color: 'rgba(212,212,224,0.54)' }}>
-          Generate strategy to preview ranked interview windows.
+          Interview windows are preparing automatically.
         </Text>
       )}
     </View>

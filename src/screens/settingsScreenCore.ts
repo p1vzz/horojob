@@ -1,4 +1,7 @@
 import type { WritableCalendarOption } from '../services/calendar';
+import { resolveDeviceTimezoneIana } from '../utils/timezone';
+
+export { resolveDeviceTimezoneIana };
 
 export function formatMinuteLabel(minuteOfDay: number) {
   const normalized = Math.max(0, Math.min(1439, Math.trunc(minuteOfDay)));
@@ -45,18 +48,4 @@ export function formatInterviewSlotWindow(
 export function formatInterviewCalendarOptionLabel(option: WritableCalendarOption) {
   if (!option.sourceName || option.sourceName === option.title) return option.title;
   return `${option.title} - ${option.sourceName}`;
-}
-
-export function resolveDeviceTimezoneIana(resolveTimezone: () => string | null = defaultResolveTimezone) {
-  try {
-    const value = resolveTimezone();
-    if (value && value.trim().length > 0) return value.trim();
-  } catch {
-    // Fallback to product default timezone when runtime cannot resolve IANA.
-  }
-  return 'America/New_York';
-}
-
-function defaultResolveTimezone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
 }

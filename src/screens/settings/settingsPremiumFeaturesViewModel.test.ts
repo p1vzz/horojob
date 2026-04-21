@@ -71,6 +71,7 @@ function createInterviewSettings(enabled: boolean): InterviewStrategySettings {
     lastGeneratedAt: '2026-03-31T08:00:00.000Z',
     updatedAt: '2026-03-31T08:00:00.000Z',
     source: 'saved',
+    timezoneIana: 'Europe/Warsaw',
     slotDurationMinutes: 45,
     allowedWeekdays: [1, 3, 5],
     workdayStartMinute: 540,
@@ -143,6 +144,7 @@ test('settings premium features view model locks premium rows for free plan', ()
     interviewSelectedCalendarId: null,
     interviewSettings: null,
     isGeneratingInterviewPlan: false,
+    isRemovingInterviewCalendarEvents: false,
     isSavingInterviewSettings: false,
     isSyncingInterviewCalendar: false,
     selectedInterviewCalendarOption: null,
@@ -155,7 +157,7 @@ test('settings premium features view model locks premium rows for free plan', ()
   assert.equal(result.premiumFeatureStates.burnout.statusLabel, 'Upgrade');
   assert.equal(result.premiumFeatureStates.lunar.statusLabel, 'Upgrade');
   assert.equal(result.premiumFeatureStates.calendar.statusLabel, 'Upgrade');
-  assert.deepEqual(result.premiumFeatureStates.calendar.detailLines, ['Target auto']);
+  assert.deepEqual(result.premiumFeatureStates.calendar.detailLines, []);
 });
 
 test('settings premium features view model reflects premium feature state details', () => {
@@ -194,6 +196,7 @@ test('settings premium features view model reflects premium feature state detail
     interviewSelectedCalendarId: 'work',
     interviewSettings: createInterviewSettings(true),
     isGeneratingInterviewPlan: false,
+    isRemovingInterviewCalendarEvents: false,
     isSavingInterviewSettings: false,
     isSyncingInterviewCalendar: false,
     selectedInterviewCalendarOption: createCalendarOption(),
@@ -217,10 +220,9 @@ test('settings premium features view model reflects premium feature state detail
   ]);
   assert.equal(result.premiumFeatureStates.calendar.statusLabel, 'Auto');
   assert.deepEqual(result.premiumFeatureStates.calendar.detailLines, [
-    '2 slots',
+    'Windows ready',
     'Calendar granted',
     'Target Work - Google',
-    'Filled until 2026-04-07',
   ]);
 });
 
@@ -255,6 +257,7 @@ test('settings premium features view model keeps lunar row useful outside the da
     interviewSelectedCalendarId: null,
     interviewSettings: null,
     isGeneratingInterviewPlan: false,
+    isRemovingInterviewCalendarEvents: false,
     isSavingInterviewSettings: false,
     isSyncingInterviewCalendar: false,
     selectedInterviewCalendarOption: null,

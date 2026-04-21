@@ -30,6 +30,7 @@ export type InterviewStrategySlot = {
   timezoneIana: string;
   score: number;
   explanation: string;
+  explanationSource?: 'deterministic' | 'llm';
   calendarNote?: string;
   breakdown: InterviewStrategyScoreBreakdown;
 };

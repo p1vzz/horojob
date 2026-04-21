@@ -8,12 +8,19 @@ import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext
 import { adaptColorOpacity } from '../utils/brightnessAdaptation';
 import { JOB_CHECK_SUPPORTED_SERVICES, JOB_CHECK_TILE_COPY } from './jobCheckTileCore';
 import { getJobCheckTileVisuals } from './jobCheckTileVisuals';
+import type { DashboardCareerFeaturePrerequisites } from '../hooks/useDashboardPrerequisites';
 
-export const JobCheckTile = React.memo(() => {
+export const JobCheckTile = React.memo(({
+  careerPrerequisites,
+}: {
+  careerPrerequisites?: DashboardCareerFeaturePrerequisites;
+}) => {
   const theme = useAppTheme();
   const { channels } = useBrightnessAdaptation();
   const navigation = useNavigation<AppNavigationProp>();
   const baseVisuals = getJobCheckTileVisuals(theme.isLight);
+  const isBlocked = careerPrerequisites?.isReadyForCareerFeatures === false;
+  const canPressAction = !isBlocked || careerPrerequisites?.reason !== 'checking';
   const visuals = useMemo(
     () => ({
       actionBackground: adaptColorOpacity(
@@ -39,8 +46,12 @@ export const JobCheckTile = React.memo(() => {
   );
 
   const navigateToScanner = React.useCallback(() => {
+    if (isBlocked) {
+      navigation.navigate('NatalChart');
+      return;
+    }
     navigation.navigate('Scanner');
-  }, [navigation]);
+  }, [isBlocked, navigation]);
 
   return (
     <View className="px-5 py-2">
@@ -59,17 +70,18 @@ export const JobCheckTile = React.memo(() => {
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open job scanner"
+            accessibilityLabel={isBlocked ? 'Open natal chart' : 'Open job scanner'}
             style={{ marginLeft: 'auto' }}
             onPress={navigateToScanner}
+            disabled={!canPressAction}
             hitSlop={8}
           >
-            <ArrowRight size={14} color={visuals.actionIcon} />
+            <ArrowRight size={14} color={visuals.actionIcon} opacity={canPressAction ? 1 : 0.55} />
           </Pressable>
         </View>
 
         <Text className="text-[12px] mb-4 leading-[18px]" style={{ color: visuals.descriptionText }}>
-          {JOB_CHECK_TILE_COPY.description}
+          {isBlocked ? careerPrerequisites?.blockBody : JOB_CHECK_TILE_COPY.description}
         </Text>
 
         <Text className="text-[10px] font-semibold uppercase mb-2" style={{ color: visuals.servicesLabelText }}>
@@ -121,14 +133,16 @@ export const JobCheckTile = React.memo(() => {
           <Pressable
             accessibilityRole="button"
             onPress={navigateToScanner}
+            disabled={!canPressAction}
             className="flex-row items-center rounded-[8px] px-3 py-2 border"
             style={{
+              opacity: canPressAction ? 1 : 0.62,
               backgroundColor: visuals.actionBackground,
               borderColor: visuals.actionBorder,
             }}
           >
             <Text className="text-[11px] font-semibold mr-1.5" style={{ color: visuals.actionText }}>
-              {JOB_CHECK_TILE_COPY.actionLabel}
+              {isBlocked ? careerPrerequisites?.actionLabel : JOB_CHECK_TILE_COPY.actionLabel}
             </Text>
             <ArrowRight size={13} color={visuals.actionText} />
           </Pressable>

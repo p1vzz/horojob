@@ -7,49 +7,8 @@ export type AiSynergyPalette = {
   scoreSubColor: string;
 };
 
-export function createFallbackAiSynergy(generatedAt = new Date().toISOString()): AiSynergyView {
-  return {
-    algorithmVersion: 'fallback',
-    dateKey: '',
-    narrativeSource: 'template',
-    llmModel: null,
-    llmPromptVersion: null,
-    score: 92,
-    scoreLabel: '92%',
-    band: 'strong',
-    confidence: 72,
-    headline: 'Strong AI collaboration day',
-    summary: 'Today supports focused AI-assisted execution.',
-    description: 'Use AI for structured drafting, summarizing, and repetitive decisions. Keep final judgment on high-impact work.',
-    recommendations: [
-      'Turn one repetitive workflow into a structured prompt.',
-      'Use AI for first drafts, then review the final output yourself.',
-      'Keep vague strategy calls human-led today.',
-    ],
-    components: {
-      cognitiveFlow: 90,
-      automationReadiness: 93,
-      decisionQuality: 86,
-      collaborationWithAI: 88,
-    },
-    signals: {
-      dominantPlanet: 'Mercury',
-      dominantHouse: 10,
-      mcSign: null,
-      ascSign: null,
-      positiveAspects: 3,
-      hardAspects: 1,
-      natalTechnicalBias: 78,
-      natalCommunicationBias: 81,
-    },
-    generatedAt,
-  };
-}
-
-export const FALLBACK_AI_SYNERGY = createFallbackAiSynergy();
-
 export function selectAiSynergyView(value: DailyTransitResponse['aiSynergy'] | null | undefined) {
-  return value ?? FALLBACK_AI_SYNERGY;
+  return value ?? null;
 }
 
 export function formatAiSynergyConfidenceLabel(confidence: number) {

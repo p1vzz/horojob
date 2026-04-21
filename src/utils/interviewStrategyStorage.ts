@@ -120,6 +120,9 @@ function parseInterviewPlan(raw: string | null): InterviewStrategyPlan | null {
           explanation: slot.explanation,
           breakdown: normalizedBreakdown,
         };
+        if (slot.explanationSource === 'deterministic' || slot.explanationSource === 'llm') {
+          normalizedSlot.explanationSource = slot.explanationSource;
+        }
         if (typeof slot.calendarNote === 'string') normalizedSlot.calendarNote = slot.calendarNote;
         return normalizedSlot;
       })

@@ -42,13 +42,13 @@ export function createUnavailableDashboardInsightsState(): DashboardInsightsStat
   return {
     burnout: {
       snapshot: FROZEN_BURNOUT_SNAPSHOT,
-      source: 'fallback',
+      source: 'unavailable',
       isHydrating: false,
       lastSyncedAt: null,
     },
     lunar: {
       snapshot: FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT,
-      source: 'fallback',
+      source: 'unavailable',
       isHydrating: false,
       lastSyncedAt: null,
     },
@@ -91,7 +91,7 @@ function resolveBurnoutInsight(
   if (!result || result.status === 'rejected') {
     return {
       snapshot: FROZEN_BURNOUT_SNAPSHOT,
-      source: 'fallback',
+      source: 'unavailable',
       isHydrating: false,
       lastSyncedAt,
     };
@@ -113,7 +113,7 @@ function resolveLunarInsight(
   if (!result || result.status === 'rejected') {
     return {
       snapshot: FROZEN_LUNAR_PRODUCTIVITY_SNAPSHOT,
-      source: 'fallback',
+      source: 'unavailable',
       isHydrating: false,
       lastSyncedAt,
     };

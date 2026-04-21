@@ -153,6 +153,7 @@ export type LunarProductivitySettingsResponse = {
 
 export type InterviewStrategySettings = InterviewStrategyPreferences & {
   enabled: boolean;
+  timezoneIana: string;
   autoFillConfirmedAt: string | null;
   autoFillStartAt: string | null;
   filledUntilDateKey: string | null;
@@ -173,8 +174,16 @@ export type InterviewStrategySettingsResponse = {
   settings: InterviewStrategySettings;
 };
 
+type NotificationsRequestInit = RequestInit & {
+  timeoutMs?: number;
+};
+
+export const INTERVIEW_STRATEGY_SETTINGS_TIMEOUT_MS = 15_000;
+export const INTERVIEW_STRATEGY_PLAN_TIMEOUT_MS = 90_000;
+export const INTERVIEW_STRATEGY_REFRESH_TIMEOUT_MS = 90_000;
+
 export type NotificationsApiDeps = {
-  authorizedFetch: (path: string, init?: RequestInit) => Promise<Response>;
+  authorizedFetch: (path: string, init?: NotificationsRequestInit) => Promise<Response>;
   parseJsonBody: (response: Response) => Promise<unknown>;
   ApiError: new (status: number, message: string, payload: unknown) => Error;
 };
@@ -300,6 +309,7 @@ export function createNotificationsApi(deps: NotificationsApiDeps) {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
+      timeoutMs: INTERVIEW_STRATEGY_SETTINGS_TIMEOUT_MS,
     });
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
@@ -312,7 +322,9 @@ export function createNotificationsApi(deps: NotificationsApiDeps) {
     const query = new URLSearchParams({
       refresh: options?.refresh ? 'true' : 'false',
     });
-    const response = await deps.authorizedFetch(`/api/notifications/interview-strategy-plan?${query.toString()}`);
+    const response = await deps.authorizedFetch(`/api/notifications/interview-strategy-plan?${query.toString()}`, {
+      timeoutMs: options?.refresh ? INTERVIEW_STRATEGY_REFRESH_TIMEOUT_MS : INTERVIEW_STRATEGY_PLAN_TIMEOUT_MS,
+    });
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
       throw new deps.ApiError(response.status, 'Failed to fetch interview strategy plan', payload);

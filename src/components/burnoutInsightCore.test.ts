@@ -27,10 +27,10 @@ test('burnout insight core normalizes metric rows for progress widths', () => {
 
 test('burnout insight core keeps frozen snapshot and copy stable', () => {
   assert.equal(BURNOUT_INSIGHT_TILE_COPY.badge, 'Burnout Radar');
-  assert.equal(BURNOUT_INSIGHT_TILE_COPY.fallbackHeadline, 'Could not update burnout guidance');
-  assert.equal(BURNOUT_INSIGHT_TILE_COPY.fallbackAction, 'Try Again');
-  assert.equal(BURNOUT_INSIGHT_TILE_COPY.fallbackSummary.includes('85'), false);
-  assert.equal(BURNOUT_INSIGHT_TILE_COPY.fallbackSummary.toLowerCase().includes('critical'), false);
+  assert.equal(BURNOUT_INSIGHT_TILE_COPY.unavailableHeadline, 'Could not update burnout guidance');
+  assert.equal(BURNOUT_INSIGHT_TILE_COPY.unavailableAction, 'Try Again');
+  assert.equal(BURNOUT_INSIGHT_TILE_COPY.unavailableSummary.includes('85'), false);
+  assert.equal(BURNOUT_INSIGHT_TILE_COPY.unavailableSummary.toLowerCase().includes('critical'), false);
   assert.equal(FROZEN_BURNOUT_SNAPSHOT.algorithmVersion, 'burnout-risk-v1');
   assert.equal(FROZEN_BURNOUT_SNAPSHOT.reasons.length, 3);
   assert.equal(FROZEN_BURNOUT_SNAPSHOT.components[0]?.label, 'Sustained Load');

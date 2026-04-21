@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -6,10 +6,24 @@ import { ChevronLeft, Crown, Lock, Sparkles, Orbit, TrendingUp, CalendarDays } f
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { AppNavigationProp } from '../types/navigation';
 import { ApiError } from '../services/authSession';
-import { fetchFullNatalCareerAnalysis, type FullNatalCareerAnalysisResponse } from '../services/astrologyApi';
+import {
+  fetchFullNatalCareerAnalysis,
+  fetchFullNatalCareerAnalysisProgress,
+  type FullNatalCareerAnalysisResponse,
+  type OperationProgressResponse,
+} from '../services/astrologyApi';
+import { FULL_NATAL_GUIDANCE_DISCLAIMER } from '../services/fullNatalCareerAnalysisCopy';
+import { trackAnalyticsEvent } from '../services/analytics';
 import { FullScreenCosmicLoader } from '../components/loaders/FullScreenCosmicLoader';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
+import {
+  FULL_NATAL_GENERATION_STEPS,
+  resolveFullNatalLoaderContent,
+  resolveFullNatalAnalysisErrorCopy,
+  shouldShowProfileChangeNotice,
+  type FullNatalAnalysisErrorCopy,
+} from './fullNatalCareerAnalysisCore';
 
 type ScreenState = 'loading' | 'ready' | 'premium_required' | 'error';
 type PhaseKey = '0_6_months' | '6_18_months' | '18_36_months';
@@ -75,6 +89,10 @@ function extractApiMessage(error: ApiError) {
   return typeof message === 'string' ? message : error.message;
 }
 
+function isFetchTimeoutError(error: unknown) {
+  return error instanceof Error && error.name === 'FetchTimeoutError';
+}
+
 function SectionTitle({ title }: { title: string }) {
   return (
     <Text
@@ -115,18 +133,34 @@ export const FullNatalCareerAnalysisScreen = () => {
   const navigation = useNavigation<AppNavigationProp<'FullNatalCareerAnalysis'>>();
   const [screenState, setScreenState] = useState<ScreenState>('loading');
   const [response, setResponse] = useState<FullNatalCareerAnalysisResponse | null>(null);
-  const [errorText, setErrorText] = useState<string | null>(null);
+  const [errorCopy, setErrorCopy] = useState<FullNatalAnalysisErrorCopy | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [retryAttempts, setRetryAttempts] = useState(0);
+  const [loaderProgress, setLoaderProgress] = useState<OperationProgressResponse | null>(null);
+  const loadStartedAtRef = useRef(0);
 
-  const loadAnalysis = useCallback(async (isMountedRef: { value: boolean }) => {
+  const loadAnalysis = useCallback(async (isMountedRef: { value: boolean }, retryAttempt: number) => {
+    const startedAt = Date.now();
+    loadStartedAtRef.current = startedAt;
     setScreenState('loading');
-    setErrorText(null);
+    setErrorCopy(null);
+    setLoaderProgress(null);
+    trackAnalyticsEvent('full_natal_report_generation_started', {
+      retryAttempt,
+      source: 'full_report_screen',
+    });
 
     try {
       const payload = await fetchFullNatalCareerAnalysis();
       if (!isMountedRef.value) return;
       setResponse(payload);
       setScreenState('ready');
+      trackAnalyticsEvent('full_natal_report_generation_succeeded', {
+        cached: payload.cached,
+        retryAttempt,
+        durationMs: Date.now() - startedAt,
+        profileChangeNoticeShown: shouldShowProfileChangeNotice(payload.profileChangeNotice),
+      });
     } catch (error) {
       if (!isMountedRef.value) return;
       setResponse(null);
@@ -134,44 +168,133 @@ export const FullNatalCareerAnalysisScreen = () => {
       if (error instanceof ApiError) {
         if (error.status === 403 && (extractApiCode(error) === 'premium_required' || !extractApiCode(error))) {
           setScreenState('premium_required');
+          trackAnalyticsEvent('full_natal_report_premium_required', {
+            retryAttempt,
+            durationMs: Date.now() - startedAt,
+          });
           return;
         }
 
-        if (error.status === 404) {
-          setScreenState('error');
-          setErrorText('Birth profile or natal chart is missing. Open Natal Chart first, then return here.');
-          return;
-        }
-
+        const apiCode = extractApiCode(error);
+        const copy = resolveFullNatalAnalysisErrorCopy({
+          status: error.status,
+          code: apiCode,
+          message: extractApiMessage(error),
+        });
         setScreenState('error');
-        setErrorText(extractApiMessage(error));
+        setErrorCopy(copy);
+        trackAnalyticsEvent('full_natal_report_generation_failed', {
+          status: error.status,
+          code: apiCode ?? 'unknown',
+          retryAttempt,
+          retryAvailable: copy.action === 'retry' && retryAttempt < 1,
+          durationMs: Date.now() - startedAt,
+        });
         return;
       }
 
+      if (isFetchTimeoutError(error)) {
+        const copy = resolveFullNatalAnalysisErrorCopy({ isTimeout: true });
+        setScreenState('error');
+        setErrorCopy(copy);
+        trackAnalyticsEvent('full_natal_report_generation_failed', {
+          status: 'timeout',
+          code: 'client_timeout',
+          retryAttempt,
+          retryAvailable: retryAttempt < 1,
+          durationMs: Date.now() - startedAt,
+        });
+        return;
+      }
+
+      const copy = resolveFullNatalAnalysisErrorCopy({
+        isNetworkError: error instanceof TypeError,
+        message: error instanceof Error ? error.message : null,
+      });
       setScreenState('error');
-      setErrorText('Unable to load full career analysis right now.');
+      setErrorCopy(copy);
+      trackAnalyticsEvent('full_natal_report_generation_failed', {
+        status: error instanceof TypeError ? 'network' : 'unknown',
+        code: error instanceof Error ? error.name : 'unknown',
+        retryAttempt,
+        retryAvailable: copy.action === 'retry' && retryAttempt < 1,
+        durationMs: Date.now() - startedAt,
+      });
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
+      trackAnalyticsEvent('full_natal_report_opened', {
+        source: 'screen_focus',
+      });
+    }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
       const isMountedRef = { value: true };
-      void loadAnalysis(isMountedRef);
+      void loadAnalysis(isMountedRef, retryAttempts);
 
       return () => {
         isMountedRef.value = false;
       };
-    }, [loadAnalysis, reloadToken])
+    }, [loadAnalysis, reloadToken, retryAttempts])
   );
+
+  useEffect(() => {
+    if (screenState !== 'loading') return;
+
+    let mounted = true;
+    const loadProgress = async () => {
+      try {
+        const progress = await fetchFullNatalCareerAnalysisProgress();
+        if (mounted) {
+          setLoaderProgress(progress);
+        }
+      } catch {
+        // Keep the local staged loader if the progress endpoint is temporarily unavailable.
+      }
+    };
+
+    void loadProgress();
+    const intervalId = setInterval(() => {
+      void loadProgress();
+    }, 1500);
+
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
+  }, [screenState, reloadToken]);
 
   const analysis = response?.analysis ?? null;
   const footerMeta = useMemo(() => {
     if (!response) return null;
-    const source = response.narrativeSource === 'llm' ? 'LLM' : 'Template';
     const generatedAt = formatGeneratedAt(response.generatedAt);
     if (!SHOULD_EXPOSE_TECHNICAL_SURFACES) return `Updated ${generatedAt}`;
-    return `${generatedAt} | ${response.model} | ${response.promptVersion} | ${source}`;
+    return `${generatedAt} | ${response.model} | ${response.promptVersion} | LLM`;
   }, [response]);
+  const showProfileChangeNotice = shouldShowProfileChangeNotice(response?.profileChangeNotice);
+  const loaderContent = resolveFullNatalLoaderContent(loaderProgress);
+  const canShowErrorAction = errorCopy?.action !== 'retry' || retryAttempts < 1;
+
+  const handleErrorAction = useCallback(() => {
+    if (errorCopy?.action === 'generate_natal_chart') {
+      trackAnalyticsEvent('full_natal_report_natal_chart_cta_tapped', {
+        source: 'error_state',
+      });
+      navigation.navigate('NatalChart');
+      return;
+    }
+    if (retryAttempts >= 1) return;
+    trackAnalyticsEvent('full_natal_report_retry_tapped', {
+      retryAttempt: retryAttempts + 1,
+      previousDurationMs: loadStartedAtRef.current ? Date.now() - loadStartedAtRef.current : null,
+    });
+    setRetryAttempts((value) => value + 1);
+    setReloadToken((value) => value + 1);
+  }, [errorCopy?.action, navigation, retryAttempts]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
@@ -223,16 +346,20 @@ export const FullNatalCareerAnalysisScreen = () => {
                 </View>
               </View>
 
-              {response?.cached ? (
-                <View
-                  className="px-2 py-1 rounded-full"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.14)', borderWidth: 1 }}
-                >
-                  <Text className="text-[10px] font-semibold tracking-[0.9px]" style={{ color: 'rgba(212,212,224,0.66)' }}>
-                    CACHED
-                  </Text>
-                </View>
-              ) : null}
+              <View className="flex-row items-center gap-2">
+                {/* v2 TODO: restore the PDF export action after the first release. */}
+
+                {response?.cached ? (
+                  <View
+                    className="px-2 py-1 rounded-full"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.14)', borderWidth: 1 }}
+                  >
+                    <Text className="text-[10px] font-semibold tracking-[0.9px]" style={{ color: 'rgba(212,212,224,0.66)' }}>
+                      CACHED
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
 
             {screenState === 'premium_required' ? (
@@ -282,34 +409,72 @@ export const FullNatalCareerAnalysisScreen = () => {
                   borderWidth: 1,
                 }}
               >
-                <Text className="text-[13px] leading-[20px]" style={{ color: '#FF9AB0' }}>
-                  {errorText ?? 'Unable to load full natal career analysis.'}
+                <Text className="text-[18px] font-semibold leading-[24px]" style={{ color: '#FFD2DC' }}>
+                  {errorCopy?.title ?? 'Could not load report'}
+                </Text>
+                <Text className="text-[13px] leading-[20px] mt-2" style={{ color: '#FF9AB0' }}>
+                  {errorCopy?.message ?? 'Unable to load full natal career analysis.'}
                 </Text>
                 <View className="flex-row mt-3 gap-2">
-                  <Pressable
-                    onPress={() => setReloadToken((value) => value + 1)}
-                    className="rounded-[10px] px-3 py-2"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.16)', borderWidth: 1 }}
-                  >
-                    <Text className="text-[12px] font-semibold" style={{ color: 'rgba(244,244,252,0.92)' }}>
-                      Retry
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => navigation.navigate('NatalChart')}
-                    className="rounded-[10px] px-3 py-2"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.16)', borderWidth: 1 }}
-                  >
-                    <Text className="text-[12px] font-semibold" style={{ color: 'rgba(244,244,252,0.92)' }}>
-                      Open Natal Chart
-                    </Text>
-                  </Pressable>
+                  {canShowErrorAction ? (
+                    <Pressable
+                      onPress={handleErrorAction}
+                      className="rounded-[10px] px-3 py-2"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.16)', borderWidth: 1 }}
+                    >
+                      <Text className="text-[12px] font-semibold" style={{ color: 'rgba(244,244,252,0.92)' }}>
+                        {errorCopy?.actionLabel ?? 'Retry'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {errorCopy?.action === 'generate_natal_chart' ? (
+                    <Pressable
+                      onPress={() => {
+                        trackAnalyticsEvent('full_natal_report_retry_tapped', {
+                          retryAttempt: retryAttempts + 1,
+                          source: 'natal_chart_missing_check_again',
+                        });
+                        setRetryAttempts((value) => value + 1);
+                        setReloadToken((value) => value + 1);
+                      }}
+                      disabled={retryAttempts >= 1}
+                      className="rounded-[10px] px-3 py-2"
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderColor: 'rgba(255,255,255,0.16)',
+                        borderWidth: 1,
+                        opacity: retryAttempts >= 1 ? 0.5 : 1,
+                      }}
+                    >
+                      <Text className="text-[12px] font-semibold" style={{ color: 'rgba(244,244,252,0.92)' }}>
+                        Check Again
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
             ) : null}
 
             {screenState === 'ready' && analysis ? (
               <View>
+                {showProfileChangeNotice && response?.profileChangeNotice ? (
+                  <View
+                    className="rounded-[18px] p-4 mb-4"
+                    style={{
+                      backgroundColor: 'rgba(225,192,102,0.1)',
+                      borderColor: 'rgba(225,192,102,0.28)',
+                      borderWidth: 1,
+                    }}
+                  >
+                    <Text className="text-[12px] font-bold tracking-[1px] uppercase" style={{ color: '#E1C066' }}>
+                      Birth data updated
+                    </Text>
+                    <Text className="text-[13px] leading-[20px] mt-1" style={{ color: 'rgba(238,226,188,0.86)' }}>
+                      This report was regenerated from your latest birth profile change on {formatGeneratedAt(response.profileChangeNotice.profileUpdatedAt)}.
+                    </Text>
+                  </View>
+                ) : null}
+
                 <View
                   className="rounded-[20px] p-4"
                   style={{
@@ -323,6 +488,22 @@ export const FullNatalCareerAnalysisScreen = () => {
                   </Text>
                   <Text className="text-[16px] leading-[25px] mt-3" style={{ color: 'rgba(212,212,224,0.63)' }}>
                     {analysis.executiveSummary}
+                  </Text>
+                </View>
+
+                <View
+                  className="rounded-[16px] p-4 mt-4"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.035)',
+                    borderColor: 'rgba(255,255,255,0.09)',
+                    borderWidth: 1,
+                  }}
+                >
+                  <Text className="text-[11px] font-bold tracking-[1.2px] uppercase" style={{ color: 'rgba(212,212,224,0.46)' }}>
+                    Guidance note
+                  </Text>
+                  <Text className="text-[13px] leading-[20px] mt-2" style={{ color: 'rgba(212,212,224,0.64)' }}>
+                    {FULL_NATAL_GUIDANCE_DISCLAIMER}
                   </Text>
                 </View>
 
@@ -608,8 +789,10 @@ export const FullNatalCareerAnalysisScreen = () => {
       {screenState === 'loading' ? (
         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
           <FullScreenCosmicLoader
-            title="Building Career Blueprint"
-            subtitle="Synthesizing archetypes, strengths, and phase roadmap..."
+            title={loaderContent.title}
+            subtitle={loaderContent.subtitle}
+            steps={loaderContent.steps.length > 0 ? loaderContent.steps : FULL_NATAL_GENERATION_STEPS}
+            activeStepIndex={loaderContent.activeStepIndex}
           />
         </View>
       ) : null}

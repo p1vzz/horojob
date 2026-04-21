@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { InterviewStrategyPlan } from '../types/interviewStrategy';
-import { createCalendarService } from './calendarCore';
+import { createCalendarService, type CalendarLike } from './calendarCore';
 
 function createPlan(): InterviewStrategyPlan {
   const slot1 = {
@@ -75,20 +75,40 @@ function createPlan(): InterviewStrategyPlan {
   };
 }
 
-test('calendar core normalizes permissions and sorts writable calendar options', async () => {
+test('calendar core normalizes permissions and limits picker to Horojob and main calendar', async () => {
+  let created = false;
   const service = createCalendarService({
     platformOs: 'android',
-    getCalendars: async () => [
-      { id: '2', title: 'Work', isPrimary: false, allowsModifications: true, source: { name: 'Google' } },
-      { id: '1', title: 'Main', isPrimary: true, allowsModifications: true, source: { name: 'iCloud' } },
-      { id: '3', title: 'ReadOnly', isPrimary: false, allowsModifications: false, source: { name: 'Other' } },
-    ],
+    getCalendars: async () => {
+      const calendars: CalendarLike[] = [
+        { id: 'birthdays', title: 'Birthdays', isPrimary: false, allowsModifications: true, source: { name: 'Google', type: 'com.google' } },
+        { id: 'tasks', title: 'Google Tasks', isPrimary: false, allowsModifications: true, source: { name: 'Google', type: 'com.google' } },
+        { id: 'holidays', title: 'US Holidays', isPrimary: false, allowsModifications: true, source: { name: 'Google', type: 'com.google' } },
+        { id: 'events', title: 'Events', isPrimary: true, allowsModifications: true, source: { name: 'Google', type: 'com.google' } },
+        { id: 'readonly', title: 'ReadOnly', isPrimary: false, allowsModifications: false, source: { name: 'Other' } },
+      ];
+      if (created) {
+        calendars.push({
+          id: 'horojob',
+          title: 'Horojob',
+          isPrimary: false,
+          allowsModifications: true,
+          source: { name: 'Horojob', type: 'LOCAL', isLocalAccount: true },
+        });
+      }
+      return calendars;
+    },
     getCalendarPermissions: async () => ({ status: 'granted', canAskAgain: true }),
     requestCalendarPermissions: async () => ({ status: 'mystery_status' }),
+    createHorojobCalendar: async () => {
+      created = true;
+      return 'horojob';
+    },
     getEvents: async () => [],
     getEvent: async () => null,
     updateEvent: async () => {},
     createEvent: async () => 'event-id',
+    deleteEvent: async () => {},
   });
 
   const granted = await service.getCalendarPermissionState();
@@ -98,44 +118,96 @@ test('calendar core normalizes permissions and sorts writable calendar options',
   assert.deepEqual(granted, { status: 'granted', canAskAgain: true });
   assert.deepEqual(requested, { status: 'undetermined', canAskAgain: false });
   assert.deepEqual(options, [
-    { id: '1', title: 'Main', sourceName: 'iCloud', isPrimary: true },
-    { id: '2', title: 'Work', sourceName: 'Google', isPrimary: false },
+    { id: 'horojob', title: 'Horojob', sourceName: 'Horojob', isPrimary: false },
+    { id: 'events', title: 'Events', sourceName: 'Google', isPrimary: true },
   ]);
 });
 
-test('calendar core resolves preferred/default/primary calendar id', async () => {
+test('calendar core resolves local Horojob calendar before main unless preferred main is valid', async () => {
   const calendars = [
-    { id: 'a', title: 'A', isPrimary: false, allowsModifications: true },
-    { id: 'b', title: 'B', isPrimary: true, allowsModifications: true },
+    { id: 'a', title: 'A', isPrimary: false, allowsModifications: true, source: { name: 'Google', type: 'com.google' } },
+    { id: 'b', title: 'B', isPrimary: true, allowsModifications: true, source: { name: 'Google', type: 'com.google' } },
   ];
 
-  const iosService = createCalendarService({
-    platformOs: 'ios',
-    getCalendars: async () => calendars,
-    getCalendarPermissions: async () => ({ status: 'granted' }),
-    requestCalendarPermissions: async () => ({ status: 'granted' }),
-    getDefaultCalendar: async () => ({ id: 'a', title: 'A' }),
-    getEvents: async () => [],
-    getEvent: async () => null,
-    updateEvent: async () => {},
-    createEvent: async () => 'event-id',
-  });
-
-  assert.equal(await iosService.resolvePreferredCalendarId('b'), 'b');
-  assert.equal(await iosService.resolvePreferredCalendarId(), 'a');
-
-  const androidService = createCalendarService({
+  const service = createCalendarService({
     platformOs: 'android',
-    getCalendars: async () => calendars,
+    getCalendars: async () => [
+      ...calendars,
+      {
+        id: 'local-h',
+        title: 'Horojob',
+        isPrimary: false,
+        allowsModifications: true,
+        source: { name: 'Horojob', type: 'LOCAL', isLocalAccount: true },
+      },
+      {
+        id: 'google-h',
+        title: 'Horojob',
+        isPrimary: false,
+        allowsModifications: true,
+        source: { name: 'Google', type: 'com.google', isLocalAccount: false },
+      },
+    ],
     getCalendarPermissions: async () => ({ status: 'granted' }),
     requestCalendarPermissions: async () => ({ status: 'granted' }),
     getEvents: async () => [],
     getEvent: async () => null,
     updateEvent: async () => {},
     createEvent: async () => 'event-id',
+    deleteEvent: async () => {},
   });
 
-  assert.equal(await androidService.resolvePreferredCalendarId(), 'b');
+  assert.equal(await service.resolvePreferredCalendarId(), 'local-h');
+  assert.equal(await service.resolvePreferredCalendarId('b'), 'b');
+  assert.equal(await service.resolvePreferredCalendarId('google-h'), 'local-h');
+});
+
+test('calendar core creates local Horojob when only account-backed Horojob exists', async () => {
+  let created = false;
+  const service = createCalendarService({
+    platformOs: 'android',
+    getCalendars: async () => [
+      {
+        id: 'google-h',
+        title: 'Horojob',
+        isPrimary: false,
+        allowsModifications: true,
+        source: { name: 'Google', type: 'com.google', isLocalAccount: false },
+      },
+      {
+        id: 'events',
+        title: 'Events',
+        isPrimary: true,
+        allowsModifications: true,
+        source: { name: 'Google', type: 'com.google', isLocalAccount: false },
+      },
+      ...(created
+        ? [
+            {
+              id: 'local-h',
+              title: 'Horojob',
+              isPrimary: false,
+              allowsModifications: true,
+              source: { name: 'Horojob', type: 'LOCAL', isLocalAccount: true },
+            },
+          ]
+        : []),
+    ],
+    getCalendarPermissions: async () => ({ status: 'granted' }),
+    requestCalendarPermissions: async () => ({ status: 'granted' }),
+    createHorojobCalendar: async () => {
+      created = true;
+      return 'local-h';
+    },
+    getEvents: async () => [],
+    getEvent: async () => null,
+    updateEvent: async () => {},
+    createEvent: async () => 'event-id',
+    deleteEvent: async () => {},
+  });
+
+  assert.equal(await service.resolvePreferredCalendarId(), 'local-h');
+  assert.equal(created, true);
 });
 
 test('calendar core loads and sorts busy intervals', async () => {
@@ -156,6 +228,7 @@ test('calendar core loads and sorts busy intervals', async () => {
     getEvent: async () => null,
     updateEvent: async () => {},
     createEvent: async () => 'event-id',
+    deleteEvent: async () => {},
   });
 
   const intervals = await service.loadCalendarBusyIntervals({
@@ -172,7 +245,7 @@ test('calendar core loads and sorts busy intervals', async () => {
 test('calendar core syncs strategy events with skip/update/create and pruning', async () => {
   const plan = createPlan();
   const updateCalls: string[] = [];
-  const createCalls: string[] = [];
+  const createCalls: Array<{ notes: string; availability: string; title: string }> = [];
 
   const service = createCalendarService({
     platformOs: 'android',
@@ -204,13 +277,20 @@ test('calendar core syncs strategy events with skip/update/create and pruning', 
       }
       return null;
     },
-    updateEvent: async (eventId) => {
+    updateEvent: async (eventId, payload) => {
       updateCalls.push(eventId);
+      assert.equal(payload.availability, 'free');
+      assert.equal(payload.title, 'Interview Timing Reminder');
     },
     createEvent: async (_calendarId, payload) => {
-      createCalls.push(payload.notes);
+      createCalls.push({
+        notes: payload.notes,
+        availability: payload.availability,
+        title: payload.title,
+      });
       return 'evt-created';
     },
+    deleteEvent: async () => {},
   });
 
   const result = await service.syncInterviewStrategyCalendarEvents({
@@ -224,12 +304,17 @@ test('calendar core syncs strategy events with skip/update/create and pruning', 
     },
   });
 
-  assert.deepEqual(updateCalls, ['evt-update']);
+  assert.deepEqual(updateCalls, ['evt-keep', 'evt-update']);
   assert.equal(createCalls.length, 1);
-  assert.match(createCalls[0], /^Why:Use this window for calm follow-ups\./);
+  assert.equal(createCalls[0].availability, 'free');
+  assert.equal(createCalls[0].title, 'Interview Timing Reminder');
+  assert.equal(createCalls[0].notes, 'Use this window for calm follow-ups.');
+  assert.doesNotMatch(createCalls[0].notes, /Why:/);
+  assert.doesNotMatch(createCalls[0].notes, /HOROJOB/);
+  assert.doesNotMatch(createCalls[0].notes, /Score:/);
   assert.equal(result.created, 1);
-  assert.equal(result.updated, 1);
-  assert.equal(result.skipped, 1);
+  assert.equal(result.updated, 2);
+  assert.equal(result.skipped, 0);
   assert.equal(result.failed, 0);
   assert.equal(result.recovered, 1);
   assert.equal(result.pruned, 1);
@@ -237,5 +322,81 @@ test('calendar core syncs strategy events with skip/update/create and pruning', 
     'slot-1': 'evt-keep',
     'slot-2': 'evt-created',
     'slot-3': 'evt-update',
+  });
+});
+
+test('calendar core removes strategy events from local map and marker scan', async () => {
+  const plan = createPlan();
+  const deleted: string[] = [];
+  const getEventById = new Map([
+    [
+      'evt-mapped',
+      {
+        id: 'evt-mapped',
+        calendarId: 'cal-1',
+        notes: 'HOROJOB_INTERVIEW_SLOT:slot-1',
+        startDate: plan.slots[0].startAt,
+        endDate: plan.slots[0].endAt,
+      },
+    ],
+    [
+      'evt-unmarked',
+      {
+        id: 'evt-unmarked',
+        calendarId: 'cal-1',
+        notes: 'personal event',
+        startDate: plan.slots[1].startAt,
+        endDate: plan.slots[1].endAt,
+      },
+    ],
+    [
+      'evt-scanned',
+      {
+        id: 'evt-scanned',
+        calendarId: 'cal-2',
+        title: 'Interview Timing Reminder',
+        notes: 'Use this window for concise interview stories.',
+        startDate: plan.slots[2].startAt,
+        endDate: plan.slots[2].endAt,
+      },
+    ],
+  ]);
+
+  const service = createCalendarService({
+    platformOs: 'android',
+    getCalendars: async () => [
+      { id: 'cal-1', title: 'Work', allowsModifications: true },
+      { id: 'cal-2', title: 'Personal', allowsModifications: true },
+      { id: 'read-only', title: 'ReadOnly', allowsModifications: false },
+    ],
+    getCalendarPermissions: async () => ({ status: 'granted' }),
+    requestCalendarPermissions: async () => ({ status: 'granted' }),
+    getEvents: async (calendarIds) => {
+      assert.deepEqual(calendarIds, ['cal-1', 'cal-2']);
+      return [getEventById.get('evt-scanned')!, getEventById.get('evt-unmarked')!];
+    },
+    getEvent: async (eventId) => getEventById.get(eventId) ?? null,
+    updateEvent: async () => {},
+    createEvent: async () => 'event-id',
+    deleteEvent: async (eventId) => {
+      deleted.push(eventId);
+    },
+  });
+
+  const result = await service.removeInterviewStrategyCalendarEvents({
+    plan,
+    existingMap: {
+      'slot-1': 'evt-mapped',
+      'slot-2': 'evt-unmarked',
+    },
+  });
+
+  assert.deepEqual(deleted.sort(), ['evt-mapped', 'evt-scanned']);
+  assert.equal(result.deleted, 2);
+  assert.equal(result.failed, 0);
+  assert.equal(result.skipped, 1);
+  assert.equal(result.scanned, 2);
+  assert.deepEqual(result.map, {
+    'slot-2': 'evt-unmarked',
   });
 });

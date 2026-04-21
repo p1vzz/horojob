@@ -1,23 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  createFallbackAiSynergy,
   formatAiSynergyConfidenceLabel,
   resolveAiSynergyPalette,
   selectAiSynergyView,
 } from './aiSynergyTileCore';
 
-test('ai synergy tile core creates deterministic fallback payload when date injected', () => {
-  const result = createFallbackAiSynergy('2026-03-31T08:00:00.000Z');
-  assert.equal(result.generatedAt, '2026-03-31T08:00:00.000Z');
-  assert.equal(result.score, 92);
-  assert.equal(result.recommendations[0], 'Turn one repetitive workflow into a structured prompt.');
-});
-
-test('ai synergy tile core selects fallback when payload is missing', () => {
-  const fallback = createFallbackAiSynergy('2026-03-31T08:00:00.000Z');
-  const selected = selectAiSynergyView(null) ?? fallback;
-  assert.equal(selected.score, 92);
+test('ai synergy tile core keeps missing payload empty instead of fabricating copy', () => {
+  assert.equal(selectAiSynergyView(null), null);
 });
 
 test('ai synergy tile core resolves score palette thresholds', () => {
