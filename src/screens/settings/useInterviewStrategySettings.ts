@@ -323,16 +323,6 @@ export function useInterviewStrategySettings(args: {
         }
       }
 
-      if (interviewPayload.settings.enabled && interviewPayload.plan.slots.length > 0) {
-        const permissionState = await getCalendarPermissionState();
-        if (!isMounted()) return;
-        if (permissionState.status === 'granted') {
-          void performInterviewCalendarSync(interviewPayload.plan, {
-            requestPermission: false,
-            silent: true,
-          });
-        }
-      }
     } catch (error) {
       if (!isMounted()) return;
       if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
@@ -470,14 +460,6 @@ export function useInterviewStrategySettings(args: {
         setInterviewPlan(generatedPlan);
         setIsInterviewSectionExpanded(Boolean(generatedSettings.enabled));
 
-        const permissionState = await getCalendarPermissionState();
-        if (permissionState.status === 'granted' && generatedSettings.enabled && generatedPlan.slots.length > 0) {
-          void performInterviewCalendarSync(generatedPlan, {
-            requestPermission: false,
-            silent: true,
-          });
-        }
-
         trackAnalyticsEvent('interview_strategy_generated', {
           slotCount: generatedPlan.slots.length,
           weekCount: generatedPlan.weeks.length,
@@ -598,14 +580,6 @@ export function useInterviewStrategySettings(args: {
         const interviewPayload = await fetchInterviewStrategyPlan({ refresh: false });
         setInterviewSettings(interviewPayload.settings);
         setInterviewPlan(interviewPayload.plan);
-
-        const permissionState = await getCalendarPermissionState();
-        if (permissionState.status === 'granted' && interviewPayload.settings.enabled && interviewPayload.plan.slots.length > 0) {
-          void performInterviewCalendarSync(interviewPayload.plan, {
-            requestPermission: false,
-            silent: true,
-          });
-        }
 
         trackAnalyticsEvent('interview_strategy_toggle_changed', {
           enabled: true,

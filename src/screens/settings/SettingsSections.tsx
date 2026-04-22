@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, Switch } from 'react-native';
+import { ActivityIndicator, View, Text, Pressable, Switch, TextInput } from 'react-native';
 import {
   Bell,
   CalendarClock,
@@ -11,16 +11,22 @@ import {
   MapPin,
   MoonStar,
   Sun,
+  UserRound,
 } from 'lucide-react-native';
-import type { MorningBriefingResponse } from '../../services/astrologyApi';
 import type { WritableCalendarOption } from '../../services/calendar';
 import type { SubscriptionPlan } from '../../services/morningBriefingSync';
 import type { InterviewStrategySettings } from '../../services/notificationsApi';
 import type { InterviewStrategyPlan } from '../../types/interviewStrategy';
+import type { OnboardingData } from '../../utils/onboardingStorage';
 import type { SettingsPremiumFeatureId, SettingsPremiumFeatureState } from './settingsTypes';
 import {
+  formatBirthCityLabel,
+  formatBirthDateLabel,
+  formatBirthNameLabel,
+  formatBirthTimeLabel,
   formatInterviewCalendarOptionLabel,
   formatInterviewSlotWindow,
+  type BirthProfileDraft,
 } from '../settingsScreenCore';
 import { resolveInterviewStrategyTimingLabel } from '../../components/interviewStrategyCore';
 
@@ -33,6 +39,12 @@ type BirthRow = {
   color: string;
 };
 
+export type BirthProfileRecalculationStep = {
+  id: string;
+  label: string;
+  status: 'pending' | 'active' | 'done' | 'failed' | 'skipped';
+};
+
 type PremiumFeatureRow = {
   id: SettingsPremiumFeatureId;
   title: string;
@@ -43,9 +55,10 @@ type PremiumFeatureRow = {
 };
 
 const birthRows: BirthRow[] = [
-  { label: 'Date of Birth', value: 'Jun 15, 1990', Icon: CalendarDays, color: '#C9A84C' },
-  { label: 'Time of Birth', value: '14:30', Icon: Clock3, color: '#C9A84C' },
-  { label: 'Birth City', value: 'New York', Icon: MapPin, color: '#C9A84C' },
+  { label: 'Name', value: 'Not set', Icon: UserRound, color: '#C9A84C' },
+  { label: 'Date of Birth', value: 'Not set', Icon: CalendarDays, color: '#C9A84C' },
+  { label: 'Time of Birth', value: 'Not set', Icon: Clock3, color: '#C9A84C' },
+  { label: 'Birth City', value: 'Not set', Icon: MapPin, color: '#C9A84C' },
 ];
 
 const premiumFeatureRows: PremiumFeatureRow[] = [
@@ -136,16 +149,110 @@ export function SettingsAppearanceSection(props: {
   );
 }
 
-export function SettingsBirthDetailsSection() {
+type BirthProfileLoadState = 'loading' | 'ready' | 'missing' | 'failed';
+
+function resolveBirthRows(profile: OnboardingData | null, loadState: BirthProfileLoadState): BirthRow[] {
+  if (loadState === 'loading') {
+    return birthRows.map((row) => ({ ...row, value: 'Loading...' }));
+  }
+  if (loadState === 'failed') {
+    return birthRows.map((row) => ({ ...row, value: 'Unavailable' }));
+  }
+  if (!profile) {
+    return birthRows;
+  }
+
+  return [
+    { ...birthRows[0], value: formatBirthNameLabel(profile.name) },
+    { ...birthRows[1], value: formatBirthDateLabel(profile.birthDate) },
+    { ...birthRows[2], value: formatBirthTimeLabel(profile) },
+    { ...birthRows[3], value: formatBirthCityLabel(profile) },
+  ];
+}
+
+function resolveBirthStatusLabel(profile: OnboardingData | null, loadState: BirthProfileLoadState) {
+  if (loadState === 'loading') return 'Loading';
+  if (loadState === 'failed') return 'Unavailable';
+  return profile ? 'Saved' : 'Missing';
+}
+
+function resolveStepStatusLabel(status: BirthProfileRecalculationStep['status']) {
+  switch (status) {
+    case 'active':
+      return 'Now';
+    case 'done':
+      return 'Done';
+    case 'failed':
+      return 'Failed';
+    case 'skipped':
+      return 'Skipped';
+    default:
+      return 'Queued';
+  }
+}
+
+function resolveStepStatusColor(status: BirthProfileRecalculationStep['status']) {
+  switch (status) {
+    case 'active':
+      return '#C9A84C';
+    case 'done':
+      return 'rgba(112,225,163,0.86)';
+    case 'failed':
+      return 'rgba(255,107,138,0.9)';
+    case 'skipped':
+      return 'rgba(212,212,224,0.38)';
+    default:
+      return 'rgba(212,212,224,0.34)';
+  }
+}
+
+export function SettingsBirthDetailsSection(props: {
+  draft: BirthProfileDraft;
+  isEditing: boolean;
+  isSaving: boolean;
+  lockMessage: string | null;
+  profile: OnboardingData | null;
+  loadState: BirthProfileLoadState;
+  recalculationSteps: BirthProfileRecalculationStep[];
+  onCancelEdit: () => void;
+  onChangeDraft: (draft: BirthProfileDraft) => void;
+  onSave: () => void;
+  onStartEdit: () => void;
+}) {
+  const {
+    draft,
+    isEditing,
+    isSaving,
+    lockMessage,
+    loadState,
+    onCancelEdit,
+    onChangeDraft,
+    onSave,
+    onStartEdit,
+    profile,
+    recalculationSteps,
+  } = props;
+  const rows = resolveBirthRows(profile, loadState);
+  const statusLabel = isSaving ? 'Updating' : isEditing ? 'Editing' : resolveBirthStatusLabel(profile, loadState);
+  const canEdit = loadState !== 'loading' && !isSaving;
+
   return (
     <View className="mb-5">
       <View className="flex-row items-center justify-between px-1 mb-2.5">
         <Text className="text-[11px] tracking-[2.4px] font-semibold" style={{ color: 'rgba(212,212,224,0.36)' }}>
           BIRTH DETAILS
         </Text>
-        <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
-          Edit
-        </Text>
+        {isEditing ? (
+          <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
+            {statusLabel}
+          </Text>
+        ) : (
+          <Pressable disabled={!canEdit} onPress={onStartEdit} hitSlop={8} style={{ opacity: canEdit ? 1 : 0.5 }}>
+            <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
+              {canEdit ? 'Edit' : statusLabel}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <View
@@ -156,7 +263,7 @@ export function SettingsBirthDetailsSection() {
           borderWidth: 1,
         }}
       >
-        {birthRows.map((row, idx) => (
+        {rows.map((row, idx) => (
           <View
             key={row.label}
             className="px-4 py-3 flex-row items-center"
@@ -169,11 +276,195 @@ export function SettingsBirthDetailsSection() {
             <Text className="text-[13px] font-semibold ml-3 flex-1" style={{ color: 'rgba(233,233,242,0.9)' }}>
               {row.label}
             </Text>
-            <Text className="text-[13px]" style={{ color: 'rgba(212,212,224,0.52)' }}>
+            <Text
+              className="text-[13px] text-right ml-3"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ color: 'rgba(212,212,224,0.52)', flexShrink: 1, maxWidth: '58%' }}
+            >
               {row.value}
             </Text>
           </View>
         ))}
+
+        {isEditing ? (
+          <View className="px-4 py-4" style={{ borderTopColor: 'rgba(255,255,255,0.05)', borderTopWidth: 1 }}>
+            <View className="mb-3">
+              <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
+                Name
+              </Text>
+              <TextInput
+                value={draft.name}
+                onChangeText={(name) => onChangeDraft({ ...draft, name })}
+                editable={!isSaving}
+                autoCapitalize="words"
+                className="text-[14px] rounded-[12px] px-3 py-2.5"
+                placeholder="Your name"
+                placeholderTextColor="rgba(212,212,224,0.24)"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  borderWidth: 1,
+                  color: 'rgba(233,233,242,0.92)',
+                }}
+              />
+            </View>
+
+            <View className="flex-row mb-3">
+              <View className="flex-1 mr-2">
+                <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
+                  Date
+                </Text>
+                <TextInput
+                  value={draft.birthDate}
+                  onChangeText={(birthDate) => onChangeDraft({ ...draft, birthDate })}
+                  editable={!isSaving}
+                  keyboardType="numbers-and-punctuation"
+                  className="text-[14px] rounded-[12px] px-3 py-2.5"
+                  placeholder="DD/MM/YYYY"
+                  placeholderTextColor="rgba(212,212,224,0.24)"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    borderColor: 'rgba(255,255,255,0.08)',
+                    borderWidth: 1,
+                    color: 'rgba(233,233,242,0.92)',
+                  }}
+                />
+              </View>
+              <View className="flex-1 ml-2">
+                <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
+                  Time
+                </Text>
+                <TextInput
+                  value={draft.birthTime}
+                  onChangeText={(birthTime) => onChangeDraft({ ...draft, birthTime })}
+                  editable={!isSaving && !draft.unknownTime}
+                  keyboardType="numbers-and-punctuation"
+                  className="text-[14px] rounded-[12px] px-3 py-2.5"
+                  placeholder="HH:MM"
+                  placeholderTextColor="rgba(212,212,224,0.24)"
+                  style={{
+                    backgroundColor: draft.unknownTime ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.05)',
+                    borderColor: 'rgba(255,255,255,0.08)',
+                    borderWidth: 1,
+                    color: draft.unknownTime ? 'rgba(212,212,224,0.34)' : 'rgba(233,233,242,0.92)',
+                  }}
+                />
+              </View>
+            </View>
+
+            <View className="mb-3">
+              <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
+                City
+              </Text>
+              <TextInput
+                value={draft.city}
+                onChangeText={(city) => onChangeDraft({ ...draft, city })}
+                editable={!isSaving}
+                autoCapitalize="words"
+                className="text-[14px] rounded-[12px] px-3 py-2.5"
+                placeholder="Birth city"
+                placeholderTextColor="rgba(212,212,224,0.24)"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  borderWidth: 1,
+                  color: 'rgba(233,233,242,0.92)',
+                }}
+              />
+            </View>
+
+            <Pressable
+              onPress={() => onChangeDraft({ ...draft, unknownTime: !draft.unknownTime })}
+              disabled={isSaving}
+              className="flex-row items-center mb-4"
+              style={{ opacity: isSaving ? 0.6 : 1 }}
+            >
+              <View
+                className="w-[42px] h-[24px] rounded-full justify-center px-1 mr-3"
+                style={{ backgroundColor: draft.unknownTime ? 'rgba(201,168,76,0.32)' : 'rgba(255,255,255,0.08)' }}
+              >
+                <View
+                  className="w-[16px] h-[16px] rounded-full"
+                  style={{
+                    alignSelf: draft.unknownTime ? 'flex-end' : 'flex-start',
+                    backgroundColor: draft.unknownTime ? '#C9A84C' : 'rgba(212,212,224,0.58)',
+                  }}
+                />
+              </View>
+              <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.86)' }}>
+                Birth time unknown
+              </Text>
+            </Pressable>
+
+            {lockMessage ? (
+              <Text className="text-[12px] leading-[17px] mb-3" style={{ color: 'rgba(255,190,112,0.86)' }}>
+                {lockMessage}
+              </Text>
+            ) : null}
+
+            {isSaving || recalculationSteps.length > 0 ? (
+              <View
+                className="rounded-[14px] px-3 py-3 mb-4"
+                style={{
+                  backgroundColor: 'rgba(201,168,76,0.08)',
+                  borderColor: 'rgba(201,168,76,0.16)',
+                  borderWidth: 1,
+                }}
+              >
+                <View className="flex-row items-center mb-2">
+                  {isSaving ? <ActivityIndicator size="small" color="#C9A84C" /> : null}
+                  <Text className="text-[12px] font-semibold ml-2" style={{ color: 'rgba(233,233,242,0.92)' }}>
+                    Recalculating profile data
+                  </Text>
+                </View>
+                {recalculationSteps.map((step) => (
+                  <View key={step.id} className="flex-row items-center justify-between py-1">
+                    <Text className="text-[11px] flex-1 pr-3" style={{ color: 'rgba(212,212,224,0.62)' }}>
+                      {step.label}
+                    </Text>
+                    <Text className="text-[10px] font-semibold uppercase" style={{ color: resolveStepStatusColor(step.status) }}>
+                      {resolveStepStatusLabel(step.status)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View className="flex-row">
+              <Pressable
+                onPress={onCancelEdit}
+                disabled={isSaving}
+                className="flex-1 rounded-[12px] px-3 py-3 mr-2 items-center"
+                style={{
+                  opacity: isSaving ? 0.55 : 1,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderColor: 'rgba(255,255,255,0.1)',
+                  borderWidth: 1,
+                }}
+              >
+                <Text className="text-[12px] font-semibold" style={{ color: 'rgba(212,212,224,0.76)' }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={onSave}
+                disabled={isSaving}
+                className="flex-1 rounded-[12px] px-3 py-3 ml-2 items-center"
+                style={{
+                  opacity: isSaving ? 0.75 : 1,
+                  backgroundColor: 'rgba(201,168,76,0.16)',
+                  borderColor: 'rgba(201,168,76,0.36)',
+                  borderWidth: 1,
+                }}
+              >
+                <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -211,6 +502,7 @@ export function SettingsSubscriptionSection(props: {
           </Text>
         </View>
 
+        {/* TODO(release): route premium management to the production subscription portal/customer center. */}
         <Pressable
           onPress={onOpenPremium}
           className="px-4 py-3.5 flex-row items-center"
@@ -231,12 +523,11 @@ export function SettingsPremiumFeaturesSection(props: {
   children?: React.ReactNode;
   featureStates: Record<SettingsPremiumFeatureId, SettingsPremiumFeatureState>;
   footerText: string;
-  latestBriefing: MorningBriefingResponse | null;
   onOpenWidgetStylePicker: () => void;
   plan: SubscriptionPlan;
   widgetVariantLabel: string;
 }) {
-  const { children, featureStates, footerText, latestBriefing, onOpenWidgetStylePicker, plan, widgetVariantLabel } = props;
+  const { children, featureStates, footerText, onOpenWidgetStylePicker, plan, widgetVariantLabel } = props;
 
   return (
     <View>
@@ -245,7 +536,7 @@ export function SettingsPremiumFeaturesSection(props: {
           PREMIUM FEATURES
         </Text>
         <Text className="text-[10px] font-semibold tracking-[1.2px]" style={{ color: 'rgba(212,212,224,0.28)' }}>
-          PRO REQUIRED
+          {plan === 'premium' ? 'Active' : 'PRO REQUIRED'}
         </Text>
       </View>
 
@@ -264,6 +555,8 @@ export function SettingsPremiumFeaturesSection(props: {
             <Pressable
               key={row.title}
               onPress={state.onPress}
+              disabled={state.busy}
+              accessibilityRole="button"
               className="px-4 py-3.5 flex-row items-center"
               style={{
                 opacity: state.busy ? 0.85 : 1,
@@ -347,27 +640,6 @@ export function SettingsPremiumFeaturesSection(props: {
           );
         })}
       </View>
-
-      {plan === 'premium' && latestBriefing ? (
-        <View
-          className="mt-3 rounded-[14px] px-3 py-3"
-          style={{
-            backgroundColor: 'rgba(201,168,76,0.08)',
-            borderColor: 'rgba(201,168,76,0.14)',
-            borderWidth: 1,
-          }}
-        >
-          <Text className="text-[10px] tracking-[1.4px] font-semibold mb-1" style={{ color: 'rgba(201,168,76,0.9)' }}>
-            LATEST MORNING BRIEFING
-          </Text>
-          <Text className="text-[12px] font-semibold mb-1" style={{ color: 'rgba(233,233,242,0.92)' }}>
-            {latestBriefing.headline}
-          </Text>
-          <Text className="text-[12px] leading-[17px]" style={{ color: 'rgba(212,212,224,0.58)' }}>
-            {latestBriefing.summary}
-          </Text>
-        </View>
-      ) : null}
 
       {plan === 'premium' ? (
         <View

@@ -52,6 +52,26 @@ test('astrology api career insights builds default and custom query', async () =
   ]);
 });
 
+test('astrology api daily transit requests ai synergy only when asked', async () => {
+  const paths: string[] = [];
+  const api = createAstrologyApi({
+    authorizedFetch: async (path) => {
+      paths.push(path);
+      return new Response(JSON.stringify({}), { status: 200 });
+    },
+    parseJsonBody: async () => ({}),
+    ApiError: FakeApiError as never,
+  });
+
+  await api.fetchDailyTransit();
+  await api.fetchDailyTransit({ includeAiSynergy: true });
+
+  assert.deepEqual(paths, [
+    '/api/astrology/daily-transit',
+    '/api/astrology/daily-transit?includeAiSynergy=true',
+  ]);
+});
+
 test('astrology api morning briefing query defaults to refresh=false', async () => {
   const paths: string[] = [];
   const api = createAstrologyApi({

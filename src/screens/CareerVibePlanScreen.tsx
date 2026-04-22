@@ -18,6 +18,8 @@ import {
 } from './careerVibePlanScreenCore';
 
 const { width, height } = Dimensions.get('window');
+const CAREER_VIBE_PENDING_POLL_INTERVAL_MS = 5_000;
+const CAREER_VIBE_PENDING_POLL_MAX_ATTEMPTS = 12;
 
 function SectionLabel({ children }: { children: string }) {
   return (
@@ -276,6 +278,7 @@ export const CareerVibePlanScreen = () => {
   const [errorText, setErrorText] = React.useState<string | null>(null);
   const contentReveal = React.useRef(new Animated.Value(0)).current;
   const mountedRef = React.useRef(true);
+  const pendingPollCountRef = React.useRef(0);
 
   const loadPlan = React.useCallback(async (refresh = false) => {
     if (refresh) {
@@ -316,6 +319,25 @@ export const CareerVibePlanScreen = () => {
   }, [loadPlan]);
 
   React.useEffect(() => {
+    if (plan?.narrativeStatus !== 'pending') {
+      pendingPollCountRef.current = 0;
+      return;
+    }
+    if (isInitialLoading || isRefreshing) return;
+    if (pendingPollCountRef.current >= CAREER_VIBE_PENDING_POLL_MAX_ATTEMPTS) {
+      setErrorText('Career Vibe is taking longer than expected. Try again in a moment.');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      pendingPollCountRef.current += 1;
+      void loadPlan(false);
+    }, CAREER_VIBE_PENDING_POLL_INTERVAL_MS);
+
+    return () => clearTimeout(timer);
+  }, [isInitialLoading, isRefreshing, loadPlan, plan?.narrativeStatus]);
+
+  React.useEffect(() => {
     if (!plan) {
       contentReveal.setValue(0);
       return;
@@ -341,9 +363,10 @@ export const CareerVibePlanScreen = () => {
   const readyPlanContent = plan?.plan ?? null;
   const narrativeUnavailableText = React.useMemo(() => {
     if (!plan || readyPlanContent) return null;
+    if (errorText) return "Today's full plan could not be prepared. Your work metrics are still available below.";
     if (plan.narrativeStatus === 'pending') return "Today's full plan is still preparing. Your work metrics are ready below.";
     return "Today's full plan could not be prepared. Your work metrics are still available below.";
-  }, [plan, readyPlanContent]);
+  }, [errorText, plan, readyPlanContent]);
   const bestFor = readyPlanContent ? normalizeCareerVibeList(readyPlanContent.bestFor, 'Focused delivery') : [];
   const avoid = readyPlanContent ? normalizeCareerVibeList(readyPlanContent.avoid, 'Starting too many parallel threads') : [];
   const drivers = plan ? normalizeCareerVibeList(plan.explanation.drivers, 'Daily transit metrics define the base work mode.') : [];

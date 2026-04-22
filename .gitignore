@@ -4,6 +4,7 @@
 node_modules
 google-services.json
 android/app/google-services.json
+android/app/debug.keystore
 *firebase-adminsdk*.json
 *.p8
 .metro-pid

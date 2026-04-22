@@ -180,7 +180,7 @@ export function usePremiumNotificationSettings(args: {
       navigateToPremium();
       return;
     }
-    if (isSavingBurnoutSettings) return;
+    if (isSavingBurnoutSettings || isSyncingBurnout) return;
 
     const nextEnabled = !(burnoutSettings?.enabled ?? false);
     const settingsPayload = {
@@ -235,7 +235,7 @@ export function usePremiumNotificationSettings(args: {
       navigateToPremium();
       return;
     }
-    if (isSavingLunarSettings) return;
+    if (isSavingLunarSettings || isSyncingLunar) return;
 
     const nextEnabled = !(lunarSettings?.enabled ?? false);
     const settingsPayload = {

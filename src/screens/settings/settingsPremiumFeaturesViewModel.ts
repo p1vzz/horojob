@@ -245,7 +245,7 @@ export function buildSettingsPremiumFeaturesViewModel(
         statusAccentColor: plan === 'premium' ? '#C9A84C' : 'rgba(212,212,224,0.46)',
         statusLabel: widgetStatusLabel,
         toggleInteractive: false,
-        toggleOn: plan === 'premium',
+        toggleOn: plan === 'premium' && setupState === 'enabled',
       },
       burnout: {
         activeThumbColor: 'rgba(201,168,76,0.9)',

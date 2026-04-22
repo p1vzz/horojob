@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Platform, Pressable } from 'react-native';
+import { View, Text, Platform, Pressable, type TextProps } from 'react-native';
 import { ChevronRight, Flame, Zap } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Canvas, Rect, RadialGradient, vec, Blur, Group } from '@shopify/react-native-skia';
@@ -17,6 +17,18 @@ import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext
 import { adaptColorOpacity, adaptOpacity } from '../utils/brightnessAdaptation';
 import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
 import type { DashboardCareerFeaturePrerequisites } from '../hooks/useDashboardPrerequisites';
+
+const CAREER_VIBE_PENDING_POLL_INTERVAL_MS = 5_000;
+const CAREER_VIBE_PENDING_POLL_MAX_ATTEMPTS = 12;
+const CAREER_VIBE_SUMMARY_LINE_HEIGHT = 22;
+const CAREER_VIBE_SUMMARY_MAX_LINES = 5;
+const CAREER_VIBE_SUMMARY_MAX_HEIGHT = CAREER_VIBE_SUMMARY_LINE_HEIGHT * CAREER_VIBE_SUMMARY_MAX_LINES;
+
+const estimateSummaryTextHeight = (text: string) => {
+  if (!text.trim()) return CAREER_VIBE_SUMMARY_LINE_HEIGHT;
+  const estimatedLineCount = Math.ceil(text.length / 48);
+  return Math.min(CAREER_VIBE_SUMMARY_MAX_LINES, Math.max(1, estimatedLineCount)) * CAREER_VIBE_SUMMARY_LINE_HEIGHT;
+};
 
 const SkeletonBar = ({
   width,
@@ -52,23 +64,13 @@ export const DailyAstroStatus = ({
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
+  const [measuredSummary, setMeasuredSummary] = useState<{ text: string; height: number } | null>(null);
+  const mountedRef = React.useRef(true);
   const hasSignaledReadyRef = React.useRef(false);
+  const pendingPollCountRef = React.useRef(0);
   const displayPlan = careerPlan;
   const isPlanNarrativeReady = Boolean(displayPlan?.plan && displayPlan.narrativeStatus === 'ready');
-  const shouldShowSkeleton = isLoading && !careerPlan;
   const isCareerPlanBlocked = careerPrerequisites?.isReadyForCareerFeatures === false;
-  const canPressPlanAction =
-    !shouldShowSkeleton &&
-    careerPrerequisites?.reason !== 'checking' &&
-    (isCareerPlanBlocked || isPlanNarrativeReady);
-  const openPlan = React.useCallback(() => {
-    if (!canPressPlanAction) return;
-    if (isCareerPlanBlocked) {
-      navigation.navigate('NatalChart');
-      return;
-    }
-    navigation.navigate('CareerVibePlan');
-  }, [canPressPlanAction, isCareerPlanBlocked, navigation]);
   const statusLabel = React.useMemo(() => {
     if (SHOULD_EXPOSE_TECHNICAL_SURFACES) {
       return isLoading
@@ -82,59 +84,129 @@ export const DailyAstroStatus = ({
               : 'Today';
     }
     if (isLoading) return 'Updating';
+    if (errorText) return 'Unavailable';
     if (displayPlan?.narrativeStatus === 'pending') return 'Preparing';
-    if (errorText || !isPlanNarrativeReady) return 'Unavailable';
+    if (!isPlanNarrativeReady) return 'Unavailable';
     return 'Today';
   }, [displayPlan?.cached, displayPlan?.narrativeStatus, errorText, isLoading, isPlanNarrativeReady, sourceMode]);
   const displayErrorText = React.useMemo(() => {
     if (!errorText && isPlanNarrativeReady) return null;
     if (SHOULD_EXPOSE_TECHNICAL_SURFACES) return errorText ?? `Narrative status: ${displayPlan?.narrativeStatus ?? 'missing'}`;
     if (sourceMode === 'cache') return "Showing your saved plan while today's update is unavailable.";
+    if (errorText) return "Today's Career Vibe could not prepare the full plan yet. Try again when the connection is stable.";
     if (displayPlan?.narrativeStatus === 'pending') return "Today's plan is still preparing. The metrics are ready.";
     return "Today's Career Vibe could not prepare the full plan yet. Try again when the connection is stable.";
   }, [displayPlan?.narrativeStatus, errorText, isPlanNarrativeReady, sourceMode]);
+  const summaryText = displayPlan?.plan?.summary ?? displayErrorText ?? '';
+  const measuredSummaryHeight = measuredSummary?.text === summaryText ? measuredSummary.height : null;
+  const isSummaryMeasurementPending = isPlanNarrativeReady && summaryText.length > 0 && measuredSummaryHeight === null;
+  const shouldShowSkeleton =
+    (!isCareerPlanBlocked &&
+      !errorText &&
+      !isPlanNarrativeReady &&
+      (isLoading || !displayPlan || displayPlan.narrativeStatus === 'pending')) ||
+    isSummaryMeasurementPending;
+  const summaryContainerHeight = measuredSummaryHeight ?? CAREER_VIBE_SUMMARY_MAX_HEIGHT;
+  const handleSummaryTextLayout = React.useCallback<NonNullable<TextProps['onTextLayout']>>((event) => {
+    if (!summaryText) return;
+    const lineCount = Math.min(
+      CAREER_VIBE_SUMMARY_MAX_LINES,
+      Math.max(1, event.nativeEvent.lines.length || 1),
+    );
+    const height = lineCount * CAREER_VIBE_SUMMARY_LINE_HEIGHT;
+    setMeasuredSummary((current) => {
+      if (current?.text === summaryText && current.height === height) return current;
+      return { text: summaryText, height };
+    });
+  }, [summaryText]);
+  const canPressPlanAction =
+    !shouldShowSkeleton &&
+    careerPrerequisites?.reason !== 'checking' &&
+    (isCareerPlanBlocked || isPlanNarrativeReady);
+  const openPlan = React.useCallback(() => {
+    if (!canPressPlanAction) return;
+    if (isCareerPlanBlocked) {
+      navigation.navigate('NatalChart');
+      return;
+    }
+    navigation.navigate('CareerVibePlan');
+  }, [canPressPlanAction, isCareerPlanBlocked, navigation]);
 
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      setIsLoading(true);
-      try {
+  const loadCareerPlan = React.useCallback(async (options: { readLocalCache?: boolean } = {}) => {
+    const readLocalCache = options.readLocalCache ?? true;
+    setIsLoading(true);
+    try {
+      if (readLocalCache) {
         const cached = await getCachedCareerVibePlanForCurrentUser();
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         if (cached.payload) {
           setCareerPlan(cached.payload);
           setSourceMode(cached.source);
           setErrorText(cached.errorText);
         }
-
-        const result = await syncCareerVibePlanCache();
-        if (!mounted) return;
-        if (result.snapshot.payload) {
-          setCareerPlan(result.snapshot.payload);
-          setSourceMode(result.snapshot.source);
-          setErrorText(result.snapshot.errorText);
-        } else {
-          setCareerPlan(null);
-          setSourceMode('empty');
-          setErrorText(result.snapshot.errorText ?? 'Fresh career signals did not sync.');
-        }
-      } catch {
-        if (mounted) {
-          setCareerPlan(null);
-          setSourceMode('empty');
-          setErrorText('Fresh career signals did not sync.');
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
       }
-    };
-    void run();
-    return () => {
-      mounted = false;
-    };
+
+      const result = await syncCareerVibePlanCache();
+      if (!mountedRef.current) return;
+      if (result.snapshot.payload) {
+        setCareerPlan(result.snapshot.payload);
+        setSourceMode(result.snapshot.source);
+        setErrorText(result.snapshot.errorText);
+      } else {
+        setCareerPlan(null);
+        setSourceMode('empty');
+        setErrorText(result.snapshot.errorText ?? 'Fresh career signals did not sync.');
+      }
+    } catch {
+      if (mountedRef.current) {
+        setCareerPlan(null);
+        setSourceMode('empty');
+        setErrorText('Fresh career signals did not sync.');
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void loadCareerPlan();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [loadCareerPlan]);
+
+  useEffect(() => {
+    if (displayPlan?.narrativeStatus !== 'pending') {
+      pendingPollCountRef.current = 0;
+      return;
+    }
+    if (isLoading || isCareerPlanBlocked) return;
+    if (pendingPollCountRef.current >= CAREER_VIBE_PENDING_POLL_MAX_ATTEMPTS) {
+      setErrorText('Career Vibe is taking longer than expected. Try again in a moment.');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      pendingPollCountRef.current += 1;
+      void loadCareerPlan({ readLocalCache: false });
+    }, CAREER_VIBE_PENDING_POLL_INTERVAL_MS);
+
+    return () => clearTimeout(timer);
+  }, [displayPlan?.narrativeStatus, isCareerPlanBlocked, isLoading, loadCareerPlan]);
+
+  useEffect(() => {
+    if (!isSummaryMeasurementPending || !summaryText) return;
+    const timer = setTimeout(() => {
+      setMeasuredSummary((current) => {
+        if (current?.text === summaryText) return current;
+        return { text: summaryText, height: estimateSummaryTextHeight(summaryText) };
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [isSummaryMeasurementPending, summaryText]);
 
   useEffect(() => {
     if (shouldShowSkeleton || !displayPlan?.plan) {
@@ -163,12 +235,160 @@ export const DailyAstroStatus = ({
 
   const skeletonColor = adaptColorOpacity('rgba(255,255,255,0.09)', channels.glowOpacityMultiplier);
   const skeletonAccent = adaptColorOpacity('rgba(201,168,76,0.16)', channels.glowOpacityMultiplier);
+  if (shouldShowSkeleton) {
+    return (
+      <View className="px-5 py-2">
+        <LinearGradient
+          colors={[
+            adaptColorOpacity('rgba(201,168,76,0.06)', channels.glowOpacityMultiplier),
+            adaptColorOpacity('rgba(90,58,204,0.06)', channels.glowOpacityMultiplier),
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          className="p-5 rounded-[24px] overflow-hidden relative"
+          style={{
+            minHeight: 392,
+            borderWidth: 1,
+            borderColor: adaptColorOpacity('rgba(201,168,76,0.1)', channels.borderOpacityMultiplier),
+          }}
+        >
+          <LinearGradient
+            colors={[
+              adaptColorOpacity('rgba(255,255,255,0.06)', channels.glowOpacityMultiplier),
+              'transparent',
+              adaptColorOpacity('rgba(0,0,0,0.15)', channels.glowOpacityMultiplier),
+            ]}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              opacity: adaptOpacity(0.6, channels.glowOpacityMultiplier),
+            }}
+          />
+
+          {summaryText ? (
+            <Text
+              accessible={false}
+              accessibilityElementsHidden
+              className="text-[14px]"
+              importantForAccessibility="no-hide-descendants"
+              numberOfLines={CAREER_VIBE_SUMMARY_MAX_LINES}
+              onTextLayout={handleSummaryTextLayout}
+              style={{
+                position: 'absolute',
+                left: 20,
+                right: 20,
+                top: 20,
+                opacity: 0,
+                color: 'transparent',
+                lineHeight: CAREER_VIBE_SUMMARY_LINE_HEIGHT,
+              }}
+            >
+              {summaryText}
+            </Text>
+          ) : null}
+
+          <View className="flex-row items-center mb-4">
+            <View
+              className="w-8 h-8 rounded-[10px] justify-center items-center mr-2.5"
+              style={{
+                backgroundColor: adaptColorOpacity('rgba(201,168,76,0.12)', channels.glowOpacityMultiplier),
+                borderColor: adaptColorOpacity('rgba(201,168,76,0.18)', channels.borderOpacityMultiplier),
+                borderWidth: 1,
+              }}
+            >
+              <Flame size={15} color={adaptColorOpacity('rgba(201,168,76,0.82)', channels.textOpacityMultiplier)} />
+            </View>
+            <View className="flex-1">
+              <SkeletonBar width="46%" height={14} color={skeletonAccent} />
+              <View style={{ height: 8 }} />
+              <SkeletonBar width="32%" height={10} color={skeletonColor} />
+            </View>
+            <SkeletonBar width={54} height={10} color={skeletonColor} />
+          </View>
+
+          <View className="mb-4">
+            <SkeletonBar width="70%" height={18} color={skeletonColor} />
+            <View style={{ height: 14 }} />
+            <SkeletonBar width={124} height={22} color={skeletonAccent} />
+          </View>
+
+          <View
+            className="rounded-[14px] px-3 py-3 mb-4"
+            style={{
+              backgroundColor: adaptColorOpacity('rgba(255,255,255,0.05)', channels.glowOpacityMultiplier),
+              borderColor: adaptColorOpacity('rgba(201,168,76,0.14)', channels.borderOpacityMultiplier),
+              borderWidth: 1,
+            }}
+          >
+            <SkeletonBar width={74} height={10} color={skeletonAccent} />
+            <View style={{ height: 12 }} />
+            <SkeletonBar width="92%" height={14} color={skeletonColor} />
+            <View style={{ height: 8 }} />
+            <SkeletonBar width="62%" height={14} color={skeletonColor} />
+          </View>
+
+          <View style={{ minHeight: 110, marginBottom: 14 }}>
+            {[0, 1, 2, 3, 4].map((index) => (
+              <View key={`summary-skeleton:${index}`} style={{ marginBottom: index === 4 ? 0 : 9 }}>
+                <SkeletonBar
+                  width={index === 4 ? '54%' : index === 3 ? '76%' : '96%'}
+                  height={13}
+                  color={skeletonColor}
+                />
+              </View>
+            ))}
+          </View>
+
+          <View className="flex-row flex-wrap mb-4">
+            {[72, 96, 82].map((item) => (
+              <View
+                key={`best-skeleton:${item}`}
+                className="px-2.5 py-1 rounded-md mr-2 mb-2"
+                style={{
+                  backgroundColor: adaptColorOpacity('rgba(56,204,136,0.08)', channels.glowOpacityMultiplier),
+                  borderColor: adaptColorOpacity('rgba(56,204,136,0.12)', channels.borderOpacityMultiplier),
+                  borderWidth: 1,
+                }}
+              >
+                <SkeletonBar width={item} height={13} color={adaptColorOpacity('rgba(56,204,136,0.16)', channels.glowOpacityMultiplier)} />
+              </View>
+            ))}
+          </View>
+
+          <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+            {[0, 1, 2, 3].map((index) => (
+              <View key={`metric-skeleton:${index}`} style={{ width: '47%' }}>
+                <View className="flex-row justify-between items-center mb-1.5">
+                  <SkeletonBar width={64} height={10} color={skeletonColor} />
+                  <SkeletonBar width={28} height={10} color={skeletonColor} />
+                </View>
+                <View
+                  className="h-1 rounded-full overflow-hidden"
+                  style={{ backgroundColor: adaptColorOpacity('rgba(255,255,255,0.06)', channels.glowOpacityMultiplier) }}
+                >
+                  <View className="h-full rounded-full" style={{ width: '46%', backgroundColor: skeletonAccent }} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  }
+
   const buttonLabel = shouldShowSkeleton
     ? 'Preparing plan'
     : careerPrerequisites?.isReadyForCareerFeatures === false
       ? careerPrerequisites.actionLabel
       : isPlanNarrativeReady
         ? 'Open full plan'
+        : errorText
+          ? 'Plan unavailable'
         : displayPlan?.narrativeStatus === 'pending'
           ? 'Preparing plan'
           : 'Plan unavailable';
@@ -308,7 +528,7 @@ export const DailyAstroStatus = ({
                 style={{ color: theme.colors.foreground, flexShrink: 1 }}
               >
                 {displayPlan?.plan?.headline ??
-                  (displayPlan?.narrativeStatus === 'pending' ? "Today's plan is preparing" : 'Career Vibe is unavailable')}
+                  (errorText || displayPlan?.narrativeStatus !== 'pending' ? 'Career Vibe is unavailable' : "Today's plan is preparing")}
               </Text>
             )}
           </View>
@@ -359,31 +579,39 @@ export const DailyAstroStatus = ({
             )}
           </View>
 
-          <View className="flex-row items-center min-h-[44px]">
-            {shouldShowSkeleton ? (
-              <View style={{ width: '100%' }}>
-                <SkeletonBar width="96%" height={13} color={skeletonColor} />
-                <View style={{ height: 9 }} />
-                <SkeletonBar width="74%" height={13} color={skeletonColor} />
-              </View>
-            ) : (
+          <View style={{ height: summaryContainerHeight, marginBottom: 12 }}>
+            {summaryText ? (
               <Text
-                className="text-[14px] leading-[22px]"
-                style={{ color: adaptColorOpacity('rgba(212,212,224,0.75)', channels.textOpacityMultiplier) }}
+                accessible={false}
+                accessibilityElementsHidden
+                className="text-[14px]"
+                importantForAccessibility="no-hide-descendants"
+                numberOfLines={CAREER_VIBE_SUMMARY_MAX_LINES}
+                onTextLayout={handleSummaryTextLayout}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  opacity: 0,
+                  color: 'transparent',
+                  lineHeight: CAREER_VIBE_SUMMARY_LINE_HEIGHT,
+                }}
               >
-                {typed || displayErrorText}
+                {summaryText}
               </Text>
-            )}
-          </View>
-
-          {!shouldShowSkeleton && displayErrorText ? (
+            ) : null}
             <Text
-              className="text-[11px] leading-[16px] mt-2"
-              style={{ color: adaptColorOpacity('rgba(201,168,76,0.72)', channels.textOpacityMultiplier) }}
+              className="text-[14px]"
+              numberOfLines={CAREER_VIBE_SUMMARY_MAX_LINES}
+              style={{
+                color: adaptColorOpacity('rgba(212,212,224,0.75)', channels.textOpacityMultiplier),
+                lineHeight: CAREER_VIBE_SUMMARY_LINE_HEIGHT,
+              }}
             >
-              {displayErrorText}
+              {typed || displayErrorText}
             </Text>
-          ) : null}
+          </View>
 
           <View className="mt-3">
             <View className="flex-row flex-wrap">

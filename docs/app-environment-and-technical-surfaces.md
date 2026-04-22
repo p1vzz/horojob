@@ -1,6 +1,6 @@
 # App Environment And Technical Surfaces
 **Status:** Active  
-**Last synced:** 2026-04-17
+**Last synced:** 2026-04-22
 
 ## Source Of Truth
 
@@ -77,9 +77,24 @@ Use `SHOULD_ALLOW_DEVELOPMENT_OVERRIDES` for behavior that should never ship to 
 
 Local `.env.example` defaults to `development`.
 
+## API Base URL
+
+`src/config/api.ts` resolves `EXPO_PUBLIC_API_BASE_URL` through `src/config/apiCore.ts`.
+
+- `development` may fall back to local HTTP development servers:
+  - Android emulator: `http://10.0.2.2:8787`
+  - other platforms: `http://localhost:8787`
+- `staging` and `production` must set `EXPO_PUBLIC_API_BASE_URL`.
+- `staging` and `production` require an `https:` API URL.
+
+This keeps local development unchanged while preventing non-development builds
+from silently shipping with local or cleartext API transport.
+
 ## Related Files
 
 - `src/config/appEnvironment.ts`
+- `src/config/api.ts`
+- `src/config/apiCore.ts`
 - `App.tsx`
 - `src/screens/CareerVibePlanScreen.tsx`
 - `src/components/DailyAstroStatus.tsx`

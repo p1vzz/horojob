@@ -18,7 +18,7 @@ export const useAiSynergy = (): UseQueryResult<AiSynergy | null, Error> => {
     queryFn: async () => {
       const response = await aiOrchestrator.withRetry({
         operation: 'ai-synergy',
-        requestFn: fetchDailyTransit,
+        requestFn: () => fetchDailyTransit({ includeAiSynergy: true }),
         telemetryMetadata: { source: 'useAiSynergy' },
       });
 
@@ -51,7 +51,7 @@ export const useDailyTransit = () => {
     queryFn: async () => {
       const response = await aiOrchestrator.withRetry({
         operation: 'daily-transit',
-        requestFn: fetchDailyTransit,
+        requestFn: () => fetchDailyTransit({ includeAiSynergy: true }),
         telemetryMetadata: { source: 'useDailyTransit' },
       });
 

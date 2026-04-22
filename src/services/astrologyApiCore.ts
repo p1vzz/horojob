@@ -1,9 +1,17 @@
 import type { OnboardingData } from '../utils/onboardingStorage';
 
+export type BirthProfileEditLock = {
+  lockedUntil: string | null;
+  retryAfterSeconds: number | null;
+  lockLevel: number;
+  durationDays: number | null;
+};
+
 export type BirthProfileResponse = {
   profile: OnboardingData & {
     updatedAt?: string;
   };
+  editLock?: BirthProfileEditLock;
 };
 
 export type CareerInsightsResponse = {
@@ -429,8 +437,13 @@ export function createAstrologyApi(deps: AstrologyApiDeps) {
     return payload as CareerInsightsResponse;
   };
 
-  const fetchDailyTransit = async () => {
-    const response = await deps.authorizedFetch('/api/astrology/daily-transit');
+  const fetchDailyTransit = async (options?: { includeAiSynergy?: boolean }) => {
+    const params = new URLSearchParams();
+    if (options?.includeAiSynergy) {
+      params.set('includeAiSynergy', 'true');
+    }
+    const query = params.toString();
+    const response = await deps.authorizedFetch(`/api/astrology/daily-transit${query ? `?${query}` : ''}`);
     const payload = await deps.parseJsonBody(response);
     if (!response.ok) {
       throw new deps.ApiError(response.status, 'Failed to fetch daily transit', payload);

@@ -68,6 +68,26 @@ react {
  */
 def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBuilds') ?: false).toBoolean()
 
+def getSigningValue = { name ->
+    def propertyValue = findProperty(name)
+    if (propertyValue != null && propertyValue.toString().trim().length() > 0) {
+        return propertyValue.toString().trim()
+    }
+    def envValue = System.getenv(name)
+    return envValue != null && envValue.trim().length() > 0 ? envValue.trim() : null
+}
+
+def releaseStoreFilePath = getSigningValue("HOROJOB_RELEASE_STORE_FILE")
+def releaseStorePassword = getSigningValue("HOROJOB_RELEASE_STORE_PASSWORD")
+def releaseKeyAlias = getSigningValue("HOROJOB_RELEASE_KEY_ALIAS")
+def releaseKeyPassword = getSigningValue("HOROJOB_RELEASE_KEY_PASSWORD")
+def releaseSigningConfigured = [
+    releaseStoreFilePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+].every { value -> value != null && value.trim().length() > 0 }
+
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
@@ -104,15 +124,25 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (releaseSigningConfigured) {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            } else {
+                println("Release signing credentials are not configured; release artifacts will be unsigned.")
+            }
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

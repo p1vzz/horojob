@@ -1,9 +1,9 @@
 import { Platform } from 'react-native';
+import { APP_ENVIRONMENT } from './appEnvironment';
+import { resolveApiBaseUrl } from './apiCore';
 
-const fallbackBaseUrl = Platform.OS === 'android' ? 'http://10.0.2.2:8787' : 'http://localhost:8787';
-
-const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-
-export const API_BASE_URL =
-  (configuredBaseUrl && configuredBaseUrl.length > 0 ? configuredBaseUrl : fallbackBaseUrl).replace(/\/+$/, '');
-
+export const API_BASE_URL = resolveApiBaseUrl({
+  appEnvironment: APP_ENVIRONMENT,
+  configuredBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
+  platformOS: Platform.OS,
+});

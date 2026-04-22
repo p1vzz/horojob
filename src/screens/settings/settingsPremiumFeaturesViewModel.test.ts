@@ -226,6 +226,41 @@ test('settings premium features view model reflects premium feature state detail
   ]);
 });
 
+test('settings premium features view model keeps widget toggle off until setup is enabled', () => {
+  const result = buildSettingsPremiumFeaturesViewModel({
+    plan: 'premium',
+    briefing: null,
+    handleWidgetSetup: noop,
+    isSyncingWidget: false,
+    setupState: 'eligible_not_prompted',
+    widgetVariant: DEFAULT_MORNING_BRIEFING_WIDGET_VARIANT,
+    burnoutSettings: null,
+    burnoutStatus: null,
+    handleBurnoutToggle: noop,
+    isSavingBurnoutSettings: false,
+    isSyncingBurnout: false,
+    lunarSettings: null,
+    lunarStatus: null,
+    handleLunarProductivityToggle: noop,
+    isSavingLunarSettings: false,
+    isSyncingLunar: false,
+    handleInterviewFeatureRowPress: noop,
+    handleInterviewStrategyToggle: noop,
+    interviewCalendarPermissionStatus: null,
+    interviewPlan: null,
+    interviewSelectedCalendarId: null,
+    interviewSettings: null,
+    isGeneratingInterviewPlan: false,
+    isRemovingInterviewCalendarEvents: false,
+    isSavingInterviewSettings: false,
+    isSyncingInterviewCalendar: false,
+    selectedInterviewCalendarOption: null,
+  });
+
+  assert.equal(result.premiumFeatureStates.widget.statusLabel, 'Set up');
+  assert.equal(result.premiumFeatureStates.widget.toggleOn, false);
+});
+
 test('settings premium features view model keeps lunar row useful outside the dashboard display range', () => {
   const result = buildSettingsPremiumFeaturesViewModel({
     plan: 'premium',
