@@ -109,9 +109,12 @@ export type BirthProfileDraft = {
   city: string;
 };
 
+export type BirthProfileEditableField = 'name' | 'birthDate' | 'birthTime' | 'city';
+
 type BirthProfileDraftValidation =
   | {
       ok: true;
+      algorithmChanged: boolean;
       changed: boolean;
       input: OnboardingData;
     }
@@ -164,36 +167,141 @@ export function createBirthProfileDraft(profile: OnboardingData | null): BirthPr
   };
 }
 
+function validateBirthProfileName(nameInput: string) {
+  const name = normalizeSpaces(nameInput);
+  if (name.length < 1) {
+    return { ok: false as const, message: 'Enter your name.' };
+  }
+  if (name.length > 80) {
+    return { ok: false as const, message: 'Name must be 80 characters or less.' };
+  }
+  return { ok: true as const, name };
+}
+
+function validateBirthProfileDate(birthDateInput: string) {
+  const birthDate = parseBirthDate(birthDateInput);
+  if (!birthDate) {
+    return { ok: false as const, message: 'Use date format DD/MM/YYYY and make sure the date is in the past.' };
+  }
+  return { ok: true as const, birthDate };
+}
+
+function validateBirthProfileTime(input: Pick<BirthProfileDraft, 'birthTime' | 'unknownTime'>) {
+  const birthTime = input.unknownTime ? null : parseBirthTime(input.birthTime);
+  if (!input.unknownTime && !birthTime) {
+    return { ok: false as const, message: 'Use time format HH:MM, or mark birth time as unknown.' };
+  }
+  return { ok: true as const, birthTime, unknownTime: input.unknownTime };
+}
+
+function validateBirthProfileCity(cityInput: string) {
+  const city = normalizeSpaces(cityInput);
+  if (city.length < 2) {
+    return { ok: false as const, message: 'Enter a birth city.' };
+  }
+  if (city.length > 160) {
+    return { ok: false as const, message: 'Birth city must be 160 characters or less.' };
+  }
+  return { ok: true as const, city };
+}
+
+export function validateBirthProfileFieldDraft(
+  field: BirthProfileEditableField,
+  draft: BirthProfileDraft,
+  currentProfile: OnboardingData | null
+): BirthProfileDraftValidation {
+  if (!currentProfile) {
+    return { ok: false, message: 'Complete your birth profile before editing individual fields.' };
+  }
+
+  if (field === 'name') {
+    const validated = validateBirthProfileName(draft.name);
+    if (!validated.ok) return validated;
+    const input: OnboardingData = {
+      ...currentProfile,
+      name: validated.name,
+    };
+    const changed = normalizeComparableText(input.name) !== normalizeComparableText(currentProfile.name);
+    return {
+      ok: true,
+      algorithmChanged: false,
+      changed,
+      input,
+    };
+  }
+
+  if (field === 'birthDate') {
+    const validated = validateBirthProfileDate(draft.birthDate);
+    if (!validated.ok) return validated;
+    const input: OnboardingData = {
+      ...currentProfile,
+      birthDate: validated.birthDate,
+    };
+    const changed = input.birthDate !== currentProfile.birthDate;
+    return {
+      ok: true,
+      algorithmChanged: changed,
+      changed,
+      input,
+    };
+  }
+
+  if (field === 'birthTime') {
+    const validated = validateBirthProfileTime(draft);
+    if (!validated.ok) return validated;
+    const input: OnboardingData = {
+      ...currentProfile,
+      birthTime: validated.birthTime,
+      unknownTime: validated.unknownTime,
+    };
+    const changed = input.birthTime !== (currentProfile.birthTime ?? null) || input.unknownTime !== currentProfile.unknownTime;
+    return {
+      ok: true,
+      algorithmChanged: changed,
+      changed,
+      input,
+    };
+  }
+
+  const validated = validateBirthProfileCity(draft.city);
+  if (!validated.ok) return validated;
+  const cityChanged = normalizeComparableText(validated.city) !== normalizeComparableText(currentProfile.city);
+  const input: OnboardingData = {
+    ...currentProfile,
+    city: validated.city,
+    latitude: cityChanged ? null : currentProfile.latitude ?? null,
+    longitude: cityChanged ? null : currentProfile.longitude ?? null,
+    country: cityChanged ? null : currentProfile.country ?? null,
+    admin1: cityChanged ? null : currentProfile.admin1 ?? null,
+  };
+  return {
+    ok: true,
+    algorithmChanged: cityChanged,
+    changed: cityChanged,
+    input,
+  };
+}
+
 export function validateBirthProfileDraft(
   draft: BirthProfileDraft,
   currentProfile: OnboardingData | null
 ): BirthProfileDraftValidation {
-  const name = normalizeSpaces(draft.name);
-  if (name.length < 1) {
-    return { ok: false, message: 'Enter your name.' };
-  }
-  if (name.length > 80) {
-    return { ok: false, message: 'Name must be 80 characters or less.' };
-  }
+  const nameValidation = validateBirthProfileName(draft.name);
+  if (!nameValidation.ok) return nameValidation;
 
-  const birthDate = parseBirthDate(draft.birthDate);
-  if (!birthDate) {
-    return { ok: false, message: 'Use date format DD/MM/YYYY and make sure the date is in the past.' };
-  }
+  const dateValidation = validateBirthProfileDate(draft.birthDate);
+  if (!dateValidation.ok) return dateValidation;
 
-  const birthTime = draft.unknownTime ? null : parseBirthTime(draft.birthTime);
-  if (!draft.unknownTime && !birthTime) {
-    return { ok: false, message: 'Use time format HH:MM, or mark birth time as unknown.' };
-  }
+  const timeValidation = validateBirthProfileTime(draft);
+  if (!timeValidation.ok) return timeValidation;
 
-  const city = normalizeSpaces(draft.city);
-  if (city.length < 2) {
-    return { ok: false, message: 'Enter a birth city.' };
-  }
-  if (city.length > 160) {
-    return { ok: false, message: 'Birth city must be 160 characters or less.' };
-  }
+  const cityValidation = validateBirthProfileCity(draft.city);
+  if (!cityValidation.ok) return cityValidation;
 
+  const name = nameValidation.name;
+  const birthDate = dateValidation.birthDate;
+  const birthTime = timeValidation.birthTime;
+  const city = cityValidation.city;
   const cityChanged = normalizeComparableText(city) !== normalizeComparableText(currentProfile?.city);
   const input: OnboardingData = {
     name,
@@ -207,16 +315,17 @@ export function validateBirthProfileDraft(
     admin1: cityChanged ? null : currentProfile?.admin1 ?? null,
   };
 
-  const changed =
+  const algorithmChanged =
     !currentProfile ||
-    normalizeComparableText(input.name) !== normalizeComparableText(currentProfile.name) ||
     input.birthDate !== currentProfile.birthDate ||
     input.birthTime !== (currentProfile.birthTime ?? null) ||
     input.unknownTime !== currentProfile.unknownTime ||
     normalizeComparableText(input.city) !== normalizeComparableText(currentProfile.city);
+  const changed = algorithmChanged || normalizeComparableText(input.name) !== normalizeComparableText(currentProfile.name);
 
   return {
     ok: true,
+    algorithmChanged,
     changed,
     input,
   };

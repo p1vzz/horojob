@@ -12,6 +12,7 @@ import {
   nextOptionFromList,
   resolveDeviceTimezoneIana,
   shouldShowSettingsInitialLoader,
+  validateBirthProfileFieldDraft,
   validateBirthProfileDraft,
 } from './settingsScreenCore';
 
@@ -112,21 +113,63 @@ test('settings core validates birth profile draft and clears coordinates when ci
   const unchanged = validateBirthProfileDraft(draft, currentProfile);
   assert.equal(unchanged.ok, true);
   if (unchanged.ok) {
+    assert.equal(unchanged.algorithmChanged, false);
     assert.equal(unchanged.changed, false);
     assert.equal(unchanged.input.latitude, 40.7128);
     assert.equal(unchanged.input.country, 'United States');
+  }
+
+  const changedName = validateBirthProfileDraft({ ...draft, name: 'Sam Lee' }, currentProfile);
+  assert.equal(changedName.ok, true);
+  if (changedName.ok) {
+    assert.equal(changedName.changed, true);
+    assert.equal(changedName.algorithmChanged, false);
+    assert.equal(changedName.input.name, 'Sam Lee');
   }
 
   const changedCity = validateBirthProfileDraft({ ...draft, city: ' Boston ' }, currentProfile);
   assert.equal(changedCity.ok, true);
   if (changedCity.ok) {
     assert.equal(changedCity.changed, true);
+    assert.equal(changedCity.algorithmChanged, true);
     assert.equal(changedCity.input.city, 'Boston');
     assert.equal(changedCity.input.latitude, null);
     assert.equal(changedCity.input.longitude, null);
     assert.equal(changedCity.input.country, null);
     assert.equal(changedCity.input.admin1, null);
   }
+});
+
+test('settings core validates individual birth fields without blocking name-only edits on date rules', () => {
+  const currentProfile = {
+    name: 'Sam',
+    birthDate: '23/06/2026',
+    birthTime: '05:20',
+    unknownTime: false,
+    city: 'Lakefront Airport',
+  };
+  const draft = {
+    name: 'Maks',
+    birthDate: '23/06/2026',
+    birthTime: '05:20',
+    unknownTime: false,
+    city: 'Lakefront Airport',
+  };
+
+  const nameOnly = validateBirthProfileFieldDraft('name', draft, currentProfile);
+  assert.equal(nameOnly.ok, true);
+  if (nameOnly.ok) {
+    assert.equal(nameOnly.changed, true);
+    assert.equal(nameOnly.algorithmChanged, false);
+    assert.equal(nameOnly.input.name, 'Maks');
+    assert.equal(nameOnly.input.birthDate, '23/06/2026');
+  }
+
+  const dateOnly = validateBirthProfileFieldDraft('birthDate', draft, currentProfile);
+  assert.deepEqual(dateOnly, {
+    ok: false,
+    message: 'Use date format DD/MM/YYYY and make sure the date is in the past.',
+  });
 });
 
 test('settings core rejects invalid birth profile drafts', () => {

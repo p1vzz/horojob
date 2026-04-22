@@ -5,7 +5,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import { JobParserQualityCard } from '../components/JobParserQualityCard';
 import { MorningBriefingWidgetVariantPicker } from '../components/MorningBriefingWidgetVariantPicker';
 import {
   fetchBirthProfile,
@@ -25,7 +24,6 @@ import { clearMorningBriefingForUser } from '../utils/morningBriefingStorage';
 import { clearNatalChartCacheForUser } from '../utils/natalChartStorage';
 import { saveOnboardingForUser } from '../utils/onboardingStorage';
 import { useThemeMode } from '../theme/ThemeModeProvider';
-import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
 import {
   SettingsBirthDetailsSection,
   type BirthProfileRecalculationStep,
@@ -36,7 +34,8 @@ import {
 import {
   createBirthProfileDraft,
   shouldShowSettingsInitialLoader,
-  validateBirthProfileDraft,
+  validateBirthProfileFieldDraft,
+  type BirthProfileEditableField,
   type BirthProfileDraft,
   type SettingsBirthProfileLoadState,
 } from './settingsScreenCore';
@@ -141,7 +140,7 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
   const [birthProfileLoadState, setBirthProfileLoadState] = React.useState<SettingsBirthProfileLoadState>('loading');
   const [birthProfileEditLock, setBirthProfileEditLock] = React.useState<BirthProfileEditLock | null>(null);
   const [birthProfileDraft, setBirthProfileDraft] = React.useState<BirthProfileDraft>(() => createBirthProfileDraft(null));
-  const [isEditingBirthProfile, setIsEditingBirthProfile] = React.useState(false);
+  const [editingBirthProfileField, setEditingBirthProfileField] = React.useState<BirthProfileEditableField | null>(null);
   const [isSavingBirthProfile, setIsSavingBirthProfile] = React.useState(false);
   const [birthRecalculationSteps, setBirthRecalculationSteps] = React.useState<BirthProfileRecalculationStep[]>([]);
   const [isSettingsBootstrapReady, setIsSettingsBootstrapReady] = React.useState(false);
@@ -279,35 +278,36 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
     setBirthRecalculationSteps((current) => current.map((step) => (step.id === id ? { ...step, status } : step)));
   };
 
-  const handleStartBirthProfileEdit = () => {
+  const handleStartBirthProfileEdit = (field: BirthProfileEditableField) => {
     setBirthProfileDraft(createBirthProfileDraft(birthProfile));
     setBirthRecalculationSteps([]);
-    setIsEditingBirthProfile(true);
+    setEditingBirthProfileField(field);
   };
 
   const handleCancelBirthProfileEdit = () => {
     if (isSavingBirthProfile) return;
     setBirthProfileDraft(createBirthProfileDraft(birthProfile));
     setBirthRecalculationSteps([]);
-    setIsEditingBirthProfile(false);
+    setEditingBirthProfileField(null);
   };
 
   const handleSaveBirthProfile = () => {
     if (isSavingBirthProfile) return;
+    if (!editingBirthProfileField) return;
 
-    const validation = validateBirthProfileDraft(birthProfileDraft, birthProfile);
+    const validation = validateBirthProfileFieldDraft(editingBirthProfileField, birthProfileDraft, birthProfile);
     if (!validation.ok) {
       Alert.alert('Check Birth Details', validation.message);
       return;
     }
 
     if (!validation.changed) {
-      setIsEditingBirthProfile(false);
+      setEditingBirthProfileField(null);
       setBirthRecalculationSteps([]);
       return;
     }
 
-    setBirthRecalculationSteps(createBirthRecalculationSteps(plan));
+    setBirthRecalculationSteps(validation.algorithmChanged ? createBirthRecalculationSteps(plan) : []);
     setIsSavingBirthProfile(true);
 
     void (async () => {
@@ -337,6 +337,12 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
 
         const session = await ensureAuthSession();
         await saveOnboardingForUser(session.user.id, response.profile);
+
+        if (!validation.algorithmChanged) {
+          setEditingBirthProfileField(null);
+          return;
+        }
+
         await Promise.all([
           clearNatalChartCacheForUser(session.user.id),
           clearCareerVibePlanForUser(session.user.id),
@@ -397,7 +403,7 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
           return;
         }
 
-        setIsEditingBirthProfile(false);
+        setEditingBirthProfileField(null);
         Alert.alert('Birth Details Updated', 'Your profile data has been recalculated.');
       } catch (error) {
         if (!saveCompleted) {
@@ -516,7 +522,7 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
               <>
                 <SettingsBirthDetailsSection
                   draft={birthProfileDraft}
-                  isEditing={isEditingBirthProfile}
+                  editingField={editingBirthProfileField}
                   isSaving={isSavingBirthProfile}
                   lockMessage={formatBirthProfileLockMessage(birthProfileEditLock)}
                   profile={birthProfile}
@@ -561,8 +567,6 @@ export const SettingsScreen = ({ route }: AppScreenProps<'Settings'>) => {
                     />
                   ) : null}
                 </SettingsPremiumFeaturesSection>
-
-                {SHOULD_EXPOSE_TECHNICAL_SURFACES ? <JobParserQualityCard /> : null}
 
                 <View className="items-center mt-12">
                   <Text className="text-[12px]" style={{ color: 'rgba(212,212,224,0.22)' }}>

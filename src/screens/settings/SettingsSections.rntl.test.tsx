@@ -22,7 +22,7 @@ function createFeatureState(overrides: Partial<SettingsPremiumFeatureState> = {}
   };
 }
 
-test('settings birth details section renders loaded profile values and inline edit affordance', () => {
+test('settings birth details section renders loaded profile values and per-field edit affordance', () => {
   const onStartEdit = jest.fn();
   render(
     <SettingsBirthDetailsSection
@@ -33,7 +33,7 @@ test('settings birth details section renders loaded profile values and inline ed
         unknownTime: false,
         city: 'New York',
       }}
-      isEditing={false}
+      editingField={null}
       isSaving={false}
       lockMessage={null}
       loadState="ready"
@@ -54,16 +54,16 @@ test('settings birth details section renders loaded profile values and inline ed
     />
   );
 
-  expect(screen.getByText('Edit')).toBeTruthy();
+  expect(screen.getAllByText('Edit').length).toBe(4);
   expect(screen.getByText('Sam')).toBeTruthy();
   expect(screen.getByText('Jun 15, 1990')).toBeTruthy();
   expect(screen.getByText('14:30')).toBeTruthy();
   expect(screen.getByText('New York, NY, United States')).toBeTruthy();
-  fireEvent.press(screen.getByText('Edit'));
-  expect(onStartEdit).toHaveBeenCalledTimes(1);
+  fireEvent.press(screen.getByLabelText('Edit Name'));
+  expect(onStartEdit).toHaveBeenCalledWith('name');
 });
 
-test('settings birth details section renders inline editor and recalculation steps', () => {
+test('settings birth details section edits one field at a time and renders recalculation steps only for active edit', () => {
   const onChangeDraft = jest.fn();
   const onSave = jest.fn();
 
@@ -76,7 +76,7 @@ test('settings birth details section renders inline editor and recalculation ste
         unknownTime: false,
         city: 'New York',
       }}
-      isEditing
+      editingField="birthTime"
       isSaving
       lockMessage="Birth details are locked after the latest change."
       loadState="ready"
@@ -98,7 +98,8 @@ test('settings birth details section renders inline editor and recalculation ste
     />
   );
 
-  expect(screen.getByDisplayValue('Sam')).toBeTruthy();
+  expect(screen.queryByDisplayValue('Sam')).toBeNull();
+  expect(screen.getByDisplayValue('14:30')).toBeTruthy();
   expect(screen.getByText('Recalculating profile data')).toBeTruthy();
   expect(screen.getByText('Preparing natal chart')).toBeTruthy();
   expect(screen.getByText('Now')).toBeTruthy();
@@ -106,6 +107,39 @@ test('settings birth details section renders inline editor and recalculation ste
   expect(onChangeDraft).not.toHaveBeenCalled();
   fireEvent.press(screen.getByText('Saving...'));
   expect(onSave).not.toHaveBeenCalled();
+});
+
+test('settings birth details section saves name without rendering recalculation steps', () => {
+  render(
+    <SettingsBirthDetailsSection
+      draft={{
+        name: 'Sam Lee',
+        birthDate: '15/06/1990',
+        birthTime: '14:30',
+        unknownTime: false,
+        city: 'New York',
+      }}
+      editingField="name"
+      isSaving={false}
+      lockMessage={null}
+      loadState="ready"
+      profile={{
+        name: 'Sam',
+        birthDate: '15/06/1990',
+        birthTime: '14:30',
+        unknownTime: false,
+        city: 'New York',
+      }}
+      recalculationSteps={[]}
+      onCancelEdit={() => {}}
+      onChangeDraft={() => {}}
+      onSave={() => {}}
+      onStartEdit={() => {}}
+    />
+  );
+
+  expect(screen.getByDisplayValue('Sam Lee')).toBeTruthy();
+  expect(screen.queryByText('Recalculating profile data')).toBeNull();
 });
 
 test('settings premium feature row ignores presses while busy', () => {

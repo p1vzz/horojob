@@ -211,3 +211,7 @@ Track non-trivial tasks to measure skill routing quality and real invocation fre
 | 2026-04-21 | Security audit of mobile client and API contract attack surfaces | mobile-server-contract-sync | react-native, api-client-contracts, node-api | Completed audit; reported findings without functional code changes |
 | 2026-04-22 | Fixed critical security audit items: Android release signing, anonymous auth rate limits, premium career insight guard, Fastify advisory | mobile-server-contract-sync | node-api, testing-quality | Completed targeted fixes and validation |
 | 2026-04-22 | Closed medium security item 3 for mobile API base URL transport and documented deferred audit TODOs | mobile-server-contract-sync | testing-quality | Non-development API URL now requires explicit HTTPS config; security backlog added; mobile verify passed |
+| 2026-04-22 | Moved Settings premium feature helper text above section | react-native | testing-quality | Completed |
+| 2026-04-22 | Skipped Settings recalculation for name-only birth profile edits | react-native | testing-quality | Completed |
+| 2026-04-22 | Removed dev parser quality block from Settings | react-native | testing-quality | Completed |
+| 2026-04-22 | Split Settings birth profile edits by individual field | react-native | testing-quality | Completed |

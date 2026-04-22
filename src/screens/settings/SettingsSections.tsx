@@ -26,6 +26,7 @@ import {
   formatBirthTimeLabel,
   formatInterviewCalendarOptionLabel,
   formatInterviewSlotWindow,
+  type BirthProfileEditableField,
   type BirthProfileDraft,
 } from '../settingsScreenCore';
 import { resolveInterviewStrategyTimingLabel } from '../../components/interviewStrategyCore';
@@ -208,7 +209,7 @@ function resolveStepStatusColor(status: BirthProfileRecalculationStep['status'])
 
 export function SettingsBirthDetailsSection(props: {
   draft: BirthProfileDraft;
-  isEditing: boolean;
+  editingField: BirthProfileEditableField | null;
   isSaving: boolean;
   lockMessage: string | null;
   profile: OnboardingData | null;
@@ -217,11 +218,11 @@ export function SettingsBirthDetailsSection(props: {
   onCancelEdit: () => void;
   onChangeDraft: (draft: BirthProfileDraft) => void;
   onSave: () => void;
-  onStartEdit: () => void;
+  onStartEdit: (field: BirthProfileEditableField) => void;
 }) {
   const {
     draft,
-    isEditing,
+    editingField,
     isSaving,
     lockMessage,
     loadState,
@@ -233,151 +234,69 @@ export function SettingsBirthDetailsSection(props: {
     recalculationSteps,
   } = props;
   const rows = resolveBirthRows(profile, loadState);
+  const isEditing = Boolean(editingField);
   const statusLabel = isSaving ? 'Updating' : isEditing ? 'Editing' : resolveBirthStatusLabel(profile, loadState);
-  const canEdit = loadState !== 'loading' && !isSaving;
-
-  return (
-    <View className="mb-5">
-      <View className="flex-row items-center justify-between px-1 mb-2.5">
-        <Text className="text-[11px] tracking-[2.4px] font-semibold" style={{ color: 'rgba(212,212,224,0.36)' }}>
-          BIRTH DETAILS
-        </Text>
-        {isEditing ? (
-          <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
-            {statusLabel}
-          </Text>
-        ) : (
-          <Pressable disabled={!canEdit} onPress={onStartEdit} hitSlop={8} style={{ opacity: canEdit ? 1 : 0.5 }}>
-            <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
-              {canEdit ? 'Edit' : statusLabel}
-            </Text>
-          </Pressable>
-        )}
-      </View>
-
-      <View
-        className="rounded-[18px] overflow-hidden"
-        style={{
-          backgroundColor: 'rgba(255,255,255,0.04)',
-          borderColor: 'rgba(255,255,255,0.08)',
-          borderWidth: 1,
-        }}
-      >
-        {rows.map((row, idx) => (
-          <View
-            key={row.label}
-            className="px-4 py-3 flex-row items-center"
+  const canEdit = loadState === 'ready' && Boolean(profile) && !isSaving;
+  const renderFieldEditor = (field: BirthProfileEditableField) => (
+    <View className="px-4 pb-4" style={{ borderTopColor: 'rgba(255,255,255,0.05)', borderTopWidth: 1 }}>
+      <View className="pt-3">
+        {field === 'name' ? (
+          <TextInput
+            value={draft.name}
+            onChangeText={(name) => onChangeDraft({ ...draft, name })}
+            editable={!isSaving}
+            autoCapitalize="words"
+            className="text-[14px] rounded-[12px] px-3 py-2.5"
+            placeholder="Your name"
+            placeholderTextColor="rgba(212,212,224,0.24)"
             style={{
-              borderBottomWidth: idx === birthRows.length - 1 ? 0 : 1,
-              borderBottomColor: 'rgba(255,255,255,0.05)',
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              color: 'rgba(233,233,242,0.92)',
             }}
-          >
-            <row.Icon size={15} color={row.color} />
-            <Text className="text-[13px] font-semibold ml-3 flex-1" style={{ color: 'rgba(233,233,242,0.9)' }}>
-              {row.label}
-            </Text>
-            <Text
-              className="text-[13px] text-right ml-3"
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{ color: 'rgba(212,212,224,0.52)', flexShrink: 1, maxWidth: '58%' }}
-            >
-              {row.value}
-            </Text>
-          </View>
-        ))}
+          />
+        ) : null}
 
-        {isEditing ? (
-          <View className="px-4 py-4" style={{ borderTopColor: 'rgba(255,255,255,0.05)', borderTopWidth: 1 }}>
-            <View className="mb-3">
-              <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
-                Name
-              </Text>
-              <TextInput
-                value={draft.name}
-                onChangeText={(name) => onChangeDraft({ ...draft, name })}
-                editable={!isSaving}
-                autoCapitalize="words"
-                className="text-[14px] rounded-[12px] px-3 py-2.5"
-                placeholder="Your name"
-                placeholderTextColor="rgba(212,212,224,0.24)"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderColor: 'rgba(255,255,255,0.08)',
-                  borderWidth: 1,
-                  color: 'rgba(233,233,242,0.92)',
-                }}
-              />
-            </View>
+        {field === 'birthDate' ? (
+          <TextInput
+            value={draft.birthDate}
+            onChangeText={(birthDate) => onChangeDraft({ ...draft, birthDate })}
+            editable={!isSaving}
+            keyboardType="numbers-and-punctuation"
+            className="text-[14px] rounded-[12px] px-3 py-2.5"
+            placeholder="DD/MM/YYYY"
+            placeholderTextColor="rgba(212,212,224,0.24)"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              color: 'rgba(233,233,242,0.92)',
+            }}
+          />
+        ) : null}
 
-            <View className="flex-row mb-3">
-              <View className="flex-1 mr-2">
-                <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
-                  Date
-                </Text>
-                <TextInput
-                  value={draft.birthDate}
-                  onChangeText={(birthDate) => onChangeDraft({ ...draft, birthDate })}
-                  editable={!isSaving}
-                  keyboardType="numbers-and-punctuation"
-                  className="text-[14px] rounded-[12px] px-3 py-2.5"
-                  placeholder="DD/MM/YYYY"
-                  placeholderTextColor="rgba(212,212,224,0.24)"
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    borderColor: 'rgba(255,255,255,0.08)',
-                    borderWidth: 1,
-                    color: 'rgba(233,233,242,0.92)',
-                  }}
-                />
-              </View>
-              <View className="flex-1 ml-2">
-                <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
-                  Time
-                </Text>
-                <TextInput
-                  value={draft.birthTime}
-                  onChangeText={(birthTime) => onChangeDraft({ ...draft, birthTime })}
-                  editable={!isSaving && !draft.unknownTime}
-                  keyboardType="numbers-and-punctuation"
-                  className="text-[14px] rounded-[12px] px-3 py-2.5"
-                  placeholder="HH:MM"
-                  placeholderTextColor="rgba(212,212,224,0.24)"
-                  style={{
-                    backgroundColor: draft.unknownTime ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.05)',
-                    borderColor: 'rgba(255,255,255,0.08)',
-                    borderWidth: 1,
-                    color: draft.unknownTime ? 'rgba(212,212,224,0.34)' : 'rgba(233,233,242,0.92)',
-                  }}
-                />
-              </View>
-            </View>
-
-            <View className="mb-3">
-              <Text className="text-[11px] font-semibold mb-1.5" style={{ color: 'rgba(212,212,224,0.46)' }}>
-                City
-              </Text>
-              <TextInput
-                value={draft.city}
-                onChangeText={(city) => onChangeDraft({ ...draft, city })}
-                editable={!isSaving}
-                autoCapitalize="words"
-                className="text-[14px] rounded-[12px] px-3 py-2.5"
-                placeholder="Birth city"
-                placeholderTextColor="rgba(212,212,224,0.24)"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderColor: 'rgba(255,255,255,0.08)',
-                  borderWidth: 1,
-                  color: 'rgba(233,233,242,0.92)',
-                }}
-              />
-            </View>
-
+        {field === 'birthTime' ? (
+          <>
+            <TextInput
+              value={draft.birthTime}
+              onChangeText={(birthTime) => onChangeDraft({ ...draft, birthTime })}
+              editable={!isSaving && !draft.unknownTime}
+              keyboardType="numbers-and-punctuation"
+              className="text-[14px] rounded-[12px] px-3 py-2.5"
+              placeholder="HH:MM"
+              placeholderTextColor="rgba(212,212,224,0.24)"
+              style={{
+                backgroundColor: draft.unknownTime ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.05)',
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                color: draft.unknownTime ? 'rgba(212,212,224,0.34)' : 'rgba(233,233,242,0.92)',
+              }}
+            />
             <Pressable
               onPress={() => onChangeDraft({ ...draft, unknownTime: !draft.unknownTime })}
               disabled={isSaving}
-              className="flex-row items-center mb-4"
+              className="flex-row items-center mt-3 mb-1"
               style={{ opacity: isSaving ? 0.6 : 1 }}
             >
               <View
@@ -396,75 +315,158 @@ export function SettingsBirthDetailsSection(props: {
                 Birth time unknown
               </Text>
             </Pressable>
-
-            {lockMessage ? (
-              <Text className="text-[12px] leading-[17px] mb-3" style={{ color: 'rgba(255,190,112,0.86)' }}>
-                {lockMessage}
-              </Text>
-            ) : null}
-
-            {isSaving || recalculationSteps.length > 0 ? (
-              <View
-                className="rounded-[14px] px-3 py-3 mb-4"
-                style={{
-                  backgroundColor: 'rgba(201,168,76,0.08)',
-                  borderColor: 'rgba(201,168,76,0.16)',
-                  borderWidth: 1,
-                }}
-              >
-                <View className="flex-row items-center mb-2">
-                  {isSaving ? <ActivityIndicator size="small" color="#C9A84C" /> : null}
-                  <Text className="text-[12px] font-semibold ml-2" style={{ color: 'rgba(233,233,242,0.92)' }}>
-                    Recalculating profile data
-                  </Text>
-                </View>
-                {recalculationSteps.map((step) => (
-                  <View key={step.id} className="flex-row items-center justify-between py-1">
-                    <Text className="text-[11px] flex-1 pr-3" style={{ color: 'rgba(212,212,224,0.62)' }}>
-                      {step.label}
-                    </Text>
-                    <Text className="text-[10px] font-semibold uppercase" style={{ color: resolveStepStatusColor(step.status) }}>
-                      {resolveStepStatusLabel(step.status)}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            <View className="flex-row">
-              <Pressable
-                onPress={onCancelEdit}
-                disabled={isSaving}
-                className="flex-1 rounded-[12px] px-3 py-3 mr-2 items-center"
-                style={{
-                  opacity: isSaving ? 0.55 : 1,
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  borderWidth: 1,
-                }}
-              >
-                <Text className="text-[12px] font-semibold" style={{ color: 'rgba(212,212,224,0.76)' }}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={onSave}
-                disabled={isSaving}
-                className="flex-1 rounded-[12px] px-3 py-3 ml-2 items-center"
-                style={{
-                  opacity: isSaving ? 0.75 : 1,
-                  backgroundColor: 'rgba(201,168,76,0.16)',
-                  borderColor: 'rgba(201,168,76,0.36)',
-                  borderWidth: 1,
-                }}
-              >
-                <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
-                  {isSaving ? 'Saving...' : 'Save'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+          </>
         ) : null}
+
+        {field === 'city' ? (
+          <TextInput
+            value={draft.city}
+            onChangeText={(city) => onChangeDraft({ ...draft, city })}
+            editable={!isSaving}
+            autoCapitalize="words"
+            className="text-[14px] rounded-[12px] px-3 py-2.5"
+            placeholder="Birth city"
+            placeholderTextColor="rgba(212,212,224,0.24)"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              color: 'rgba(233,233,242,0.92)',
+            }}
+          />
+        ) : null}
+      </View>
+
+      {lockMessage && field !== 'name' ? (
+        <Text className="text-[12px] leading-[17px] mt-3" style={{ color: 'rgba(255,190,112,0.86)' }}>
+          {lockMessage}
+        </Text>
+      ) : null}
+
+      {recalculationSteps.length > 0 ? (
+        <View
+          className="rounded-[14px] px-3 py-3 mt-3"
+          style={{
+            backgroundColor: 'rgba(201,168,76,0.08)',
+            borderColor: 'rgba(201,168,76,0.16)',
+            borderWidth: 1,
+          }}
+        >
+          <View className="flex-row items-center mb-2">
+            {isSaving ? <ActivityIndicator size="small" color="#C9A84C" /> : null}
+            <Text className="text-[12px] font-semibold ml-2" style={{ color: 'rgba(233,233,242,0.92)' }}>
+              Recalculating profile data
+            </Text>
+          </View>
+          {recalculationSteps.map((step) => (
+            <View key={step.id} className="flex-row items-center justify-between py-1">
+              <Text className="text-[11px] flex-1 pr-3" style={{ color: 'rgba(212,212,224,0.62)' }}>
+                {step.label}
+              </Text>
+              <Text className="text-[10px] font-semibold uppercase" style={{ color: resolveStepStatusColor(step.status) }}>
+                {resolveStepStatusLabel(step.status)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      <View className="flex-row mt-4">
+        <Pressable
+          onPress={onCancelEdit}
+          disabled={isSaving}
+          className="flex-1 rounded-[12px] px-3 py-3 mr-2 items-center"
+          style={{
+            opacity: isSaving ? 0.55 : 1,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+          }}
+        >
+          <Text className="text-[12px] font-semibold" style={{ color: 'rgba(212,212,224,0.76)' }}>
+            Cancel
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onSave}
+          disabled={isSaving}
+          className="flex-1 rounded-[12px] px-3 py-3 ml-2 items-center"
+          style={{
+            opacity: isSaving ? 0.75 : 1,
+            backgroundColor: 'rgba(201,168,76,0.16)',
+            borderColor: 'rgba(201,168,76,0.36)',
+            borderWidth: 1,
+          }}
+        >
+          <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
+            {isSaving ? 'Saving...' : 'Save'}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  return (
+    <View className="mb-5">
+      <View className="flex-row items-center justify-between px-1 mb-2.5">
+        <Text className="text-[11px] tracking-[2.4px] font-semibold" style={{ color: 'rgba(212,212,224,0.36)' }}>
+          BIRTH DETAILS
+        </Text>
+        <Text className="text-[12px] font-semibold" style={{ color: '#C9A84C' }}>
+          {statusLabel}
+        </Text>
+      </View>
+
+      <View
+        className="rounded-[18px] overflow-hidden"
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.04)',
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+        }}
+      >
+        {rows.map((row, idx) => {
+          const field = ['name', 'birthDate', 'birthTime', 'city'][idx] as BirthProfileEditableField;
+          const isActive = editingField === field;
+          return (
+            <View
+              key={row.label}
+              style={{
+                borderBottomWidth: idx === birthRows.length - 1 ? 0 : 1,
+                borderBottomColor: 'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Pressable
+                onPress={() => onStartEdit(field)}
+                disabled={!canEdit || isActive}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${row.label}`}
+                className="px-4 py-3 flex-row items-center"
+                style={{ opacity: !canEdit && !isActive ? 0.72 : 1 }}
+              >
+                <row.Icon size={15} color={row.color} />
+                <Text className="text-[13px] font-semibold ml-3 flex-1" style={{ color: 'rgba(233,233,242,0.9)' }}>
+                  {row.label}
+                </Text>
+                <Text
+                  className="text-[13px] text-right ml-3"
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={{ color: 'rgba(212,212,224,0.52)', flexShrink: 1, maxWidth: '46%' }}
+                >
+                  {row.value}
+                </Text>
+                {canEdit || isActive ? (
+                  <Text className="text-[11px] font-semibold ml-3" style={{ color: '#C9A84C' }}>
+                    {isActive ? 'Editing' : 'Edit'}
+                  </Text>
+                ) : null}
+              </Pressable>
+
+              {isActive ? renderFieldEditor(field) : null}
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -531,6 +533,10 @@ export function SettingsPremiumFeaturesSection(props: {
 
   return (
     <View>
+      <Text className="text-[12px] leading-[17px] px-1 mb-3" style={{ color: 'rgba(212,212,224,0.42)' }}>
+        {footerText}
+      </Text>
+
       <View className="flex-row items-center justify-between px-1 mb-2.5">
         <Text className="text-[11px] tracking-[2.4px] font-semibold" style={{ color: 'rgba(212,212,224,0.36)' }}>
           PREMIUM FEATURES
@@ -680,10 +686,6 @@ export function SettingsPremiumFeaturesSection(props: {
       ) : null}
 
       {children}
-
-      <Text className="text-center text-[12px] mt-4" style={{ color: 'rgba(212,212,224,0.24)' }}>
-        {footerText}
-      </Text>
     </View>
   );
 }
