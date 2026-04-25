@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/horojob.iml" filepath="$PROJECT_DIR$/.idea/horojob.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../horojob-landing/.idea/horojob-landing.iml" filepath="$PROJECT_DIR$/../horojob-landing/.idea/horojob-landing.iml" />
       <module fileurl="file://$PROJECT_DIR$/../horojob-server/.idea/horojob-server.iml" filepath="$PROJECT_DIR$/../horojob-server/.idea/horojob-server.iml" />
     </modules>
   </component>

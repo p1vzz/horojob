@@ -6,6 +6,7 @@ import {
   formatBirthDateLabel,
   formatBirthNameLabel,
   formatBirthTimeLabel,
+  formatCurrentJobTitleLabel,
   formatInterviewCalendarOptionLabel,
   formatInterviewSlotWindow,
   formatMinuteLabel,
@@ -83,6 +84,8 @@ test('settings core formats birth profile fields', () => {
   assert.equal(formatBirthDateLabel('bad-date'), 'bad-date');
   assert.equal(formatBirthTimeLabel({ birthTime: '14:30', unknownTime: false }), '14:30');
   assert.equal(formatBirthTimeLabel({ birthTime: null, unknownTime: true }), 'Unknown');
+  assert.equal(formatCurrentJobTitleLabel('  Product   Manager '), 'Product Manager');
+  assert.equal(formatCurrentJobTitleLabel(''), 'Not set');
   assert.equal(
     formatBirthCityLabel({ city: 'New York', admin1: 'NY', country: 'United States' }),
     'New York, NY, United States'
@@ -96,6 +99,7 @@ test('settings core validates birth profile draft and clears coordinates when ci
     birthTime: '14:30',
     unknownTime: false,
     city: 'New York',
+    currentJobTitle: 'Product Manager',
     latitude: 40.7128,
     longitude: -74.006,
     admin1: 'NY',
@@ -108,6 +112,7 @@ test('settings core validates birth profile draft and clears coordinates when ci
     birthTime: '14:30',
     unknownTime: false,
     city: 'New York',
+    currentJobTitle: 'Product Manager',
   });
 
   const unchanged = validateBirthProfileDraft(draft, currentProfile);
@@ -125,6 +130,14 @@ test('settings core validates birth profile draft and clears coordinates when ci
     assert.equal(changedName.changed, true);
     assert.equal(changedName.algorithmChanged, false);
     assert.equal(changedName.input.name, 'Sam Lee');
+  }
+
+  const changedCurrentJob = validateBirthProfileDraft({ ...draft, currentJobTitle: 'Founder' }, currentProfile);
+  assert.equal(changedCurrentJob.ok, true);
+  if (changedCurrentJob.ok) {
+    assert.equal(changedCurrentJob.changed, true);
+    assert.equal(changedCurrentJob.algorithmChanged, false);
+    assert.equal(changedCurrentJob.input.currentJobTitle, 'Founder');
   }
 
   const changedCity = validateBirthProfileDraft({ ...draft, city: ' Boston ' }, currentProfile);
@@ -147,6 +160,7 @@ test('settings core validates individual birth fields without blocking name-only
     birthTime: '05:20',
     unknownTime: false,
     city: 'Lakefront Airport',
+    currentJobTitle: 'Analyst',
   };
   const draft = {
     name: 'Maks',
@@ -154,6 +168,7 @@ test('settings core validates individual birth fields without blocking name-only
     birthTime: '05:20',
     unknownTime: false,
     city: 'Lakefront Airport',
+    currentJobTitle: 'Analyst',
   };
 
   const nameOnly = validateBirthProfileFieldDraft('name', draft, currentProfile);
@@ -182,10 +197,11 @@ test('settings core rejects invalid birth profile drafts', () => {
     validateBirthProfileDraft(
       {
         name: 'Sam',
-        birthDate: '31/02/1990',
-        birthTime: '14:30',
-        unknownTime: false,
-        city: 'New York',
+    birthDate: '31/02/1990',
+    birthTime: '14:30',
+    unknownTime: false,
+    city: 'New York',
+    currentJobTitle: '',
       },
       null
     ),
@@ -199,10 +215,11 @@ test('settings core rejects invalid birth profile drafts', () => {
     validateBirthProfileDraft(
       {
         name: 'Sam',
-        birthDate: '15/06/1990',
-        birthTime: '99:30',
-        unknownTime: false,
-        city: 'New York',
+    birthDate: '15/06/1990',
+    birthTime: '99:30',
+    unknownTime: false,
+    city: 'New York',
+    currentJobTitle: '',
       },
       null
     ),

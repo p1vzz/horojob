@@ -1,6 +1,6 @@
 # Job Position Check - Feature Implementation Plan
-**Version:** 1.7
-**Status:** Release candidate hardening
+**Version:** 1.8
+**Status:** Market Lite/Full integration
 **Owner:** Backend + Mobile
 
 ## 1. Feature Goal
@@ -28,6 +28,12 @@ Target: stable and deterministic output for similar inputs (minimal score jitter
 - Wellfound browser fallback: disabled by default (debug/manual path only).
 - Trial entry is intentionally not part of v1 Job Position Check monetization.
 - Scanner premium upsell is scoped to `10 Daily Job Checks`; Deep Reports and AI Insights are promoted from the natal chart surface.
+- Market-driven evolution is tracked in `docs/market-driven-career-intelligence-plan.md`.
+- Monetization direction: separate free Lite market checks from limited Full analyses. Lite checks should keep labor-market facts free/public where provider terms require it; Full analyses should sell personalized decision support, repeated deep analysis, saved workflows, comparison, negotiation, and timing features.
+- Current quotas: free users get 30 Lite checks/day and 1 Full analysis/day; premium users get 30 Lite checks/day and 10 Full analyses/day.
+- Any successful new analysis consumes the matching quota. Reopening history or serving an unchanged cached Full result does not consume quota.
+- Scan history is available to all users, and every result/history row must show a `Lite` or `Full` badge.
+- Lite results stay Lite after a premium upgrade; users can explicitly run a new Full analysis from a Lite history item.
 
 ## 3. User Flow (Mobile)
 1. User sees the Job Posting Check dashboard card with the currently supported services.
@@ -66,11 +72,21 @@ Production gates:
 
 ## 4. Current Backend Contract
 - `GET /api/jobs/limits`
+- `GET /api/jobs/history?limit=8`
+- `POST /api/jobs/history/import`
 - `POST /api/jobs/preflight`
 - `POST /api/jobs/analyze`
 - `POST /api/jobs/analyze-screenshots`
 - `GET /api/jobs/metrics?windowHours=24`
 - `GET /api/jobs/alerts?windowHours=24`
+
+Market-driven additions:
+
+- `GET /api/jobs/limits` preserves legacy `limit` and also returns `limits.lite` and `limits.full`.
+- `POST /api/jobs/preflight` returns `recommendedScanDepth` (`full` when Full quota is available, otherwise `lite` when Lite quota remains) and the same Lite/Full limit snapshot.
+- `POST /api/jobs/analyze` accepts `scanDepth: "auto" | "lite" | "full"`; `auto` prefers Full and falls back to Lite when Full quota is exhausted.
+- Analyze success returns durable `scanDepth`, `requestedScanDepth`, `usage.depth`, optional `usage.limits`, and `market`.
+- `POST /api/jobs/analyze-screenshots` is Full-only for now and consumes Full quota on successful analysis.
 
 ## 4.1 Mobile Client Data Layer (Current)
 
@@ -85,10 +101,9 @@ Production gates:
 - Retry profiles are intentionally heavier for slower work:
   - URL analysis uses a wider retry window than preflight
   - screenshot analysis uses the widest retry window of the three
-- Current runtime reality is still the pre-existing imperative flow:
-  - `src/screens/useScannerRuntime.ts` calls `preflightJobUrl()` and `analyzeJobUrl()` directly
-  - `src/screens/useJobScreenshotUploadRuntime.ts` calls `analyzeJobScreenshots()` directly
-- Impact: no backend contract or current scanner UX change yet; this is groundwork for a later migration onto the shared query/mutation layer.
+- `src/screens/useScannerRuntime.ts` now orchestrates scans through `useJobPreflight()` and `useJobAnalysis()`.
+- `src/screens/useJobScreenshotUploadRuntime.ts` now orchestrates screenshot analysis through `useJobScreenshotAnalysis()`.
+- Impact: scanner URL flow and screenshot fallback now share the same retry, validation, and telemetry boundary as the query-layer wrappers without changing backend contracts or current UX.
 
 ## 5. Parsing + Analysis Pipeline (Implemented)
 ```text
@@ -131,9 +146,15 @@ url input
 - Dedupe hash is content-based (title/company/location/description/employment/seniority), not URL-based.
 
 ## 9. Limits and Monetization
-- Free plan: 1 successful parse per rolling 7 days.
-- Premium plan: 10 successful parses per UTC day.
+- Free plan: 30 Lite checks per UTC day and 1 Full analysis per UTC day.
+- Premium plan: 30 Lite checks per UTC day and 10 Full analyses per UTC day.
 - Non-production only: limits can be disabled (`JOB_USAGE_LIMITS_ENABLED=false`).
+- Lite checks include parser summary, occupation match when available, market estimate, salary/pay transparency, market range, outlook/demand, skills, and attribution.
+- Full analyses include Lite market context plus compatibility score, AI replacement risk as low-weight context, natal/career fit breakdown, personalized tradeoffs, saved history, and deeper explanations.
+- Missing posted salary should be treated as a negotiation opportunity. The result UI now separates nullable `Posted salary` from provider-backed `Market estimate`.
+- After Full quota is exhausted, scanner should still render Lite results and show glass/blurred premium panels for locked Full sections.
+- Any successful new Lite or Full result consumes only the matching quota. Reopening history or serving an unchanged cached Full analysis does not consume quota.
+- Lite results expose `Run Full Analysis`, including when reopened from local history; the action explicitly requests `scanDepth="full"` and replaces the Lite history entry if it succeeds.
 
 ## 10. Error Contract (App-facing)
 - `unsupported_path`: `This URL is not supported by the current parser.`
@@ -170,6 +191,13 @@ Screenshot minimum data:
 - Deterministic scoring output.
 - Limits subsystem (+ dev bypass).
 - Metrics/alerts endpoints + alert scheduler.
+- Market occupation insight endpoint and mobile market service contract.
+- Lite/Full scanner depth contract, quotas, and fallback behavior.
+- Scanner result/history badges for `Lite` and `Full`.
+- Lite result UI with market snapshot, source footer, and locked Full panels.
+- `JobProfileCard` separates posted salary from market estimate using nullable backend `job.salaryText`.
+- Lite history can trigger a fresh Full analysis without reusing the session Lite cache.
+- Scanner history is now remote-first via `/api/jobs/history`, with device AsyncStorage kept as fallback and migration cache.
 
 ## 13. Implementation Backlog
 ### P0 (must-have before release)

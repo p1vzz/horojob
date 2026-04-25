@@ -1,4 +1,4 @@
-import type { FullNatalCareerAnalysisResponse } from '../services/astrologyApi';
+import type { FullNatalCareerAnalysisResponse } from '../services/astrologyApiCore';
 
 type FullNatalAnalysis = FullNatalCareerAnalysisResponse['analysis'];
 

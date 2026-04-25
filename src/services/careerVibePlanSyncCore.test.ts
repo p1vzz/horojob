@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { CareerVibePlanResponse } from './astrologyApi';
+import type { CareerVibePlanResponse } from './astrologyApiCore';
 import { createCareerVibePlanCacheService } from './careerVibePlanSyncCore';
 
 class FakeApiError extends Error {

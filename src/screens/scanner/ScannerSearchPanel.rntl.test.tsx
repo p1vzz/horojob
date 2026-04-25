@@ -71,6 +71,7 @@ test('scanner search panel shows saved scan title and link instead of input for 
         title: 'Senior Product Designer',
         url: 'https://linkedin.com/jobs/view/123',
         canOpenUrl: true,
+        scanDepth: 'full',
       }}
       onBack={() => {}}
       onOpenHistoricalUrl={onOpenHistoricalUrl}

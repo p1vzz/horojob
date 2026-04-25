@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, View, Text, Pressable, Switch, TextInput } from 'react-native';
 import {
   Bell,
+  BriefcaseBusiness,
   CalendarClock,
   CalendarDays,
   ChevronRight,
@@ -24,6 +25,7 @@ import {
   formatBirthDateLabel,
   formatBirthNameLabel,
   formatBirthTimeLabel,
+  formatCurrentJobTitleLabel,
   formatInterviewCalendarOptionLabel,
   formatInterviewSlotWindow,
   type BirthProfileEditableField,
@@ -60,6 +62,7 @@ const birthRows: BirthRow[] = [
   { label: 'Date of Birth', value: 'Not set', Icon: CalendarDays, color: '#C9A84C' },
   { label: 'Time of Birth', value: 'Not set', Icon: Clock3, color: '#C9A84C' },
   { label: 'Birth City', value: 'Not set', Icon: MapPin, color: '#C9A84C' },
+  { label: 'Current Role', value: 'Not set', Icon: BriefcaseBusiness, color: '#C9A84C' },
 ];
 
 const premiumFeatureRows: PremiumFeatureRow[] = [
@@ -168,6 +171,7 @@ function resolveBirthRows(profile: OnboardingData | null, loadState: BirthProfil
     { ...birthRows[1], value: formatBirthDateLabel(profile.birthDate) },
     { ...birthRows[2], value: formatBirthTimeLabel(profile) },
     { ...birthRows[3], value: formatBirthCityLabel(profile) },
+    { ...birthRows[4], value: formatCurrentJobTitleLabel(profile.currentJobTitle) },
   ];
 }
 
@@ -335,9 +339,32 @@ export function SettingsBirthDetailsSection(props: {
             }}
           />
         ) : null}
+
+        {field === 'currentJobTitle' ? (
+          <>
+            <TextInput
+              value={draft.currentJobTitle}
+              onChangeText={(currentJobTitle) => onChangeDraft({ ...draft, currentJobTitle })}
+              editable={!isSaving}
+              autoCapitalize="words"
+              className="text-[14px] rounded-[12px] px-3 py-2.5"
+              placeholder="Optional current role"
+              placeholderTextColor="rgba(212,212,224,0.24)"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                borderColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                color: 'rgba(233,233,242,0.92)',
+              }}
+            />
+            <Text className="text-[12px] leading-[17px] mt-3" style={{ color: 'rgba(212,212,224,0.52)' }}>
+              Optional. This personalizes role transitions and other career guidance across the app.
+            </Text>
+          </>
+        ) : null}
       </View>
 
-      {lockMessage && field !== 'name' ? (
+      {lockMessage && field !== 'name' && field !== 'currentJobTitle' ? (
         <Text className="text-[12px] leading-[17px] mt-3" style={{ color: 'rgba(255,190,112,0.86)' }}>
           {lockMessage}
         </Text>
@@ -426,7 +453,7 @@ export function SettingsBirthDetailsSection(props: {
         }}
       >
         {rows.map((row, idx) => {
-          const field = ['name', 'birthDate', 'birthTime', 'city'][idx] as BirthProfileEditableField;
+          const field = ['name', 'birthDate', 'birthTime', 'city', 'currentJobTitle'][idx] as BirthProfileEditableField;
           const isActive = editingField === field;
           return (
             <View

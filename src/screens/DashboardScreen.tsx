@@ -10,6 +10,7 @@ import { DailyAstroStatus } from '../components/DailyAstroStatus';
 import { JobCheckTile } from '../components/JobCheckTile';
 import { CareerMatchmakerTile } from '../components/CareerMatchmakerTile';
 import { AiSynergyTile } from '../components/AiSynergyTile';
+import { NegotiationPrepCard } from '../components/NegotiationPrepCard';
 import { InterviewStrategy } from '../components/InterviewStrategy';
 import { DeepDiveTile } from '../components/DeepDiveTile';
 import { useDashboardInsights } from '../hooks/useDashboardInsights';
@@ -256,6 +257,7 @@ export const DashboardScreen = ({ route }: DashboardScreenProps) => {
             <JobCheckTile careerPrerequisites={dashboardPrerequisites} />
             <CareerMatchmakerTile careerPrerequisites={dashboardPrerequisites} />
             <AiSynergyTile />
+            <NegotiationPrepCard careerPrerequisites={dashboardPrerequisites} />
             <InterviewStrategy careerPrerequisites={dashboardPrerequisites} />
             <DeepDiveTile careerPrerequisites={dashboardPrerequisites} />
           </View>

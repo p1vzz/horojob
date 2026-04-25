@@ -1,4 +1,4 @@
-import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
+import type { JobAnalyzeSuccessResponse } from '../services/jobsApiCore';
 
 const SESSION_SCAN_TTL_MS = 10 * 60 * 1000;
 

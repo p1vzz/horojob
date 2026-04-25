@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
+import type { JobAnalyzeSuccessResponse } from '../services/jobsApiCore';
 
 const JOB_SCAN_KEY_BY_USER = 'job-scan:last:v1-by-user';
 

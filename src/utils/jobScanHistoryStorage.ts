@@ -1,21 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
+import type {
+  JobAnalyzeSuccessResponse,
+  JobScanHistoryEntry,
+  JobScanHistoryMeta,
+} from '../services/jobsApiCore';
 
 const JOB_SCAN_HISTORY_KEY_BY_USER = 'job-scan:history:v1-by-user';
-const JOB_SCAN_HISTORY_LIMIT = 8;
-
-type JobScanHistoryMeta = {
-  source: string;
-  cached: boolean;
-  provider: string | null;
-};
-
-export type JobScanHistoryEntry = {
-  url: string;
-  analysis: JobAnalyzeSuccessResponse;
-  meta: JobScanHistoryMeta;
-  savedAt: string;
-};
+export const JOB_SCAN_HISTORY_LIMIT = 8;
+export type { JobScanHistoryEntry, JobScanHistoryMeta } from '../services/jobsApiCore';
 
 type JobScanHistoryByUser = Record<string, JobScanHistoryEntry[]>;
 
@@ -64,7 +56,7 @@ function parseByUser(raw: string | null): JobScanHistoryByUser {
   }
 }
 
-function normalizeUrlForHistoryKey(rawUrl: string) {
+export function normalizeJobScanHistoryUrlForKey(rawUrl: string) {
   const trimmed = rawUrl.trim();
   if (!trimmed) return '';
 
@@ -88,17 +80,55 @@ function toTs(iso: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function getJobScanHistoryEntryKey(entry: Pick<JobScanHistoryEntry, 'url' | 'analysis'>) {
+  const normalizedUrl = normalizeJobScanHistoryUrlForKey(entry.url);
+  return normalizedUrl.length > 0 ? normalizedUrl : `analysis:${entry.analysis.analysisId}`;
+}
+
+export function mergeJobScanHistoryEntries(entries: JobScanHistoryEntry[], limit = JOB_SCAN_HISTORY_LIMIT) {
+  const byKey = new Map<string, JobScanHistoryEntry>();
+
+  for (const entry of entries) {
+    const key = getJobScanHistoryEntryKey(entry);
+    const existing = byKey.get(key);
+    if (!existing || toTs(entry.savedAt) >= toTs(existing.savedAt)) {
+      byKey.set(key, entry);
+    }
+  }
+
+  return Array.from(byKey.values())
+    .sort((a, b) => toTs(b.savedAt) - toTs(a.savedAt))
+    .slice(0, limit);
+}
+
+export function selectJobScanHistoryEntriesForSync(
+  localEntries: JobScanHistoryEntry[],
+  remoteEntries: JobScanHistoryEntry[],
+) {
+  const remoteByKey = new Map(
+    mergeJobScanHistoryEntries(remoteEntries, Number.MAX_SAFE_INTEGER).map((entry) => [
+      getJobScanHistoryEntryKey(entry),
+      entry,
+    ]),
+  );
+
+  return mergeJobScanHistoryEntries(localEntries, Number.MAX_SAFE_INTEGER).filter((entry) => {
+    const remoteEntry = remoteByKey.get(getJobScanHistoryEntryKey(entry));
+    if (!remoteEntry) {
+      return true;
+    }
+    return toTs(entry.savedAt) > toTs(remoteEntry.savedAt);
+  });
+}
+
 function upsertHistoryEntry(existing: JobScanHistoryEntry[], incoming: JobScanHistoryEntry) {
-  const incomingKey = normalizeUrlForHistoryKey(incoming.url);
-  const filtered = existing.filter((entry) => normalizeUrlForHistoryKey(entry.url) !== incomingKey);
-  const merged = [incoming, ...filtered].sort((a, b) => toTs(b.savedAt) - toTs(a.savedAt));
-  return merged.slice(0, JOB_SCAN_HISTORY_LIMIT);
+  return mergeJobScanHistoryEntries([incoming, ...existing]);
 }
 
 export async function loadJobScanHistoryForUser(userId: string): Promise<JobScanHistoryEntry[]> {
   const raw = await AsyncStorage.getItem(JOB_SCAN_HISTORY_KEY_BY_USER);
   const byUser = parseByUser(raw);
-  return (byUser[userId] ?? []).slice(0, JOB_SCAN_HISTORY_LIMIT);
+  return mergeJobScanHistoryEntries(byUser[userId] ?? []);
 }
 
 export async function saveJobScanHistoryEntryForUser(userId: string, entry: Omit<JobScanHistoryEntry, 'savedAt'>) {
@@ -112,6 +142,14 @@ export async function saveJobScanHistoryEntryForUser(userId: string, entry: Omit
   byUser[userId] = updated;
   await AsyncStorage.setItem(JOB_SCAN_HISTORY_KEY_BY_USER, JSON.stringify(byUser));
   return updated;
+}
+
+export async function replaceJobScanHistoryForUser(userId: string, entries: JobScanHistoryEntry[]) {
+  const raw = await AsyncStorage.getItem(JOB_SCAN_HISTORY_KEY_BY_USER);
+  const byUser = parseByUser(raw);
+  byUser[userId] = mergeJobScanHistoryEntries(entries);
+  await AsyncStorage.setItem(JOB_SCAN_HISTORY_KEY_BY_USER, JSON.stringify(byUser));
+  return byUser[userId];
 }
 
 export async function clearJobScanHistoryForUser(userId: string) {

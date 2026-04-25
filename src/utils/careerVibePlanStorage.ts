@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { CareerVibePlanResponse } from '../services/astrologyApi';
+import type { CareerVibePlanResponse } from '../services/astrologyApiCore';
 
 const CAREER_VIBE_PLAN_KEY_PREFIX = 'career-vibe-plan:v1';
 

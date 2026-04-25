@@ -12,5 +12,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="horojob-server" />
+    <orderEntry type="module" module-name="horojob-landing" />
   </component>
 </module>

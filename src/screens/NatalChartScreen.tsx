@@ -8,10 +8,17 @@ import { loadOnboardingForUser } from '../utils/onboardingStorage';
 import { loadNatalChartCacheForUser, saveNatalChartCacheForUser } from '../utils/natalChartStorage';
 import { FullScreenCosmicLoader } from '../components/loaders/FullScreenCosmicLoader';
 import { ApiError, ensureAuthSession } from '../services/authSession';
-import { fetchCareerInsights, fetchNatalChart, type CareerInsightsResponse } from '../services/astrologyApi';
+import {
+  fetchCareerInsights,
+  fetchMarketCareerContext,
+  fetchNatalChart,
+  type CareerInsightsResponse,
+  type MarketCareerContextResponse,
+} from '../services/astrologyApi';
 import type { AppNavigationProp } from '../types/navigation';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { NatalPremiumInsightsCard } from '../components/NatalPremiumInsightsCard';
+import { MarketCareerPathsSection } from '../components/MarketCareerPathsSection';
 
 type ChartPlanet = {
   name: string;
@@ -507,6 +514,8 @@ export const NatalChartScreen = () => {
   const [errorText, setErrorText] = useState<string | null>(null);
   const [loadedFromCache, setLoadedFromCache] = useState(false);
   const [aiInsightCards, setAiInsightCards] = useState<InsightCard[] | null>(null);
+  const [marketContext, setMarketContext] = useState<MarketCareerContextResponse | null>(null);
+  const [isMarketLoading, setIsMarketLoading] = useState(false);
 
   const headerEnter = useRef(new Animated.Value(0)).current;
   const placementsEnter = useRef(new Animated.Value(0)).current;
@@ -633,6 +642,7 @@ export const NatalChartScreen = () => {
         setErrorText(null);
         setLoadedFromCache(false);
         setAiInsightCards(null);
+        setMarketContext(null);
         try {
           const session = await ensureAuthSession();
           currentUserId = session.user.id;
@@ -696,6 +706,30 @@ export const NatalChartScreen = () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!apiPayload?.chart) return;
+    let mounted = true;
+    setIsMarketLoading(true);
+    void fetchMarketCareerContext()
+      .then((payload) => {
+        if (!mounted) return;
+        setMarketContext(payload);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setMarketContext(null);
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsMarketLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [apiPayload?.chart]);
 
   useEffect(() => {
     headerEnter.setValue(0);
@@ -1325,6 +1359,11 @@ export const NatalChartScreen = () => {
                   </Animated.View>
                 ))}
               </View>
+              <MarketCareerPathsSection
+                paths={marketContext?.marketCareerPaths ?? []}
+                loading={isMarketLoading}
+                subtitle="Career directions from your chart, paired with public U.S. salary and demand context."
+              />
               <NatalPremiumInsightsCard onPress={() => navigation.navigate('PremiumPurchase')} />
             </Animated.View>
           </View>

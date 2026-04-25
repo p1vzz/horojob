@@ -7,17 +7,26 @@ import { z } from 'zod';
 export const JobSourceSchema = z.enum(['linkedin', 'wellfound', 'ziprecruiter', 'indeed', 'glassdoor', 'manual']);
 export const JobProviderSchema = z.enum(['http_fetch', 'browser_fallback', 'screenshot_vision', 'manual']);
 export const UsagePlanSchema = z.enum(['free', 'premium']);
+export const JobScanDepthSchema = z.enum(['lite', 'full']);
+export const JobScanDepthRequestSchema = z.enum(['auto', 'lite', 'full']);
 export const UsagePeriodSchema = z.enum(['rolling_7_days', 'daily_utc']);
 export const NegativeCacheStatusSchema = z.enum(['blocked', 'login_wall', 'not_found']);
 
 export const JobUsageLimitSchema = z.object({
   plan: UsagePlanSchema,
+  depth: JobScanDepthSchema,
   period: UsagePeriodSchema,
   limit: z.number(),
   used: z.number(),
   remaining: z.number(),
   nextAvailableAt: z.string().nullable(),
   canProceed: z.boolean(),
+});
+
+export const JobUsageLimitsSchema = z.object({
+  plan: UsagePlanSchema,
+  lite: JobUsageLimitSchema,
+  full: JobUsageLimitSchema,
 });
 
 export const JobPreflightResponseSchema = z.object({
@@ -53,6 +62,8 @@ export const JobPreflightResponseSchema = z.object({
     }),
   }),
   limit: JobUsageLimitSchema,
+  limits: JobUsageLimitsSchema.optional(),
+  recommendedScanDepth: JobScanDepthSchema,
   versions: z.object({
     parserVersion: z.string(),
     rubricVersion: z.string(),
@@ -84,6 +95,8 @@ export const JobProviderAttemptSchema = z.object({
 export const JobAnalyzeSuccessResponseSchema = z.object({
   analysisId: z.string(),
   status: z.literal('done'),
+  scanDepth: JobScanDepthSchema,
+  requestedScanDepth: JobScanDepthRequestSchema,
   providerUsed: JobProviderSchema.nullable(),
   providerAttempts: z.array(JobProviderAttemptSchema).optional(),
   cached: z.boolean(),
@@ -94,8 +107,10 @@ export const JobAnalyzeSuccessResponseSchema = z.object({
   }),
   usage: z.object({
     plan: UsagePlanSchema,
+    depth: JobScanDepthSchema,
     incremented: z.boolean(),
     limit: JobUsageLimitSchema.optional(),
+    limits: JobUsageLimitsSchema.optional(),
   }),
   versions: z.object({
     parserVersion: z.string(),
@@ -111,11 +126,13 @@ export const JobAnalyzeSuccessResponseSchema = z.object({
   jobSummary: z.string(),
   tags: z.array(z.string()),
   descriptors: z.array(z.string()).optional(),
+  market: z.unknown().nullable(),
   job: z
     .object({
       title: z.string(),
       company: z.string().nullable(),
       location: z.string().nullable(),
+      salaryText: z.string().nullable().optional(),
       employmentType: z.string().nullable(),
       source: JobSourceSchema,
     })

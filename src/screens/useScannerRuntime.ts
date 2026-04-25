@@ -1,10 +1,7 @@
 import React from 'react';
 import { ensureAuthSession } from '../services/authSession';
-import {
-  analyzeJobUrl,
-  preflightJobUrl,
-  type JobAnalyzeSuccessResponse,
-} from '../services/jobsApi';
+import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
+import { useJobAnalysis, useJobPreflight } from '../hooks/queries/useJobAnalysis';
 import type { AppNavigationProp, AppRouteProp, ScannerImportedMeta } from '../types/navigation';
 import {
   saveJobScanHistoryEntryForUser,
@@ -52,6 +49,8 @@ type ActiveScannerSnapshot = {
 
 export function useScannerRuntime(args: UseScannerRuntimeArgs) {
   const { navigation, route } = args;
+  const { mutateAsync: runPreflightMutation } = useJobPreflight();
+  const { mutateAsync: runAnalysisMutation } = useJobAnalysis();
   const [url, setUrl] = React.useState('');
   const [analysis, setAnalysis] = React.useState<JobAnalyzeSuccessResponse | null>(null);
   const [phase, setPhase] = React.useState<ScannerPhase>('idle');
@@ -263,7 +262,7 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
 
       setIsLoading(true);
       setPhase('preflight');
-      const preflight = await preflightJobUrl(trimmedUrl);
+      const preflight = await runPreflightMutation({ url: trimmedUrl });
       const gate = resolvePreflightGate(preflight);
       if (gate.kind === 'blocked') {
         setErrorState(gate.errorState);
@@ -271,7 +270,7 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
       }
 
       setPhase(gate.phase);
-      const result = await analyzeJobUrl(trimmedUrl);
+      const result = await runAnalysisMutation({ url: trimmedUrl });
       const nextMeta = buildScanMetaFromResult(preflight, result);
       setAnalysis(result);
       setScanMeta(nextMeta);
@@ -306,7 +305,81 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
       setIsLoading(false);
       setPhase('idle');
     }
-  }, []);
+  }, [runAnalysisMutation, runPreflightMutation]);
+
+  const onRunFullAnalysis = React.useCallback(async () => {
+    const trimmedUrl = normalizeScannerInitialUrl(url);
+    if (!trimmedUrl) {
+      setErrorState({
+        code: 'invalid_url',
+        message: ERROR_TEXTS.invalid_url,
+        retryAt: null,
+        usageContext: null,
+      });
+      return;
+    }
+
+    if (inFlightRef.current) {
+      return;
+    }
+
+    inFlightRef.current = true;
+    activeScanSnapshotRef.current = null;
+    setHistoryEntry(null);
+    setUrl(trimmedUrl);
+    setErrorState(null);
+    setIsLoading(true);
+
+    try {
+      const session = await ensureAuthSession();
+      setPhase('preflight');
+      const preflight = await runPreflightMutation({ url: trimmedUrl });
+      const gate = resolvePreflightGate(preflight);
+      if (gate.kind === 'blocked') {
+        setErrorState(gate.errorState);
+        return;
+      }
+
+      setPhase('scoring');
+      const result = await runAnalysisMutation({
+        url: trimmedUrl,
+        options: { scanDepth: 'full' },
+      });
+      const nextMeta = buildScanMetaFromResult(preflight, result);
+      setAnalysis(result);
+      setScanMeta(nextMeta);
+      saveSessionJobScanForUser(session.user.id, trimmedUrl, {
+        analysis: result,
+        meta: nextMeta,
+      });
+
+      try {
+        await saveJobScanHistoryEntryForUser(session.user.id, {
+          url: trimmedUrl,
+          analysis: result,
+          meta: nextMeta,
+        });
+      } catch {
+        // non-blocking history save
+      }
+
+      try {
+        await saveLastJobScanForUser(session.user.id, {
+          url: trimmedUrl,
+          analysis: result,
+          meta: nextMeta,
+        });
+      } catch {
+        // non-blocking cache save
+      }
+    } catch (error) {
+      setErrorState(parseApiError(error));
+    } finally {
+      inFlightRef.current = false;
+      setIsLoading(false);
+      setPhase('idle');
+    }
+  }, [runAnalysisMutation, runPreflightMutation, url]);
 
   React.useEffect(() => {
     const initialUrl = normalizeScannerInitialUrl(route.params?.initialUrl);
@@ -361,6 +434,7 @@ export function useScannerRuntime(args: UseScannerRuntimeArgs) {
     historicalScan,
     isLoading,
     onReturnToActiveScan,
+    onRunFullAnalysis,
     onScanPress,
     phase,
     scanMeta,

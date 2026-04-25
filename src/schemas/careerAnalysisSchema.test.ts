@@ -14,6 +14,32 @@ test('full natal career analysis schema accepts current route payload', () => {
       profileUpdatedAt: '2026-03-20T11:00:00.000Z',
       expiresAt: '2026-03-23T11:00:00.000Z',
     },
+    marketContext: {
+      algorithmVersion: 'market_career_context.v1',
+      generatedAt: '2026-04-23T12:00:00.000Z',
+      location: 'US',
+      sourceNote: 'Market data provided by CareerOneStop. Horojob guidance is independent.',
+    },
+    marketCareerPaths: [
+      {
+        slug: 'software-engineer',
+        title: 'Technical Systems',
+        domain: 'Technical Systems',
+        fitScore: 91,
+        fitLabel: 'Best fit',
+        opportunityScore: 96,
+        rationale: 'Systems-oriented chart signals.',
+        developmentVector: 'Build production systems.',
+        exampleRoles: ['Software Developer'],
+        tags: ['technical'],
+        salaryRangeLabel: '$95k-$145k/yr',
+        marketGradient: 'high_upside',
+        marketScoreLabel: 'strong market',
+        demandLabel: 'high',
+        sourceRoleTitle: 'Software Developers',
+        market: null,
+      },
+    ],
     analysis: {
       schemaVersion: 'full_natal_analysis.v1',
       headline: 'Full Natal Career Blueprint',
@@ -86,6 +112,7 @@ test('full natal career analysis schema accepts current route payload', () => {
 
   assert.equal(payload.narrativeSource, 'llm');
   assert.equal(payload.profileChangeNotice?.profileUpdatedAt, '2026-03-20T11:00:00.000Z');
+  assert.equal(payload.marketCareerPaths?.[0]?.salaryRangeLabel, '$95k-$145k/yr');
   assert.equal(payload.analysis.phasePlan[0]?.phase, '0_6_months');
   assert.equal(payload.analysis.roleFitMatrix.length, 5);
 });

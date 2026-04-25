@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Canvas, Rect, RadialGradient, vec, Blur, Group } from '@shopify/react-native-skia';
 import Svg, { Defs, RadialGradient as SvgRadialGradient, Stop, Rect as SvgRect } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
-import type { CareerVibePlanResponse } from '../services/astrologyApi';
+import type { CareerVibePlanResponse } from '../services/astrologyApiCore';
 import {
   getCachedCareerVibePlanForCurrentUser,
   syncCareerVibePlanCache,

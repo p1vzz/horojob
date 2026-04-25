@@ -19,9 +19,11 @@ import {
 function createAnalysis(
   overrides: Partial<JobAnalyzeSuccessResponse> = {}
 ): JobAnalyzeSuccessResponse {
-  return {
+  const base: JobAnalyzeSuccessResponse = {
     analysisId: 'analysis-1',
     status: 'done',
+    scanDepth: 'full',
+    requestedScanDepth: 'auto',
     providerUsed: 'http_fetch',
     cached: false,
     cache: {
@@ -31,6 +33,7 @@ function createAnalysis(
     },
     usage: {
       plan: 'free',
+      depth: 'full',
       incremented: false,
     },
     versions: {
@@ -47,6 +50,7 @@ function createAnalysis(
     jobSummary: 'Normal job summary',
     tags: ['remote'],
     descriptors: [],
+    market: null,
     job: {
       title: 'Product Manager',
       company: 'Acme',
@@ -54,14 +58,14 @@ function createAnalysis(
       employmentType: 'full-time',
       source: 'linkedin',
     },
-    ...overrides,
   };
+  return { ...base, ...overrides } as JobAnalyzeSuccessResponse;
 }
 
 function createPreflight(
   overrides: Partial<JobPreflightResponse> = {}
 ): JobPreflightResponse {
-  return {
+  const base: JobPreflightResponse = {
     source: 'linkedin',
     canonicalUrl: 'https://linkedin.com/jobs/view/123',
     canonicalUrlHash: 'hash-123',
@@ -79,6 +83,7 @@ function createPreflight(
     },
     limit: {
       plan: 'free',
+      depth: 'full',
       period: 'rolling_7_days',
       limit: 10,
       used: 3,
@@ -86,13 +91,14 @@ function createPreflight(
       nextAvailableAt: null,
       canProceed: true,
     },
+    recommendedScanDepth: 'full',
     versions: {
       parserVersion: 'parser-v1',
       rubricVersion: 'rubric-v1',
       modelVersion: 'model-v1',
     },
-    ...overrides,
   };
+  return { ...base, ...overrides } as JobPreflightResponse;
 }
 
 function createMeta(overrides: Partial<ScannerImportedMeta> = {}): ScannerImportedMeta {
@@ -164,6 +170,7 @@ test('scanner runtime core builds history display metadata', () => {
     title: 'Product Manager',
     url: 'https://linkedin.com/jobs/view/123',
     canOpenUrl: true,
+    scanDepth: 'full',
   });
   assert.deepEqual(
     buildHistoryScanDisplay(
@@ -179,6 +186,7 @@ test('scanner runtime core builds history display metadata', () => {
       title: 'Imported screenshot role',
       url: 'Screenshot Upload',
       canOpenUrl: false,
+      scanDepth: 'full',
     }
   );
   assert.equal(isOpenableJobUrl('linkedin.com/jobs/view/123'), true);
@@ -227,6 +235,7 @@ test('scanner runtime core maps usage limit and negative cache preflight blocks'
     createPreflight({
       limit: {
         plan: 'free',
+        depth: 'full',
         period: 'daily_utc',
         limit: 1,
         used: 1,
@@ -238,6 +247,7 @@ test('scanner runtime core maps usage limit and negative cache preflight blocks'
   );
   const negativeGate = resolvePreflightGate(
     createPreflight({
+      nextStage: 'done',
       cache: {
         raw: { hit: false, updatedAt: null },
         parsed: { hit: false, parserVersion: null, updatedAt: null },
@@ -253,7 +263,7 @@ test('scanner runtime core maps usage limit and negative cache preflight blocks'
 
   assert.equal(usageLimitGate.kind, 'blocked');
   assert.equal(usageLimitGate.errorState.code, 'usage_limit_reached');
-  assert.equal(usageLimitGate.errorState.usageContext, 'Usage: 1/1 (daily UTC)');
+  assert.equal(usageLimitGate.errorState.usageContext, 'Full usage: 1/1 (daily UTC)');
 
   assert.equal(negativeGate.kind, 'blocked');
   assert.equal(negativeGate.errorState.code, 'login_wall');
@@ -269,6 +279,40 @@ test('scanner runtime core maps successful preflight next stage into fetch or sc
     phase: 'fetching',
   });
   assert.deepEqual(scoringGate, {
+    kind: 'continue',
+    phase: 'scoring',
+  });
+});
+
+test('scanner runtime core allows cached full analysis when full quota is exhausted', () => {
+  const gate = resolvePreflightGate(
+    createPreflight({
+      nextStage: 'done',
+      cache: {
+        raw: { hit: true, updatedAt: '2026-04-01T09:00:00.000Z' },
+        parsed: { hit: true, parserVersion: 'parser-v1', updatedAt: '2026-04-01T09:00:00.000Z' },
+        analysis: {
+          hit: true,
+          rubricVersion: 'rubric-v1',
+          modelVersion: 'model-v1',
+          updatedAt: '2026-04-01T09:00:00.000Z',
+        },
+        negative: { hit: false, status: null, retryAt: null },
+      },
+      limit: {
+        plan: 'free',
+        depth: 'full',
+        period: 'daily_utc',
+        limit: 1,
+        used: 1,
+        remaining: 0,
+        nextAvailableAt: '2026-04-23T00:00:00.000Z',
+        canProceed: false,
+      },
+    })
+  );
+
+  assert.deepEqual(gate, {
     kind: 'continue',
     phase: 'scoring',
   });

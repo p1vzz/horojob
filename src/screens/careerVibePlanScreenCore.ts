@@ -1,4 +1,4 @@
-import type { CareerVibePlanResponse } from '../services/astrologyApi';
+import type { CareerVibePlanResponse } from '../services/astrologyApiCore';
 
 export type CareerVibeMetricRow = {
   label: string;

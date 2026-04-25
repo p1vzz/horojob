@@ -10,11 +10,13 @@ import {
   fetchFullNatalCareerAnalysis,
   fetchFullNatalCareerAnalysisProgress,
   type FullNatalCareerAnalysisResponse,
+  type MarketCareerPath,
   type OperationProgressResponse,
 } from '../services/astrologyApi';
 import { FULL_NATAL_GUIDANCE_DISCLAIMER } from '../services/fullNatalCareerAnalysisCopy';
 import { trackAnalyticsEvent } from '../services/analytics';
 import { FullScreenCosmicLoader } from '../components/loaders/FullScreenCosmicLoader';
+import { MarketCareerPathsSection } from '../components/MarketCareerPathsSection';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { SHOULD_EXPOSE_TECHNICAL_SURFACES } from '../config/appEnvironment';
 import {
@@ -125,6 +127,26 @@ function ListDots({ items, color }: { items: string[]; color: string }) {
       ))}
     </View>
   );
+}
+
+function normalizeComparisonText(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+}
+
+function findMarketPathForRoleFit(
+  item: FullNatalCareerAnalysisResponse['analysis']['roleFitMatrix'][number],
+  paths: MarketCareerPath[]
+) {
+  const domain = normalizeComparisonText(item.domain);
+  return paths.find((path) => {
+    const pathDomain = normalizeComparisonText(path.domain);
+    if (pathDomain && (pathDomain.includes(domain) || domain.includes(pathDomain))) return true;
+    const pathRoles = path.exampleRoles.map(normalizeComparisonText);
+    return item.exampleRoles.some((role) => {
+      const normalizedRole = normalizeComparisonText(role);
+      return pathRoles.some((pathRole) => pathRole.includes(normalizedRole) || normalizedRole.includes(pathRole));
+    });
+  }) ?? null;
 }
 
 export const FullNatalCareerAnalysisScreen = () => {
@@ -269,6 +291,7 @@ export const FullNatalCareerAnalysisScreen = () => {
   }, [screenState, reloadToken]);
 
   const analysis = response?.analysis ?? null;
+  const marketCareerPaths = response?.marketCareerPaths ?? [];
   const footerMeta = useMemo(() => {
     if (!response) return null;
     const generatedAt = formatGeneratedAt(response.generatedAt);
@@ -645,46 +668,62 @@ export const FullNatalCareerAnalysisScreen = () => {
 
                 <SectionTitle title="Role Fit Matrix" />
                 <View className="gap-3">
-                  {analysis.roleFitMatrix.map((item) => (
-                    <View
-                      key={item.domain}
-                      className="rounded-[18px] p-4"
-                      style={{
-                        backgroundColor: 'rgba(255,255,255,0.04)',
-                        borderColor: 'rgba(124,92,255,0.3)',
-                        borderWidth: 1,
-                      }}
-                    >
-                      <View className="flex-row items-center justify-between mb-2">
-                        <View className="flex-row items-center flex-1 pr-3">
-                          <Orbit size={15} color="#8E72FF" />
-                          <Text className="text-[22px] font-semibold ml-2 tracking-tight" style={{ color: 'rgba(240,240,248,0.96)' }}>
-                            {item.domain}
-                          </Text>
-                        </View>
-                        <Text className="text-[17px] font-bold" style={{ color: '#E1C066' }}>
-                          {toPercent(item.fitScore)}
-                        </Text>
-                      </View>
-                      <Text className="text-[15px] leading-[22px]" style={{ color: 'rgba(212,212,224,0.67)' }}>
-                        {item.why}
-                      </Text>
-                      <View className="flex-row flex-wrap gap-2 mt-3">
-                        {item.exampleRoles.map((role, index) => (
-                          <View
-                            key={`${item.domain}-role-${index}`}
-                            className="px-2 py-1 rounded-full"
-                            style={{ backgroundColor: 'rgba(124,92,255,0.14)' }}
-                          >
-                            <Text className="text-[11px]" style={{ color: '#A58EFF' }}>
-                              {role}
+                  {analysis.roleFitMatrix.map((item) => {
+                    const marketPath = findMarketPathForRoleFit(item, marketCareerPaths);
+                    return (
+                      <View
+                        key={item.domain}
+                        className="rounded-[18px] p-4"
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.04)',
+                          borderColor: 'rgba(124,92,255,0.3)',
+                          borderWidth: 1,
+                        }}
+                      >
+                        <View className="flex-row items-center justify-between mb-2">
+                          <View className="flex-row items-center flex-1 pr-3">
+                            <Orbit size={15} color="#8E72FF" />
+                            <Text className="text-[22px] font-semibold ml-2 tracking-tight" style={{ color: 'rgba(240,240,248,0.96)' }}>
+                              {item.domain}
                             </Text>
                           </View>
-                        ))}
+                          <Text className="text-[17px] font-bold" style={{ color: '#E1C066' }}>
+                            {toPercent(item.fitScore)}
+                          </Text>
+                        </View>
+                        <Text className="text-[15px] leading-[22px]" style={{ color: 'rgba(212,212,224,0.67)' }}>
+                          {item.why}
+                        </Text>
+                        <View className="flex-row flex-wrap gap-2 mt-3">
+                          {item.exampleRoles.map((role, index) => (
+                            <View
+                              key={`${item.domain}-role-${index}`}
+                              className="px-2 py-1 rounded-full"
+                              style={{ backgroundColor: 'rgba(124,92,255,0.14)' }}
+                            >
+                              <Text className="text-[11px]" style={{ color: '#A58EFF' }}>
+                                {role}
+                              </Text>
+                            </View>
+                          ))}
+                          {marketPath?.salaryRangeLabel ? (
+                            <View className="px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(25,195,125,0.14)' }}>
+                              <Text className="text-[11px] font-semibold" style={{ color: '#6DE9B5' }}>
+                                {marketPath.salaryRangeLabel}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
+
+                <MarketCareerPathsSection
+                  paths={marketCareerPaths}
+                  title="MARKET GRADIENTS"
+                  subtitle="Public salary ranges and demand signals for the career paths in this blueprint."
+                />
 
                 <SectionTitle title="Phase Plan" />
                 <View className="gap-3">

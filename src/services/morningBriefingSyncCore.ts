@@ -1,4 +1,4 @@
-import type { MorningBriefingResponse } from './astrologyApi';
+import type { MorningBriefingResponse } from './astrologyApiCore';
 import type { MorningBriefingSetupState } from '../utils/morningBriefingStorage';
 import type { MorningBriefingWidgetVariantId } from './morningBriefingWidgetVariants';
 

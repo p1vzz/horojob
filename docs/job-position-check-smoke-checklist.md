@@ -66,11 +66,17 @@ Run for each source URL.
 2. Assert preflight response:
    - `source` matches expected source.
    - `canonicalUrlHash` is present.
-   - `limit.canProceed === true` (or unlimited in dev mode).
+   - `recommendedScanDepth` is `full` or `lite`.
+   - `limits.full` and `limits.lite` are present.
+   - `limit.canProceed === true` for the recommended depth (or unlimited in dev mode).
 3. `POST /api/jobs/analyze` with `{ "url": "<SOURCE_URL>" }`
 4. Assert analyze response:
    - HTTP `200`,
    - `status === "done"`,
+   - `scanDepth === "full"` when Full quota is available,
+   - `usage.depth === scanDepth`,
+   - `usage.limits.full` and `usage.limits.lite` are present,
+   - `market` is either a normalized occupation insight object or `null`,
    - `scores.compatibility` in `[0..100]`,
    - `scores.aiReplacementRisk` in `[0..100]`,
    - `scores.overall` in `[0..100]`,
@@ -157,11 +163,14 @@ Mark all items complete in one smoke pass.
 ## 8. Optional UI Spot Check (Mobile)
 On `ScannerScreen`:
 - success result renders cards and scores,
+- full result shows `Full scan` badge,
+- when Full quota is exhausted but Lite remains, result shows `Lite scan` badge, market snapshot if available, locked Full panels, and premium CTA,
+- market-backed results show a source footer and do not imply CareerOneStop endorsement of Horojob guidance,
 - `usage_limit_reached` shows premium CTA,
 - `blocked/login_wall/not_found/provider_failed` show mapped screenshot-first message + retry timestamp when provided.
 - top-right `History` opens `ScannerHistoryScreen`,
 - tapping a saved scan opens the full saved result on `ScannerScreen`,
-- historical results show vacancy title instead of URL input and display the source URL below.
+- historical results show vacancy title instead of URL input, display the source URL below, and show the saved `Lite`/`Full` badge.
 
 ## 9. Screenshot Fallback UI Smoke (Mobile)
 Use one deterministic blocked or login-wall vacancy URL so the scanner offers screenshot fallback CTA.

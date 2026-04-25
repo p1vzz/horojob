@@ -1,4 +1,4 @@
-import type { CareerVibePlanResponse } from './astrologyApi';
+import type { CareerVibePlanResponse } from './astrologyApiCore';
 
 type SessionLike = {
   user: {

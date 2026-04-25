@@ -1,4 +1,4 @@
-import type { MorningBriefingResponse } from '../../services/astrologyApi';
+import type { MorningBriefingResponse } from '../../services/astrologyApiCore';
 import type { WritableCalendarOption } from '../../services/calendar';
 import type {
   BurnoutSettings,

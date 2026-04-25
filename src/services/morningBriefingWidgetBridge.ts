@@ -1,5 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
-import type { MorningBriefingResponse } from './astrologyApi';
+import type { MorningBriefingResponse } from './astrologyApiCore';
 import { DEFAULT_MORNING_BRIEFING_WIDGET_VARIANT } from './morningBriefingWidgetVariants';
 import {
   createMorningBriefingWidgetBridge,

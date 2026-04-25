@@ -13,5 +13,7 @@ const jobsApi = createJobsApi({
 export const preflightJobUrl = jobsApi.preflightJobUrl;
 export const analyzeJobUrl = jobsApi.analyzeJobUrl;
 export const analyzeJobScreenshots = jobsApi.analyzeJobScreenshots;
+export const fetchJobHistory = jobsApi.fetchJobHistory;
+export const importJobHistory = jobsApi.importJobHistory;
 export const fetchJobMetrics = jobsApi.fetchJobMetrics;
 export const fetchJobAlerts = jobsApi.fetchJobAlerts;

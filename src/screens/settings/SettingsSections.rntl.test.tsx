@@ -32,6 +32,7 @@ test('settings birth details section renders loaded profile values and per-field
         birthTime: '14:30',
         unknownTime: false,
         city: 'New York',
+        currentJobTitle: 'Product Manager',
       }}
       editingField={null}
       isSaving={false}
@@ -43,6 +44,7 @@ test('settings birth details section renders loaded profile values and per-field
         birthTime: '14:30',
         unknownTime: false,
         city: 'New York',
+        currentJobTitle: 'Product Manager',
         admin1: 'NY',
         country: 'United States',
       }}
@@ -54,11 +56,12 @@ test('settings birth details section renders loaded profile values and per-field
     />
   );
 
-  expect(screen.getAllByText('Edit').length).toBe(4);
+  expect(screen.getAllByText('Edit').length).toBe(5);
   expect(screen.getByText('Sam')).toBeTruthy();
   expect(screen.getByText('Jun 15, 1990')).toBeTruthy();
   expect(screen.getByText('14:30')).toBeTruthy();
   expect(screen.getByText('New York, NY, United States')).toBeTruthy();
+  expect(screen.getByText('Product Manager')).toBeTruthy();
   fireEvent.press(screen.getByLabelText('Edit Name'));
   expect(onStartEdit).toHaveBeenCalledWith('name');
 });
@@ -75,6 +78,7 @@ test('settings birth details section edits one field at a time and renders recal
         birthTime: '14:30',
         unknownTime: false,
         city: 'New York',
+        currentJobTitle: 'Product Manager',
       }}
       editingField="birthTime"
       isSaving
@@ -86,6 +90,7 @@ test('settings birth details section edits one field at a time and renders recal
         birthTime: '14:30',
         unknownTime: false,
         city: 'New York',
+        currentJobTitle: 'Product Manager',
       }}
       recalculationSteps={[
         { id: 'save', label: 'Saving birth details', status: 'done' },
@@ -118,6 +123,7 @@ test('settings birth details section saves name without rendering recalculation 
         birthTime: '14:30',
         unknownTime: false,
         city: 'New York',
+        currentJobTitle: 'Product Manager',
       }}
       editingField="name"
       isSaving={false}
@@ -129,6 +135,7 @@ test('settings birth details section saves name without rendering recalculation 
         birthTime: '14:30',
         unknownTime: false,
         city: 'New York',
+        currentJobTitle: 'Product Manager',
       }}
       recalculationSteps={[]}
       onCancelEdit={() => {}}

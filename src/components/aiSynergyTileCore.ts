@@ -1,4 +1,4 @@
-import type { DailyTransitResponse } from '../services/astrologyApi';
+import type { DailyTransitResponse } from '../services/astrologyApiCore';
 
 export type AiSynergyView = NonNullable<DailyTransitResponse['aiSynergy']>;
 

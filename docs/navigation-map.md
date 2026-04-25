@@ -1,6 +1,6 @@
 # Navigation Map
 **Status:** Active  
-**Last synced:** 2026-04-14
+**Last synced:** 2026-04-23
 
 ## Root Stack
 
@@ -16,10 +16,11 @@ Routes:
 6. `PremiumPurchase` -> `PremiumPurchaseScreen`
 7. `NatalChart` -> `NatalChartScreen`
 8. `CareerVibePlan` -> `CareerVibePlanScreen`
-9. `FullNatalCareerAnalysis` -> `FullNatalCareerAnalysisScreen`
-10. `DiscoverRoles` -> `DiscoverRolesScreen`
-11. `Settings` -> `SettingsScreen`
-12. `JobScreenshotUpload` -> `JobScreenshotUploadScreen`
+9. `NegotiationPrep` -> `NegotiationPrepScreen`
+10. `FullNatalCareerAnalysis` -> `FullNatalCareerAnalysisScreen`
+11. `DiscoverRoles` -> `DiscoverRolesScreen`
+12. `Settings` -> `SettingsScreen`
+13. `JobScreenshotUpload` -> `JobScreenshotUploadScreen`
 
 ## Initial Route Rules
 
@@ -48,6 +49,10 @@ Routes:
   - saved scan list on `ScannerHistory`
   - tapping a saved scan opens `Scanner` in history-result mode
   - screenshot-based scan on `JobScreenshotUpload`
+- Market negotiation:
+  - dashboard `Negotiation Prep` card opens `NegotiationPrep`
+  - missing natal-chart prerequisites route users to `NatalChart`
+  - `NegotiationPrep` can send users to `Scanner` for posting-specific checks
 
 ## Settings-Centric Feature Branches
 

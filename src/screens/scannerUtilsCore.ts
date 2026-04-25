@@ -220,9 +220,13 @@ function formatLimitPeriod(period: JobUsageLimit['period']) {
   return 'daily UTC';
 }
 
+function formatLimitDepth(depth: JobUsageLimit['depth']) {
+  return depth === 'lite' ? 'Lite' : 'Full';
+}
+
 export function toUsageContext(limit: JobUsageLimit | null | undefined) {
   if (!limit) return null;
-  return `Usage: ${limit.used}/${limit.limit} (${formatLimitPeriod(limit.period)})`;
+  return `${formatLimitDepth(limit.depth)} usage: ${limit.used}/${limit.limit} (${formatLimitPeriod(limit.period)})`;
 }
 
 function parseUsageLimitPayload(input: unknown): JobUsageLimit | null {
@@ -230,6 +234,7 @@ function parseUsageLimitPayload(input: unknown): JobUsageLimit | null {
   const payload = input as Record<string, unknown>;
 
   const plan = payload.plan;
+  const depth = payload.depth;
   const period = payload.period;
   if ((plan !== 'free' && plan !== 'premium') || (period !== 'rolling_7_days' && period !== 'daily_utc')) {
     return null;
@@ -246,6 +251,7 @@ function parseUsageLimitPayload(input: unknown): JobUsageLimit | null {
 
   return {
     plan,
+    depth: depth === 'lite' || depth === 'full' ? depth : 'full',
     period,
     limit,
     used,

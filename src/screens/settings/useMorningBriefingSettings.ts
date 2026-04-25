@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Platform } from 'react-native';
-import type { MorningBriefingResponse } from '../../services/astrologyApi';
+import type { MorningBriefingResponse } from '../../services/astrologyApiCore';
 import {
   getMorningBriefingSnapshotForCurrentUser,
   setMorningBriefingSetupStateForCurrentUser,

@@ -1,6 +1,7 @@
 import React from 'react';
-import { expect, jest, test } from '@jest/globals';
+import { afterEach, expect, jest, test } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Pressable, Text, View } from 'react-native';
 import type { JobAnalyzeSuccessResponse } from '../services/jobsApi';
 import type { AppNavigationProp, AppRouteProp } from '../types/navigation';
@@ -21,11 +22,17 @@ jest.mock('../services/authSession', () => ({
 }));
 
 type RuntimeDeps = NonNullable<Parameters<typeof useJobScreenshotUploadRuntime>[0]['deps']>;
+const { ApiError } = jest.requireMock('../services/authSession') as {
+  ApiError: new (status: number, message: string, payload: unknown) => Error;
+};
+const activeQueryClients: QueryClient[] = [];
 
 function createAnalyzeResult(): JobAnalyzeSuccessResponse {
   return {
     analysisId: 'analysis-1',
     status: 'done',
+    scanDepth: 'full',
+    requestedScanDepth: 'full',
     providerUsed: 'screenshot_vision',
     cached: false,
     cache: {
@@ -35,6 +42,7 @@ function createAnalyzeResult(): JobAnalyzeSuccessResponse {
     },
     usage: {
       plan: 'premium',
+      depth: 'full',
       incremented: true,
     },
     versions: {
@@ -51,6 +59,7 @@ function createAnalyzeResult(): JobAnalyzeSuccessResponse {
     jobSummary: 'summary',
     tags: ['remote'],
     descriptors: [],
+    market: null,
     job: {
       title: 'Product Manager',
       company: 'Acme',
@@ -124,10 +133,33 @@ function RuntimeHarness(props: {
   );
 }
 
+function renderRuntime(element: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        gcTime: Number.POSITIVE_INFINITY,
+      },
+      mutations: {
+        retry: false,
+        gcTime: Number.POSITIVE_INFINITY,
+      },
+    },
+  });
+  activeQueryClients.push(queryClient);
+
+  return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
+}
+
+afterEach(() => {
+  while (activeQueryClients.length > 0) {
+    activeQueryClients.pop()?.clear();
+  }
+});
+
 test('screenshot runtime shows permission error when gallery access is denied', async () => {
   const navigation = createNavigationMock();
 
-  render(
+  renderRuntime(
     <RuntimeHarness
       navigation={navigation}
       route={createRouteMock()}
@@ -151,7 +183,7 @@ test('screenshot runtime shows permission error when gallery access is denied', 
 test('screenshot runtime reports unreadable picker assets and does not add items', async () => {
   const navigation = createNavigationMock();
 
-  render(
+  renderRuntime(
     <RuntimeHarness
       navigation={navigation}
       route={createRouteMock()}
@@ -195,7 +227,7 @@ test('screenshot runtime picks screenshots and navigates back to scanner on succ
     ],
   }));
 
-  render(
+  renderRuntime(
     <RuntimeHarness
       navigation={navigation}
       route={createRouteMock('https://blocked.example/jobs/123')}
@@ -221,7 +253,7 @@ test('screenshot runtime picks screenshots and navigates back to scanner on succ
 
   fireEvent.press(screen.getByText('Analyze screenshots'));
 
-  await waitFor(() => expect(analyzeJobScreenshots).toHaveBeenCalledWith(['data:image/png;base64,YWJj']));
+  await waitFor(() => expect(analyzeJobScreenshots).toHaveBeenCalledWith(['data:image/png;base64,YWJj'], false));
   await waitFor(() =>
     expect((navigation as unknown as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith('Scanner', {
       importedAnalysis: createAnalyzeResult(),
@@ -238,7 +270,7 @@ test('screenshot runtime picks screenshots and navigates back to scanner on succ
 test('screenshot runtime maps API analyze failure into UI error text', async () => {
   const navigation = createNavigationMock();
 
-  render(
+  renderRuntime(
     <RuntimeHarness
       navigation={navigation}
       route={createRouteMock()}
@@ -257,16 +289,11 @@ test('screenshot runtime maps API analyze failure into UI error text', async () 
           ],
         })) as unknown as RuntimeDeps['launchImageLibraryAsync'],
         analyzeJobScreenshots: jest.fn(async () => {
-          throw {
-            status: 422,
-            payload: {
-              code: 'screenshot_incomplete_info',
-              missingFields: ['title', 'company'],
-            },
-          };
+          throw new ApiError(422, 'Missing screenshot fields', {
+            code: 'screenshot_incomplete_info',
+            missingFields: ['title', 'company'],
+          });
         }) as RuntimeDeps['analyzeJobScreenshots'],
-        isApiError: (value): value is { status: number; payload: unknown } =>
-          Boolean(value && typeof value === 'object' && 'status' in value && 'payload' in value),
       }}
     />
   );
@@ -276,10 +303,12 @@ test('screenshot runtime maps API analyze failure into UI error text', async () 
 
   fireEvent.press(screen.getByText('Analyze screenshots'));
 
-  await waitFor(() =>
-    expect(
-      screen.getByText('error:Not enough vacancy details are visible in screenshots. Missing: title, company.')
-    ).toBeTruthy()
+  await waitFor(
+    () =>
+      expect(
+        screen.getByText('error:Not enough vacancy details are visible in screenshots. Missing: title, company.')
+      ).toBeTruthy(),
+    { timeout: 4000 }
   );
 });
 
@@ -287,7 +316,7 @@ test('screenshot runtime blocks oversized screenshots before analyze request', a
   const navigation = createNavigationMock();
   const analyzeJobScreenshots = jest.fn();
 
-  render(
+  renderRuntime(
     <RuntimeHarness
       navigation={navigation}
       route={createRouteMock()}

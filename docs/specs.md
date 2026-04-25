@@ -1,5 +1,5 @@
 # Project: Horojob Mobile (USA Market Focus)
-**Version:** 1.4 (synced on 2026-04-07)  
+**Version:** 1.7 (synced on 2026-04-25)
 **Status:** Active (mobile app in production-oriented state, selected roadmap items still pending)
 
 ---
@@ -7,13 +7,19 @@
 ## 0. Repo Topology and DB Access
 - Mobile client (this repo): `horojob/`
 - Backend API: `../horojob-server`
+- Public website / landing + public market surface: `../horojob-landing`
 - MongoDB access is configured in backend `.env`
 - The first public release has not shipped yet and production DB starts empty. Until that release, prefer clean current contracts over compatibility shims for old payloads, old indexes, or local development data.
+- Documentation linkage rule for public-market work:
+  - when CareerOneStop/O*NET compliance interpretation, attribution treatment, or public tool scope changes, update docs in `horojob`, `horojob-server`, and `horojob-landing` together;
+  - `horojob-landing` is now a first-class repo in the product topology and must not stay undocumented relative to mobile/backend decisions.
 
 ---
 
 ## 1. Core Vision
-Career intelligence app that combines astrology signals with AI-oriented career interpretation, daily ritual loops, and premium productivity tooling.
+Career intelligence app for the U.S. market that combines reliable labor-market data, astrology/profile signals, AI-oriented career interpretation, daily ritual loops, and premium productivity tooling.
+
+Product direction: market facts should be available as free/public utility where required by provider terms; premium value should come from personalized synthesis, prioritization, timing, saved workflows, and decision support.
 
 ---
 
@@ -26,6 +32,7 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 - **Navigation:** React Navigation native stack
 - **Backend/DB:** Node + MongoDB (`../horojob-server`)
 - **Astrology APIs:** server-owned astrology endpoints consumed by mobile
+- **Labor-market APIs:** server-owned integrations for U.S. market data (CareerOneStop and O*NET credentials configured in backend; provider smoke checks pass from a U.S. VPN path)
 - **Notifications:** Expo Notifications + app-side push token sync
 - **Payments:** RevenueCat SDK + backend sync bridge
 - **Widgets:** Android native widget providers + shared briefing payload bridge (iOS widget extension pending)
@@ -39,7 +46,8 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 2. **Scanner + Job Position Check:** URL preflight/analyze, screenshot analyze flow, premium gate and usage-limit UX.
 3. **AI Synergy and Daily Transit:** dashboard insights + stored history integration.
 4. **Full Natal Career Analysis:** dedicated one-shot report screen; no user-facing regenerate flow.
-5. **Discover Roles:** recommendation/search flow from backend role catalog.
+5. **Discover Roles:** recommendation/search flow from backend role catalog, with planned expansion toward role reality, transition guidance, compare, and optional current-job personalization.
+6. **Market-Driven Career Intelligence:** labor-market enrichment for salary ranges, outlook, demand, skills, pay transparency, role-market fit, and negotiation support. Job Position Check, Discover Roles, Natal Chart market paths, Negotiation Prep card/page, and Full Career Blueprint now share provider-backed market context.
 
 ### B. Retention & Habit Loop
 1. **Morning Career Briefing:** daily payload sync to app and widget bridge.
@@ -65,7 +73,8 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 4. `src/schemas/aiSynergySchema.ts`, `src/schemas/careerAnalysisSchema.ts`, and `src/schemas/jobAnalysisSchema.ts` now own runtime validation and inferred mobile types for the main AI-backed payloads.
 5. Adoption status is partial by design.
    - `AiSynergyTile` already reads through a React Query hook
-   - career-analysis and job-analysis hooks exist, but `FullNatalCareerAnalysisScreen`, `DeepDiveTile`, `useScannerRuntime`, and `useJobScreenshotUploadRuntime` still use the existing direct service/runtime path today
+   - `useScannerRuntime` and `useJobScreenshotUploadRuntime` now read through the job-analysis query mutations
+   - `FullNatalCareerAnalysisScreen` and `DeepDiveTile` still use the existing direct service/runtime path today
 6. Preferred extension pattern for new AI-backed mobile features:
    - keep transport in `src/services/*`
    - define runtime schema in `src/schemas/*`
@@ -85,7 +94,16 @@ Career intelligence app that combines astrology signals with AI-oriented career 
    - production UI should not show report source, model, or provider by default
    - development builds may expose source/model/prompt metadata for QA
    - if legal review identifies a jurisdictional AI-use disclosure requirement, satisfy it with a clear general product-level/user-level notice rather than exposing provider/model internals in every report
-10. Current performance boundaries:
+10. Labor-market source attribution policy:
+   - market-data source attribution must be visible wherever provider-backed market facts appear
+   - CareerOneStop-backed market facts must show the CareerOneStop logo/icon in the same footer row as the attribution copy
+   - provider attribution must not be attached to Horojob's astrology/profile recommendations
+   - copy must not imply CareerOneStop, O*NET, or any public data provider endorses Horojob guidance, astrology interpretation, or fit scoring
+   - market-data blocks and Horojob interpretation blocks must stay visually and semantically distinct
+   - provider clarification recorded on April 25, 2026: one public website/tool is sufficient for CareerOneStop Web API compliance; the same data may also appear inside the mobile app, including login-gated screens, as long as the public free no-login website version exists
+   - the website compliance surface now ships from `../horojob-landing` at `app/market-tools/role-outlook/page.tsx`
+   - the public web tool reads normalized provider facts from `../horojob-server` via `GET /api/public/market/occupation-insight`
+11. Current performance boundaries:
    - `AiSynergyTile`, `JobCheckTile`, and `DeepDiveTile` are memoized to reduce unnecessary dashboard re-renders
    - shared onboarding SVG backgrounds are memoized because the same heavy art is reused across startup and onboarding, while the light variant stays parked for a future v2 rollout
 
@@ -101,10 +119,11 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 ---
 
 ## 5. Monetization Model
-- **Free:** limited scans, baseline insights
-- **Premium:** 10 successful job checks per UTC day, strategy modules, widget setup, Full Career Blueprint, and deeper AI work guidance
+- **Free:** baseline insights, free/public labor-market facts where required by data-source terms, 30 Lite job checks per day, 1 Full job analysis per day, and scan history.
+- **Premium:** 30 Lite job checks per day, 10 Full job analyses per day, deeper personalized synthesis, strategy modules, widget setup, Full Career Blueprint, saved/compare workflows, negotiation support, timing/calendar guidance, and deeper AI work guidance.
 - Gating remains anchored on backend `subscriptionTier` projection for compatibility
 - Trial is not part of the current release scope; revisit partial/full trial design after the premium feature set is less uneven.
+- Market-data monetization boundary: do not sell raw public provider facts as the premium value; sell value-added personalized decisions and workflows built on top of them.
 
 ---
 
@@ -128,6 +147,10 @@ Career intelligence app that combines astrology signals with AI-oriented career 
 - [x] Full natal career analysis screen + API wiring
 - [x] Discover roles API and UI integration
 - [x] Interview strategy settings + backend plan + calendar sync
+- [x] Market-data enrichment for Job Posting Check Lite/Full scanner slice
+- [x] Market-data enrichment for Discover Roles recommendation slice
+- [x] Market-data enrichment for Natal Chart, Negotiation Prep, and Full Career Blueprint market paths
+- [ ] Discover Roles expansion: `current job` (now edited from `Settings -> Birth Details`), sectioned role detail, decision support, and inline compare are now implemented; remaining work is mainly catalog/search quality and related polish. This personalization must not depend on scanner history or saved scans.
 - [ ] Burnout alert full delivery pipeline completion
 - [ ] Lunar productivity timing/status UX hardening
 
@@ -184,3 +207,13 @@ flowchart TD
   - `docs/dashboard-insight-cards-behavior.md`
 - Scanner micro-UX and cache/fallback behavior:
   - `docs/scanner-flow-ux-addendum.md`
+- Market-driven career intelligence plan:
+  - `docs/market-driven-career-intelligence-plan.md`
+- Market-driven technical implementation plan:
+  - `docs/market-driven-technical-implementation-plan.md`
+- Public web market surface plan (`horojob-landing`):
+  - `docs/public-web-market-surface-plan.md`
+- Discover Roles expansion plan:
+  - `docs/discover-roles-expansion-plan.md`
+- Discover Roles single-screen UX plan:
+  - `docs/discover-roles-single-screen-ux-plan.md`

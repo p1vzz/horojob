@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { MorningBriefingResponse } from '../services/astrologyApi';
+import type { MorningBriefingResponse } from '../services/astrologyApiCore';
 import {
   MORNING_BRIEFING_WIDGET_VARIANTS,
   getMorningBriefingWidgetVariantOption,

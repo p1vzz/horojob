@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TextInput, Pressable, Keyboard } from 'react-native';
 import { ArrowRight, ChevronLeft, Link as LinkIcon } from 'lucide-react-native';
 import { ScanButton } from '../../components/ScanButton';
+import { ScanDepthBadge } from '../../components/ScanDepthBadge';
 import { useThemeMode } from '../../theme/ThemeModeProvider';
 import { useBrightnessAdaptation } from '../../contexts/BrightnessAdaptationContext';
 import { adaptColorOpacity } from '../../utils/brightnessAdaptation';
@@ -92,9 +93,12 @@ export function ScannerSearchPanel(props: ScannerSearchPanelProps) {
             >
               Saved scan
             </Text>
-            <Text className="text-[14px] font-semibold leading-[20px]" style={{ color: theme.colors.foreground }}>
-              {historicalScan.title}
-            </Text>
+            <View className="flex-row items-start">
+              <Text className="text-[14px] font-semibold leading-[20px] flex-1 mr-2" style={{ color: theme.colors.foreground }}>
+                {historicalScan.title}
+              </Text>
+              <ScanDepthBadge depth={historicalScan.scanDepth} compact />
+            </View>
             <Pressable
               accessibilityRole={historicalScan.canOpenUrl ? 'link' : 'text'}
               disabled={!historicalScan.canOpenUrl}

@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { Briefcase, MapPin } from 'lucide-react-native';
+import { Briefcase, DollarSign, MapPin } from 'lucide-react-native';
+import type { OccupationInsightResponse } from '../services/marketApiCore';
 
 type JobProfileCardProps = {
   title?: string;
   company?: string | null;
   location?: string | null;
+  postedSalaryText?: string | null;
+  market?: OccupationInsightResponse | null;
   tags?: string[];
   descriptors?: string[];
 };
@@ -115,6 +118,23 @@ function normalizeTagLabel(input: string) {
   return toTitleCase(input.trim());
 }
 
+function formatMoney(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value >= 1000) return `$${Math.round(value / 1000)}k`;
+  return `$${Math.round(value)}`;
+}
+
+function formatMarketEstimate(market: OccupationInsightResponse | null | undefined) {
+  const salary = market?.salary;
+  if (!salary) return null;
+  const min = formatMoney(salary.min);
+  const max = formatMoney(salary.max);
+  const median = formatMoney(salary.median);
+  if (min && max) return `${min} - ${max}`;
+  if (median) return `${median} median`;
+  return null;
+}
+
 function toSignalKey(input: string) {
   return input
     .trim()
@@ -186,9 +206,14 @@ export const JobProfileCard = ({
   title = 'Role not detected',
   company = null,
   location,
+  postedSalaryText,
+  market,
   tags,
   descriptors,
 }: JobProfileCardProps) => {
+  const postedSalary = postedSalaryText?.trim() || null;
+  const marketEstimate = formatMarketEstimate(market);
+  const shouldShowSalary = Boolean(postedSalary || marketEstimate || market);
   const groupedSignals = React.useMemo(() => {
     const signals = normalizeSignals({ tags, descriptors });
     const grouped = new Map<SignalGroup, SignalItem[]>();
@@ -242,6 +267,42 @@ export const JobProfileCard = ({
             </View>
           </View>
         </View>
+
+        {shouldShowSalary ? (
+          <View
+            className="mt-3 rounded-[8px] p-3"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.035)',
+              borderColor: 'rgba(230,202,115,0.16)',
+              borderWidth: 1,
+            }}
+          >
+            <View className="flex-row items-center mb-2">
+              <DollarSign size={12} color="#E6CA73" />
+              <Text className="text-[10px] uppercase ml-1" style={{ color: 'rgba(212,212,224,0.48)' }}>
+                Pay Transparency
+              </Text>
+            </View>
+            <View className="flex-row">
+              <View className="flex-1 mr-2">
+                <Text className="text-[10px] uppercase mb-1" style={{ color: 'rgba(212,212,224,0.42)' }}>
+                  Posted salary
+                </Text>
+                <Text className="text-[12px] font-semibold" style={{ color: 'rgba(233,233,242,0.9)' }}>
+                  {postedSalary ?? 'Not disclosed in posting'}
+                </Text>
+              </View>
+              <View className="flex-1 ml-2">
+                <Text className="text-[10px] uppercase mb-1" style={{ color: 'rgba(212,212,224,0.42)' }}>
+                  Market estimate
+                </Text>
+                <Text className="text-[12px] font-semibold" style={{ color: '#E6CA73' }}>
+                  {marketEstimate ?? 'Unavailable'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
 
         <View className="mt-3 pt-3" style={{ borderTopColor: 'rgba(255,255,255,0.07)', borderTopWidth: 1 }}>
           {groupedSignals.length > 0 ? (

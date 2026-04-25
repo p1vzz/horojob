@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useThemeMode } from '../../theme/ThemeModeProvider';
+import { ScanDepthBadge } from '../../components/ScanDepthBadge';
 import type { JobScanHistoryEntry } from '../../utils/jobScanHistoryStorage';
 
 type ScannerHistorySectionProps = {
@@ -34,6 +35,7 @@ export function ScannerHistorySection(props: ScannerHistorySectionProps) {
           const title = entry.analysis.job?.title || entry.url;
           const source = entry.meta.source.toUpperCase();
           const overall = entry.analysis.scores.overall;
+          const isLite = entry.analysis.scanDepth === 'lite';
 
           return (
             <Pressable
@@ -53,13 +55,24 @@ export function ScannerHistorySection(props: ScannerHistorySectionProps) {
                 >
                   {title}
                 </Text>
-                <Text className="text-[11px] font-semibold" style={{ color: '#C9A84C' }}>
-                  {overall}%
+                {isLite ? (
+                  <ScanDepthBadge depth="lite" compact />
+                ) : (
+                  <Text className="text-[11px] font-semibold" style={{ color: '#C9A84C' }}>
+                    {overall}%
+                  </Text>
+                )}
+              </View>
+              <View className="flex-row items-center mt-1">
+                {!isLite ? <ScanDepthBadge depth="full" compact /> : null}
+                <Text
+                  numberOfLines={1}
+                  className={isLite ? 'text-[10px] flex-1' : 'text-[10px] ml-2 flex-1'}
+                  style={{ color: 'rgba(212,212,224,0.45)' }}
+                >
+                  {source} | Tap to reopen
                 </Text>
               </View>
-              <Text numberOfLines={1} className="text-[10px] mt-0.5" style={{ color: 'rgba(212,212,224,0.45)' }}>
-                {source} | Tap to reopen
-              </Text>
             </Pressable>
           );
         })}

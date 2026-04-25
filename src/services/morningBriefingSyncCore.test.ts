@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { MorningBriefingSetupState } from '../utils/morningBriefingStorage';
-import type { MorningBriefingResponse } from './astrologyApi';
+import type { MorningBriefingResponse } from './astrologyApiCore';
 import { createMorningBriefingSyncService } from './morningBriefingSyncCore';
 
 class FakeApiError extends Error {

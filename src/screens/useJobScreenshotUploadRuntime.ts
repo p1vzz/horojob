@@ -2,6 +2,7 @@ import React from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { ApiError } from '../services/authSession';
 import { analyzeJobScreenshots } from '../services/jobsApi';
+import { useJobScreenshotAnalysis } from '../hooks/queries/useJobAnalysis';
 import type { AppNavigationProp, AppRouteProp } from '../types/navigation';
 import {
   MAX_SCREENSHOTS,
@@ -31,10 +32,10 @@ type UseJobScreenshotUploadRuntimeArgs = {
 
 export function useJobScreenshotUploadRuntime(args: UseJobScreenshotUploadRuntimeArgs) {
   const { navigation, route, deps } = args;
+  const { mutateAsync: runScreenshotAnalysis } = useJobScreenshotAnalysis(deps?.analyzeJobScreenshots);
   const requestMediaLibraryPermissionsAsync =
     deps?.requestMediaLibraryPermissionsAsync ?? ImagePicker.requestMediaLibraryPermissionsAsync;
   const launchImageLibraryAsync = deps?.launchImageLibraryAsync ?? ImagePicker.launchImageLibraryAsync;
-  const analyzeScreenshots = deps?.analyzeJobScreenshots ?? analyzeJobScreenshots;
   const isApiError =
     deps?.isApiError ??
     ((value: unknown): value is ScreenshotAnalyzeApiErrorLike => value instanceof ApiError);
@@ -114,7 +115,9 @@ export function useJobScreenshotUploadRuntime(args: UseJobScreenshotUploadRuntim
     setErrorText(null);
 
     try {
-      const result = await analyzeScreenshots(items.map((entry) => entry.dataUrl));
+      const result = await runScreenshotAnalysis({
+        imageUris: items.map((entry) => entry.dataUrl),
+      });
       const { importedMeta, importedUrl } = buildScannerImportFromScreenshotAnalysis(result, failedUrl);
 
       navigation.navigate('Scanner', {
@@ -127,7 +130,7 @@ export function useJobScreenshotUploadRuntime(args: UseJobScreenshotUploadRuntim
     } finally {
       setIsLoading(false);
     }
-  }, [analyzeScreenshots, failedUrl, isApiError, items, navigation]);
+  }, [failedUrl, isApiError, items, navigation, runScreenshotAnalysis]);
 
   return {
     canAddMore,

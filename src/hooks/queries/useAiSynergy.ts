@@ -41,24 +41,3 @@ export const useAiSynergy = (): UseQueryResult<AiSynergy | null, Error> => {
     refetchOnReconnect: true,
   });
 };
-
-/**
- * Hook for full daily transit data (including aiSynergy)
- */
-export const useDailyTransit = () => {
-  return useQuery({
-    queryKey: ['dailyTransit', 'today'],
-    queryFn: async () => {
-      const response = await aiOrchestrator.withRetry({
-        operation: 'daily-transit',
-        requestFn: () => fetchDailyTransit({ includeAiSynergy: true }),
-        telemetryMetadata: { source: 'useDailyTransit' },
-      });
-
-      return DailyTransitResponseSchema.parse(response);
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: 2,
-  });
-};

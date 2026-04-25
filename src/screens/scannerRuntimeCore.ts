@@ -53,6 +53,7 @@ export type ScannerHistoryDisplay = {
   title: string;
   url: string;
   canOpenUrl: boolean;
+  scanDepth: 'lite' | 'full';
 };
 
 export function normalizeScannerInitialUrl(value: unknown) {
@@ -80,6 +81,7 @@ export function buildHistoryScanDisplay(entry: JobScanHistoryEntry | null | unde
     title,
     url: entry.url,
     canOpenUrl: isOpenableJobUrl(entry.url),
+    scanDepth: entry.analysis.scanDepth,
   };
 }
 
@@ -167,7 +169,7 @@ export function resolveLastScanRestore(cache: JobScanCache | null | undefined): 
 }
 
 export function resolvePreflightGate(preflight: JobPreflightResponse): ScannerPreflightGate {
-  if (!preflight.limit.canProceed) {
+  if (!preflight.limit.canProceed && !preflight.cache.analysis.hit) {
     return {
       kind: 'blocked',
       errorState: {

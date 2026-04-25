@@ -101,15 +101,21 @@ export function formatBirthCityLabel(
   return [profile.city, profile.admin1, profile.country].filter(Boolean).join(', ');
 }
 
+export function formatCurrentJobTitleLabel(currentJobTitle: string | null | undefined) {
+  const normalized = typeof currentJobTitle === 'string' ? currentJobTitle.trim().replace(/\s+/g, ' ') : '';
+  return normalized.length > 0 ? normalized : 'Not set';
+}
+
 export type BirthProfileDraft = {
   name: string;
   birthDate: string;
   birthTime: string;
   unknownTime: boolean;
   city: string;
+  currentJobTitle: string;
 };
 
-export type BirthProfileEditableField = 'name' | 'birthDate' | 'birthTime' | 'city';
+export type BirthProfileEditableField = 'name' | 'birthDate' | 'birthTime' | 'city' | 'currentJobTitle';
 
 type BirthProfileDraftValidation =
   | {
@@ -164,6 +170,7 @@ export function createBirthProfileDraft(profile: OnboardingData | null): BirthPr
     birthTime: profile?.birthTime ?? '',
     unknownTime: profile?.unknownTime ?? false,
     city: profile?.city ?? '',
+    currentJobTitle: profile?.currentJobTitle ?? '',
   };
 }
 
@@ -203,6 +210,20 @@ function validateBirthProfileCity(cityInput: string) {
     return { ok: false as const, message: 'Birth city must be 160 characters or less.' };
   }
   return { ok: true as const, city };
+}
+
+function validateCurrentJobTitle(currentJobTitleInput: string) {
+  const currentJobTitle = normalizeSpaces(currentJobTitleInput);
+  if (currentJobTitle.length === 0) {
+    return { ok: true as const, currentJobTitle: null };
+  }
+  if (currentJobTitle.length < 2) {
+    return { ok: false as const, message: 'Current role must be at least 2 characters or left blank.' };
+  }
+  if (currentJobTitle.length > 120) {
+    return { ok: false as const, message: 'Current role must be 120 characters or less.' };
+  }
+  return { ok: true as const, currentJobTitle };
 }
 
 export function validateBirthProfileFieldDraft(
@@ -263,6 +284,22 @@ export function validateBirthProfileFieldDraft(
     };
   }
 
+  if (field === 'currentJobTitle') {
+    const validated = validateCurrentJobTitle(draft.currentJobTitle);
+    if (!validated.ok) return validated;
+    const input: OnboardingData = {
+      ...currentProfile,
+      currentJobTitle: validated.currentJobTitle,
+    };
+    const changed = normalizeComparableText(input.currentJobTitle) !== normalizeComparableText(currentProfile.currentJobTitle);
+    return {
+      ok: true,
+      algorithmChanged: false,
+      changed,
+      input,
+    };
+  }
+
   const validated = validateBirthProfileCity(draft.city);
   if (!validated.ok) return validated;
   const cityChanged = normalizeComparableText(validated.city) !== normalizeComparableText(currentProfile.city);
@@ -297,6 +334,8 @@ export function validateBirthProfileDraft(
 
   const cityValidation = validateBirthProfileCity(draft.city);
   if (!cityValidation.ok) return cityValidation;
+  const currentJobValidation = validateCurrentJobTitle(draft.currentJobTitle);
+  if (!currentJobValidation.ok) return currentJobValidation;
 
   const name = nameValidation.name;
   const birthDate = dateValidation.birthDate;
@@ -313,6 +352,7 @@ export function validateBirthProfileDraft(
     longitude: cityChanged ? null : currentProfile?.longitude ?? null,
     country: cityChanged ? null : currentProfile?.country ?? null,
     admin1: cityChanged ? null : currentProfile?.admin1 ?? null,
+    currentJobTitle: currentJobValidation.currentJobTitle,
   };
 
   const algorithmChanged =
@@ -321,7 +361,10 @@ export function validateBirthProfileDraft(
     input.birthTime !== (currentProfile.birthTime ?? null) ||
     input.unknownTime !== currentProfile.unknownTime ||
     normalizeComparableText(input.city) !== normalizeComparableText(currentProfile.city);
-  const changed = algorithmChanged || normalizeComparableText(input.name) !== normalizeComparableText(currentProfile.name);
+  const changed =
+    algorithmChanged ||
+    normalizeComparableText(input.name) !== normalizeComparableText(currentProfile?.name) ||
+    normalizeComparableText(input.currentJobTitle) !== normalizeComparableText(currentProfile?.currentJobTitle);
 
   return {
     ok: true,

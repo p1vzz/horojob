@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ONBOARDING_KEY_BY_USER = 'onboarding:v2-by-user';
-const LEGACY_ONBOARDING_KEY = 'onboarding:v1';
 
 export type OnboardingData = {
   name: string;
@@ -9,6 +8,7 @@ export type OnboardingData = {
   birthTime: string | null;
   unknownTime: boolean;
   city: string;
+  currentJobTitle?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   country?: string | null;
@@ -39,6 +39,12 @@ function parseByUser(raw: string | null): OnboardingByUser {
         birthTime: typeof candidate.birthTime === 'string' || candidate.birthTime === null ? candidate.birthTime : null,
         unknownTime: candidate.unknownTime,
         city: candidate.city,
+        currentJobTitle:
+          typeof candidate.currentJobTitle === 'string'
+            ? candidate.currentJobTitle.trim() || null
+            : candidate.currentJobTitle === null
+              ? null
+              : null,
         latitude: typeof candidate.latitude === 'number' ? candidate.latitude : null,
         longitude: typeof candidate.longitude === 'number' ? candidate.longitude : null,
         country: typeof candidate.country === 'string' ? candidate.country : null,
@@ -74,11 +80,4 @@ export async function clearOnboardingForUser(userId: string) {
     return;
   }
   await AsyncStorage.setItem(ONBOARDING_KEY_BY_USER, JSON.stringify(byUser));
-}
-
-export async function clearOnboarding() {
-  await Promise.all([
-    AsyncStorage.removeItem(ONBOARDING_KEY_BY_USER),
-    AsyncStorage.removeItem(LEGACY_ONBOARDING_KEY),
-  ]);
 }

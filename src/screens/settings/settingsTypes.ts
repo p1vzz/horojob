@@ -12,8 +12,3 @@ export type SettingsPremiumFeatureState = {
   toggleInteractive: boolean;
   toggleOn: boolean;
 };
-
-export type SettingsWeekdayOption = {
-  label: string;
-  value: number;
-};

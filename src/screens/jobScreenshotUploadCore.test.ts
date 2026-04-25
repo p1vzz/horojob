@@ -29,6 +29,8 @@ function createAnalyzeResult(): JobAnalyzeSuccessResponse {
   return {
     analysisId: 'analysis-1',
     status: 'done',
+    scanDepth: 'full',
+    requestedScanDepth: 'full',
     providerUsed: 'screenshot_vision',
     cached: false,
     cache: {
@@ -38,6 +40,7 @@ function createAnalyzeResult(): JobAnalyzeSuccessResponse {
     },
     usage: {
       plan: 'premium',
+      depth: 'full',
       incremented: true,
     },
     versions: {
@@ -54,6 +57,7 @@ function createAnalyzeResult(): JobAnalyzeSuccessResponse {
     jobSummary: 'summary',
     tags: ['remote'],
     descriptors: [],
+    market: null,
     job: {
       title: 'Product Manager',
       company: 'Acme',

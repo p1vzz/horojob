@@ -24,6 +24,7 @@ import { ScannerHistoryScreen } from './src/screens/ScannerHistoryScreen';
 import { PremiumPurchaseScreen } from './src/screens/PremiumPurchaseScreen';
 import { NatalChartScreen } from './src/screens/NatalChartScreen';
 import { CareerVibePlanScreen } from './src/screens/CareerVibePlanScreen';
+import { NegotiationPrepScreen } from './src/screens/NegotiationPrepScreen';
 import { DiscoverRolesScreen } from './src/screens/DiscoverRolesScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { JobScreenshotUploadScreen } from './src/screens/JobScreenshotUploadScreen';
@@ -303,6 +304,7 @@ function AppShell() {
                 <Stack.Screen name="PremiumPurchase" component={PremiumPurchaseScreen} />
                 <Stack.Screen name="NatalChart" component={NatalChartScreen} />
                 <Stack.Screen name="CareerVibePlan" component={CareerVibePlanScreen} />
+                <Stack.Screen name="NegotiationPrep" component={NegotiationPrepScreen} />
                 <Stack.Screen name="FullNatalCareerAnalysis" component={FullNatalCareerAnalysisScreen} />
                 <Stack.Screen name="DiscoverRoles" component={DiscoverRolesScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />

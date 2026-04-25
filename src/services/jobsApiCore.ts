@@ -1,6 +1,10 @@
+import { parseOccupationInsightResponse, type OccupationInsightResponse } from './marketApiCore';
+
 type JobSource = 'linkedin' | 'wellfound' | 'ziprecruiter' | 'indeed' | 'glassdoor' | 'manual';
 type JobProviderName = 'http_fetch' | 'browser_fallback' | 'screenshot_vision';
 type UsagePlan = 'free' | 'premium';
+type JobScanDepth = 'lite' | 'full';
+type JobScanDepthRequest = 'auto' | JobScanDepth;
 type JobsRequestInit = RequestInit & {
   timeoutMs?: number;
 };
@@ -9,10 +13,13 @@ export const JOBS_PREFLIGHT_TIMEOUT_MS = 10_000;
 export const JOBS_ANALYZE_TIMEOUT_MS = 60_000;
 export const JOBS_SCREENSHOT_ANALYZE_TIMEOUT_MS = 90_000;
 export const JOBS_METRICS_TIMEOUT_MS = 10_000;
+export const JOBS_HISTORY_TIMEOUT_MS = 10_000;
 
 const JOB_SOURCES = ['linkedin', 'wellfound', 'ziprecruiter', 'indeed', 'glassdoor', 'manual'] as const;
 const JOB_PROVIDERS = ['http_fetch', 'browser_fallback', 'screenshot_vision'] as const;
 const USAGE_PLANS = ['free', 'premium'] as const;
+const JOB_SCAN_DEPTHS = ['lite', 'full'] as const;
+const JOB_SCAN_DEPTH_REQUESTS = ['auto', 'lite', 'full'] as const;
 const USAGE_PERIODS = ['rolling_7_days', 'daily_utc'] as const;
 const PRELIGHT_NEXT_STAGES = [
   'done',
@@ -69,12 +76,23 @@ function parseUsageLimit(input: unknown): JobUsageLimit {
   const payload = asRecord(input);
   return {
     plan: payload && isOneOf(USAGE_PLANS, payload.plan) ? payload.plan : 'free',
+    depth: payload && isOneOf(JOB_SCAN_DEPTHS, payload.depth) ? payload.depth : 'full',
     period: payload && isOneOf(USAGE_PERIODS, payload.period) ? payload.period : 'rolling_7_days',
     limit: payload ? asNumber(payload.limit) : 0,
     used: payload ? asNumber(payload.used) : 0,
     remaining: payload ? asNumber(payload.remaining) : 0,
     nextAvailableAt: payload ? asNullableString(payload.nextAvailableAt) : null,
     canProceed: payload ? asBoolean(payload.canProceed, true) : true,
+  };
+}
+
+function parseJobUsageLimits(input: unknown): JobUsageLimits | undefined {
+  const payload = asRecord(input);
+  if (!payload) return undefined;
+  return {
+    plan: isOneOf(USAGE_PLANS, payload.plan) ? payload.plan : 'free',
+    lite: parseUsageLimit(payload.lite),
+    full: parseUsageLimit(payload.full),
   };
 }
 
@@ -122,6 +140,9 @@ function parseJobPreflightResponse(input: unknown): JobPreflightResponse {
       },
     },
     limit: parseUsageLimit(payload?.limit),
+    limits: parseJobUsageLimits(payload?.limits),
+    recommendedScanDepth:
+      payload && isOneOf(JOB_SCAN_DEPTHS, payload.recommendedScanDepth) ? payload.recommendedScanDepth : 'full',
     versions: {
       parserVersion: asString(versions?.parserVersion, 'unknown'),
       rubricVersion: asString(versions?.rubricVersion, 'unknown'),
@@ -162,6 +183,8 @@ function parseJobAnalyzeSuccessResponse(input: unknown): JobAnalyzeSuccessRespon
   const scores = asRecord(payload?.scores);
   const job = asRecord(payload?.job);
   const screenshot = asRecord(payload?.screenshot);
+  const usageLimits = parseJobUsageLimits(usage?.limits);
+  const scanDepth = payload && isOneOf(JOB_SCAN_DEPTHS, payload.scanDepth) ? payload.scanDepth : 'full';
 
   const providerAttempts = Array.isArray(payload?.providerAttempts)
     ? payload.providerAttempts
@@ -172,6 +195,9 @@ function parseJobAnalyzeSuccessResponse(input: unknown): JobAnalyzeSuccessRespon
   return {
     analysisId: asString(payload?.analysisId, 'unknown-analysis'),
     status: 'done',
+    scanDepth,
+    requestedScanDepth:
+      payload && isOneOf(JOB_SCAN_DEPTH_REQUESTS, payload.requestedScanDepth) ? payload.requestedScanDepth : scanDepth,
     providerUsed: normalizeJobProvider(payload?.providerUsed),
     providerAttempts,
     cached: asBoolean(payload?.cached),
@@ -182,8 +208,10 @@ function parseJobAnalyzeSuccessResponse(input: unknown): JobAnalyzeSuccessRespon
     },
     usage: {
       plan: usage && isOneOf(USAGE_PLANS, usage.plan) ? usage.plan : 'free',
+      depth: usage && isOneOf(JOB_SCAN_DEPTHS, usage.depth) ? usage.depth : scanDepth,
       incremented: asBoolean(usage?.incremented),
       limit: usage?.limit ? parseUsageLimit(usage.limit) : undefined,
+      limits: usageLimits,
     },
     versions: {
       parserVersion: asString(versions?.parserVersion, 'unknown'),
@@ -203,11 +231,13 @@ function parseJobAnalyzeSuccessResponse(input: unknown): JobAnalyzeSuccessRespon
     jobSummary: asString(payload?.jobSummary),
     tags: asStringArray(payload?.tags),
     descriptors: asStringArray(payload?.descriptors),
+    market: payload?.market ? parseOccupationInsightResponse(payload.market) : null,
     job: job
       ? {
           title: asString(job.title, 'Role not detected'),
           company: asNullableString(job.company),
           location: asNullableString(job.location),
+          salaryText: asNullableString(job.salaryText),
           employmentType: asNullableString(job.employmentType),
           source: normalizeJobSource(job.source),
         }
@@ -222,14 +252,52 @@ function parseJobAnalyzeSuccessResponse(input: unknown): JobAnalyzeSuccessRespon
   };
 }
 
+function parseJobScanHistoryMeta(input: unknown): JobScanHistoryMeta {
+  const payload = asRecord(input);
+  return {
+    source: asString(payload?.source, 'unknown'),
+    cached: asBoolean(payload?.cached),
+    provider: asNullableString(payload?.provider),
+  };
+}
+
+function parseJobScanHistoryEntry(input: unknown): JobScanHistoryEntry | null {
+  const payload = asRecord(input);
+  const analysis = asRecord(payload?.analysis);
+  if (!payload || !analysis) {
+    return null;
+  }
+
+  return {
+    url: asString(payload.url),
+    analysis: parseJobAnalyzeSuccessResponse(analysis),
+    meta: parseJobScanHistoryMeta(payload.meta),
+    savedAt: asString(payload.savedAt, new Date(0).toISOString()),
+  };
+}
+
+function parseJobScanHistoryEntries(input: unknown): JobScanHistoryEntry[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((entry) => parseJobScanHistoryEntry(entry))
+    .filter((entry): entry is JobScanHistoryEntry => entry !== null);
+}
+
 export type JobUsageLimit = {
   plan: UsagePlan;
+  depth: JobScanDepth;
   period: 'rolling_7_days' | 'daily_utc';
   limit: number;
   used: number;
   remaining: number;
   nextAvailableAt: string | null;
   canProceed: boolean;
+};
+
+export type JobUsageLimits = {
+  plan: UsagePlan;
+  lite: JobUsageLimit;
+  full: JobUsageLimit;
 };
 
 export type JobPreflightResponse = {
@@ -249,6 +317,8 @@ export type JobPreflightResponse = {
     negative: { hit: boolean; status: 'blocked' | 'login_wall' | 'not_found' | null; retryAt: string | null };
   };
   limit: JobUsageLimit;
+  limits?: JobUsageLimits;
+  recommendedScanDepth: JobScanDepth;
   versions: {
     parserVersion: string;
     rubricVersion: string;
@@ -263,9 +333,17 @@ export type JobAnalysisBreakdownItem = {
   note: string;
 };
 
+export type JobScanHistoryMeta = {
+  source: string;
+  cached: boolean;
+  provider: string | null;
+};
+
 export type JobAnalyzeSuccessResponse = {
   analysisId: string;
   status: 'done';
+  scanDepth: JobScanDepth;
+  requestedScanDepth: JobScanDepthRequest;
   providerUsed: JobProviderName | 'manual' | null;
   providerAttempts?: Array<{
     provider: string;
@@ -281,8 +359,10 @@ export type JobAnalyzeSuccessResponse = {
   };
   usage: {
     plan: UsagePlan;
+    depth: JobScanDepth;
     incremented: boolean;
     limit?: JobUsageLimit;
+    limits?: JobUsageLimits;
   };
   versions: {
     parserVersion: string;
@@ -298,10 +378,12 @@ export type JobAnalyzeSuccessResponse = {
   jobSummary: string;
   tags: string[];
   descriptors?: string[];
+  market: OccupationInsightResponse | null;
   job?: {
     title: string;
     company: string | null;
     location: string | null;
+    salaryText?: string | null;
     employmentType: string | null;
     source: JobSource;
   };
@@ -310,6 +392,17 @@ export type JobAnalyzeSuccessResponse = {
     confidence: number;
     reason: string;
   };
+};
+
+export type JobScanHistoryEntry = {
+  url: string;
+  analysis: JobAnalyzeSuccessResponse;
+  meta: JobScanHistoryMeta;
+  savedAt: string;
+};
+
+export type JobScanHistoryImportResponse = {
+  importedCount: number;
 };
 
 export type JobAnalyzeErrorCode =
@@ -329,8 +422,10 @@ export type JobAnalyzeErrorCode =
 export type JobAnalyzeErrorPayload = {
   error?: string;
   code?: JobAnalyzeErrorCode;
+  scanDepth?: JobScanDepth;
   retryAt?: string;
   limit?: JobUsageLimit;
+  limits?: JobUsageLimits;
   attempts?: Array<{
     provider: string;
     ok: boolean;
@@ -402,6 +497,24 @@ export type JobsApiDeps = {
   ApiError: new (status: number, message: string, payload: unknown) => Error;
 };
 
+export type AnalyzeJobOptions = {
+  regenerate?: boolean;
+  scanDepth?: JobScanDepthRequest;
+};
+
+function normalizeAnalyzeJobOptions(input: boolean | AnalyzeJobOptions | undefined): Required<AnalyzeJobOptions> {
+  if (typeof input === 'boolean') {
+    return {
+      regenerate: input,
+      scanDepth: 'auto',
+    };
+  }
+  return {
+    regenerate: input?.regenerate ?? false,
+    scanDepth: input?.scanDepth ?? 'auto',
+  };
+}
+
 export function createJobsApi(deps: JobsApiDeps) {
   const preflightJobUrl = async (url: string) => {
     const response = await deps.authorizedFetch('/api/jobs/preflight', {
@@ -417,11 +530,16 @@ export function createJobsApi(deps: JobsApiDeps) {
     return parseJobPreflightResponse(payload);
   };
 
-  const analyzeJobUrl = async (url: string, regenerate = false) => {
+  const analyzeJobUrl = async (url: string, options?: boolean | AnalyzeJobOptions) => {
+    const resolvedOptions = normalizeAnalyzeJobOptions(options);
     const response = await deps.authorizedFetch('/api/jobs/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, regenerate }),
+      body: JSON.stringify({
+        url,
+        regenerate: resolvedOptions.regenerate,
+        scanDepth: resolvedOptions.scanDepth,
+      }),
       timeoutMs: JOBS_ANALYZE_TIMEOUT_MS,
     });
     const payload = await deps.parseJsonBody(response);
@@ -470,10 +588,41 @@ export function createJobsApi(deps: JobsApiDeps) {
     return payload as JobMetricsAlertsReport;
   };
 
+  const fetchJobHistory = async (limit = 8) => {
+    const response = await deps.authorizedFetch(`/api/jobs/history?limit=${limit}`, {
+      timeoutMs: JOBS_HISTORY_TIMEOUT_MS,
+    });
+    const payload = await deps.parseJsonBody(response);
+    if (!response.ok) {
+      throw new deps.ApiError(response.status, 'Failed to fetch saved scans', payload);
+    }
+    return parseJobScanHistoryEntries(payload);
+  };
+
+  const importJobHistory = async (entries: JobScanHistoryEntry[]) => {
+    const response = await deps.authorizedFetch('/api/jobs/history/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries }),
+      timeoutMs: JOBS_HISTORY_TIMEOUT_MS,
+    });
+    const payload = await deps.parseJsonBody(response);
+    if (!response.ok) {
+      throw new deps.ApiError(response.status, 'Failed to import saved scans', payload);
+    }
+    const importedCount =
+      payload && typeof payload === 'object' && typeof (payload as Record<string, unknown>).importedCount === 'number'
+        ? ((payload as Record<string, unknown>).importedCount as number)
+        : 0;
+    return { importedCount };
+  };
+
   return {
     preflightJobUrl,
     analyzeJobUrl,
     analyzeJobScreenshots,
+    fetchJobHistory,
+    importJobHistory,
     fetchJobMetrics,
     fetchJobAlerts,
   };

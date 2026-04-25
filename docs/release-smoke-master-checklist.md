@@ -42,10 +42,15 @@ Unified pre-release smoke checklist for the highest-risk user flows across onboa
 - [ ] Logout or missing profile does not keep showing a previous user's saved Career Vibe plan.
 - [ ] Burnout and lunar dashboard cards hydrate live for premium user, or gracefully fall back without crash when plan fetch fails/unavailable.
 - [ ] Returning from `Settings` refreshes burnout/lunar dashboard card content on `Dashboard`.
+- [ ] `Career Matchmaker` opens Discover Roles, `Best Fit` and `Best Opportunity` switch without crash, and market-backed recommendations show attribution footer with CareerOneStop logo when CareerOneStop data is present.
+- [ ] Discover Roles shortlist can stage two saved roles into the inline compare module, compare rows render on one screen, and opening either compared role returns to the same detail stack without crash.
 
 ### 4. Scanner and job analysis
 - [ ] URL preflight + analyze success path works from `Scanner`.
+- [ ] Free user's first daily scan returns `Full scan`; next scan returns `Lite scan` with market snapshot/locked Full panels when Full quota is exhausted.
+- [ ] Market-backed scanner result shows attribution footer with CareerOneStop logo and without provider endorsement copy.
 - [ ] Scanner `History` opens saved scans and tapping an item restores the full saved result.
+- [ ] Scanner history rows show the saved `Lite`/`Full` badge.
 - [ ] Screenshot analyze flow works from `JobScreenshotUpload`.
 - [ ] Known error states are mapped (blocked/login wall/not found/limit) without crash.
 
@@ -59,6 +64,14 @@ Unified pre-release smoke checklist for the highest-risk user flows across onboa
 - [ ] Premium user can generate strategy plan from Settings.
 - [ ] `Add to Calendar` works with permission granted.
 - [ ] Permission denied path shows graceful UX and no crash.
+
+### 6a. Market-backed career surfaces
+- [ ] Natal Chart market paths show salary ranges/gradients and attribution footer with CareerOneStop logo when CareerOneStop data is present.
+- [ ] Dashboard `Negotiation Prep` card shows free market guidance and opens `NegotiationPrep`.
+- [ ] `NegotiationPrep` page shows anchor strategy, recruiter questions, baseline scripts, offer checklist, red flags, tradeoff levers, next steps, and attribution footer with CareerOneStop logo when CareerOneStop data is present.
+- [ ] `NegotiationPrep` page `Check a Posting` action opens `Scanner`.
+- [ ] Full Career Blueprint market gradients show salary ranges/gradients and attribution footer with CareerOneStop logo when CareerOneStop data is present.
+- [ ] Market attribution/footer appears only on market-backed blocks, not on Horojob fit or astrology interpretation cards.
 
 ### 7. Android widget flow
 - [ ] Variant picker shows available widget variants.

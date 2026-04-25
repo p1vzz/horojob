@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const NATAL_CHART_KEY_BY_USER = 'natal-chart:v2-by-user';
-const LEGACY_NATAL_CHART_KEY = 'natal-chart:v1';
 
 export type NatalChartCache = {
   payload: unknown;
@@ -58,11 +57,4 @@ export async function clearNatalChartCacheForUser(userId: string) {
     return;
   }
   await AsyncStorage.setItem(NATAL_CHART_KEY_BY_USER, JSON.stringify(byUser));
-}
-
-export async function clearNatalChartCache() {
-  await Promise.all([
-    AsyncStorage.removeItem(NATAL_CHART_KEY_BY_USER),
-    AsyncStorage.removeItem(LEGACY_NATAL_CHART_KEY),
-  ]);
 }

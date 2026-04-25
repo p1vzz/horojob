@@ -6,6 +6,8 @@ test('job analysis schema accepts normalized jobsApi success payload', () => {
   const payload = JobAnalyzeSuccessResponseSchema.parse({
     analysisId: 'analysis-1',
     status: 'done',
+    scanDepth: 'full',
+    requestedScanDepth: 'auto',
     providerUsed: 'browser_fallback',
     providerAttempts: [
       {
@@ -23,6 +25,7 @@ test('job analysis schema accepts normalized jobsApi success payload', () => {
     },
     usage: {
       plan: 'premium',
+      depth: 'full',
       incremented: true,
     },
     versions: {
@@ -39,6 +42,7 @@ test('job analysis schema accepts normalized jobsApi success payload', () => {
     jobSummary: 'A role with product ownership.',
     tags: ['product', 'remote'],
     descriptors: ['leadership'],
+    market: null,
     job: {
       title: 'Product Manager',
       company: 'Acme',

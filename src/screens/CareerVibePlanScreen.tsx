@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ChevronLeft, RefreshCw, Sparkles, Clock3, ShieldCheck } from 'lucide-react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
-import type { CareerVibePlanResponse } from '../services/astrologyApi';
+import type { CareerVibePlanResponse } from '../services/astrologyApiCore';
 import { syncCareerVibePlanCache, type CareerVibePlanSourceMode } from '../services/careerVibePlanSync';
 import type { AppNavigationProp } from '../types/navigation';
 import { useThemeMode } from '../theme/ThemeModeProvider';

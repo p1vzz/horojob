@@ -43,6 +43,7 @@ export const ScannerScreen = () => {
     historicalScan,
     isLoading,
     onReturnToActiveScan,
+    onRunFullAnalysis,
     onScanPress,
     phase,
     scanMeta,
@@ -84,8 +85,9 @@ export const ScannerScreen = () => {
     if (!scanMeta) return null;
     const source = scanMeta.source.toUpperCase();
     const providerLabel = scanMeta.provider ? ` via ${scanMeta.provider.replace('_', ' ')}` : '';
-    return `${source}${providerLabel}${scanMeta.cached ? ' - cached result' : ' - fresh scan'}`;
-  }, [scanMeta]);
+    const depthLabel = analysis?.scanDepth === 'lite' ? 'Lite' : 'Full';
+    return `${depthLabel} | ${source}${providerLabel}${scanMeta.cached ? ' - cached result' : ' - fresh scan'}`;
+  }, [analysis?.scanDepth, scanMeta]);
 
   const openHistory = React.useCallback(() => {
     navigation.navigate('ScannerHistory');
@@ -214,7 +216,11 @@ export const ScannerScreen = () => {
                   }
                 />
               </View>
-              <ScannerAnalysisSection analysis={analysis} />
+              <ScannerAnalysisSection
+                analysis={analysis}
+                isLoading={isLoading}
+                onRunFullAnalysis={onRunFullAnalysis}
+              />
             </Animated.View>
           </ScrollView>
         </KeyboardAvoidingView>

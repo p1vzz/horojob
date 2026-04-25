@@ -65,15 +65,16 @@ test('scanner core detects challenge-like analysis text', () => {
 test('scanner core builds usage context and parses API error payload', () => {
   assert.equal(
     toUsageContext({
-      plan: 'free',
-      period: 'rolling_7_days',
+    plan: 'free',
+    depth: 'full',
+    period: 'rolling_7_days',
       limit: 10,
       used: 3,
       remaining: 7,
       nextAvailableAt: null,
       canProceed: true,
     }),
-    'Usage: 3/10 (rolling 7 days)'
+    'Full usage: 3/10 (rolling 7 days)'
   );
 
   const parsed = parseScannerApiError(
@@ -84,6 +85,7 @@ test('scanner core builds usage context and parses API error payload', () => {
         retryAt: '2026-03-31T00:00:00.000Z',
         limit: {
           plan: 'free',
+          depth: 'full',
           period: 'daily_utc',
           limit: 1,
           used: 1,
@@ -101,7 +103,7 @@ test('scanner core builds usage context and parses API error payload', () => {
   assert.equal(parsed.code, 'usage_limit_reached');
   assert.equal(parsed.message, ERROR_TEXTS.usage_limit_reached);
   assert.equal(parsed.retryAt, '2026-03-31T00:00:00.000Z');
-  assert.equal(parsed.usageContext, 'Usage: 1/1 (daily UTC)');
+  assert.equal(parsed.usageContext, 'Full usage: 1/1 (daily UTC)');
 });
 
 test('scanner core falls back to unknown on non-api errors', () => {

@@ -30,6 +30,8 @@ const entry: JobScanHistoryEntry = {
   analysis: {
     analysisId: 'analysis-1',
     status: 'done',
+    scanDepth: 'full',
+    requestedScanDepth: 'auto',
     providerUsed: 'http_fetch',
     cached: false,
     cache: {
@@ -39,6 +41,7 @@ const entry: JobScanHistoryEntry = {
     },
     usage: {
       plan: 'free',
+      depth: 'full',
       incremented: false,
     },
     versions: {
@@ -54,6 +57,7 @@ const entry: JobScanHistoryEntry = {
     breakdown: [],
     jobSummary: 'Normal summary',
     tags: ['remote'],
+    market: null,
     job: {
       title: 'Product Designer',
       company: 'Acme',
@@ -78,4 +82,30 @@ test('scanner history section reopens selected cached entry', () => {
   fireEvent.press(screen.getByText('Product Designer'));
   expect(onSelect).toHaveBeenCalledWith(entry);
   expect(screen.getByText('LINKEDIN | Tap to reopen')).toBeTruthy();
+  expect(screen.getByText('Full scan')).toBeTruthy();
+});
+
+test('scanner history section shows lite scan badge without score emphasis', () => {
+  render(
+    <ScannerHistorySection
+      entries={[
+        {
+          ...entry,
+          analysis: {
+            ...entry.analysis,
+            scanDepth: 'lite',
+            scores: {
+              compatibility: 0,
+              aiReplacementRisk: 0,
+              overall: 0,
+            },
+          },
+        },
+      ]}
+      onSelect={() => {}}
+    />
+  );
+
+  expect(screen.getByText('Lite scan')).toBeTruthy();
+  expect(screen.queryByText('0%')).toBeNull();
 });

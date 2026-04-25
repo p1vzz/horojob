@@ -36,6 +36,7 @@ export type RootStackParamList = {
   PremiumPurchase: undefined;
   NatalChart: undefined;
   CareerVibePlan: undefined;
+  NegotiationPrep: undefined;
   FullNatalCareerAnalysis: undefined;
   DiscoverRoles: undefined;
   Settings:

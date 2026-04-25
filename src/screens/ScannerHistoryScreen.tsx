@@ -8,7 +8,15 @@ import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useBrightnessAdaptation } from '../contexts/BrightnessAdaptationContext';
 import { adaptColorOpacity, adaptOpacity } from '../utils/brightnessAdaptation';
 import { ensureAuthSession } from '../services/authSession';
-import { loadJobScanHistoryForUser, type JobScanHistoryEntry } from '../utils/jobScanHistoryStorage';
+import { fetchJobHistory, importJobHistory } from '../services/jobsApi';
+import {
+  JOB_SCAN_HISTORY_LIMIT,
+  loadJobScanHistoryForUser,
+  mergeJobScanHistoryEntries,
+  replaceJobScanHistoryForUser,
+  selectJobScanHistoryEntriesForSync,
+  type JobScanHistoryEntry,
+} from '../utils/jobScanHistoryStorage';
 import { ScannerHistorySection } from './scanner/ScannerHistorySection';
 import type { AppNavigationProp } from '../types/navigation';
 
@@ -28,10 +36,41 @@ export const ScannerHistoryScreen = () => {
       setErrorText(null);
 
       void ensureAuthSession()
-        .then((session) => loadJobScanHistoryForUser(session.user.id))
-        .then((history) => {
-          if (!mounted) return;
-          setEntries(history);
+        .then(async (session) => {
+          const localHistory = await loadJobScanHistoryForUser(session.user.id);
+
+          try {
+            let remoteHistory = await fetchJobHistory(JOB_SCAN_HISTORY_LIMIT);
+            const entriesToSync = selectJobScanHistoryEntriesForSync(localHistory, remoteHistory);
+
+            if (entriesToSync.length > 0) {
+              try {
+                await importJobHistory(entriesToSync);
+                remoteHistory = await fetchJobHistory(JOB_SCAN_HISTORY_LIMIT);
+                if (remoteHistory.length === 0 && localHistory.length > 0) {
+                  remoteHistory = mergeJobScanHistoryEntries([...remoteHistory, ...localHistory]);
+                }
+              } catch {
+                remoteHistory = mergeJobScanHistoryEntries([...remoteHistory, ...localHistory]);
+              }
+            }
+
+            if (!mounted) return;
+            setEntries(remoteHistory);
+            try {
+              await replaceJobScanHistoryForUser(session.user.id, remoteHistory);
+            } catch {
+              // non-blocking local cache refresh
+            }
+            return;
+          } catch {
+            if (!mounted) return;
+            if (localHistory.length > 0) {
+              setEntries(localHistory);
+              return;
+            }
+            throw new Error('scanner_history_unavailable');
+          }
         })
         .catch(() => {
           if (!mounted) return;

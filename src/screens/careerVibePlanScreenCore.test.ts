@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { CareerVibePlanResponse } from '../services/astrologyApi';
+import type { CareerVibePlanResponse } from '../services/astrologyApiCore';
 import {
   buildCareerVibeMetricRows,
   formatCareerVibePlanHeaderSubtitle,

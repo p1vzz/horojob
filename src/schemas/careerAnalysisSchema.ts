@@ -68,6 +68,25 @@ export const FullNatalCareerAnalysisSchema = z.object({
   next90DaysPlan: z.array(z.string()),
 });
 
+export const MarketCareerPathSchema = z.object({
+  slug: z.string(),
+  title: z.string(),
+  domain: z.string(),
+  fitScore: z.number().min(0).max(100),
+  fitLabel: z.string(),
+  opportunityScore: z.number().min(0).max(100),
+  rationale: z.string(),
+  developmentVector: z.string(),
+  exampleRoles: z.array(z.string()),
+  tags: z.array(z.string()),
+  salaryRangeLabel: z.string().nullable(),
+  marketGradient: z.enum(['high_upside', 'steady_growth', 'stable_floor', 'niche_path', 'limited_data']),
+  marketScoreLabel: z.string().nullable(),
+  demandLabel: z.string().nullable(),
+  sourceRoleTitle: z.string().nullable(),
+  market: z.unknown().nullable(),
+});
+
 export const FullNatalCareerAnalysisResponseSchema = z.object({
   cached: z.boolean(),
   promptVersion: z.string(),
@@ -82,6 +101,16 @@ export const FullNatalCareerAnalysisResponseSchema = z.object({
     })
     .nullable()
     .optional(),
+  marketContext: z
+    .object({
+      algorithmVersion: z.string(),
+      generatedAt: z.string(),
+      location: z.string(),
+      sourceNote: z.string(),
+    })
+    .nullable()
+    .optional(),
+  marketCareerPaths: z.array(MarketCareerPathSchema).optional(),
   analysis: FullNatalCareerAnalysisSchema,
 });
 
@@ -89,6 +118,7 @@ export const DiscoverRolesResponseSchema = z.object({
   algorithmVersion: z.string(),
   cached: z.boolean(),
   generatedAt: z.string(),
+  rankingMode: z.enum(['fit', 'opportunity']).default('fit'),
   query: z.string(),
   recommended: z.array(
     z.object({
@@ -104,6 +134,8 @@ export const DiscoverRolesResponseSchema = z.object({
         code: z.string().nullable(),
         url: z.string().nullable(),
       }),
+      market: z.unknown().nullable().optional(),
+      opportunityScore: z.number().min(0).max(100).optional(),
     })
   ),
   search: z.array(
@@ -115,6 +147,8 @@ export const DiscoverRolesResponseSchema = z.object({
       score: z.number().min(0).max(100).optional(),
       scoreLabel: z.string().optional(),
       scoreStatus: z.enum(['ready', 'deferred']).optional(),
+      market: z.unknown().nullable().optional(),
+      opportunityScore: z.number().min(0).max(100).nullable().optional(),
     })
   ),
   meta: z.object({

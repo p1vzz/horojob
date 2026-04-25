@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { MorningBriefingResponse } from '../services/astrologyApi';
+import type { MorningBriefingResponse } from '../services/astrologyApiCore';
 import {
   DEFAULT_MORNING_BRIEFING_WIDGET_VARIANT,
   isMorningBriefingWidgetVariantId,

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Animated, Easing, Dimensions, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Animated, Easing, Dimensions, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ChevronLeft, Crown, Sparkles, Sun, TrendingUp, Orbit, Bell, CalendarDays, Moon, Shield, Lock } from 'lucide-react-native';
@@ -25,8 +25,15 @@ import {
   type PremiumPackageTypes,
   type PremiumPlan,
 } from './premiumPurchaseScreenCore';
+import { PUBLIC_PRIVACY_POLICY_URL, PUBLIC_TERMS_OF_USE_URL } from '../config/publicSite';
 
 type Plan = PremiumPlan<PurchasesPackage>;
+
+function openExternalUrl(url: string) {
+  return Linking.openURL(url).catch(() => {
+    Alert.alert('Unable to open link', 'Try again in a moment.');
+  });
+}
 
 const FEATURES = [
   {
@@ -1103,6 +1110,21 @@ export const PremiumPurchaseScreen = () => {
                   {isRestoring ? 'Restoring...' : 'Restore Purchases'}
                 </Text>
               </Pressable>
+              <View className="flex-row items-center justify-center mt-3">
+                <Pressable onPress={() => void openExternalUrl(PUBLIC_PRIVACY_POLICY_URL)}>
+                  <Text className="text-[12px]" style={{ color: 'rgba(212,212,224,0.48)' }}>
+                    Privacy Policy
+                  </Text>
+                </Pressable>
+                <Text className="mx-3 text-[12px]" style={{ color: 'rgba(212,212,224,0.2)' }}>
+                  |
+                </Text>
+                <Pressable onPress={() => void openExternalUrl(PUBLIC_TERMS_OF_USE_URL)}>
+                  <Text className="text-[12px]" style={{ color: 'rgba(212,212,224,0.48)' }}>
+                    Terms of Use
+                  </Text>
+                </Pressable>
+              </View>
             </Animated.View>
           </View>
         </ScrollView>
